@@ -228,6 +228,15 @@ describe('Lote F fixes', () => {
     expect(afterRedo.layers).toHaveLength(2);
   });
 
+  it('5b) undoing a layer keeps the renamed kit name on a linked document', async () => {
+    const s = resetStore();
+    const { doc } = await createItem({ name: 'Before', kind: 'design-system', space: 'studio', sessionId: s.id, by: 'user' });
+    addTextLayer(s.id, doc!.id, 'Step 1', { x: 0, y: 0, width: 100 }, {});
+    useStore.setState((st) => ({ sessions: { ...st.sessions, [s.id]: { ...st.sessions[s.id], docs: st.sessions[s.id].docs.map((d) => d.id === doc!.id ? { ...d, name: 'After' } : d) } } }));
+    undoDoc(s.id, doc!.id);
+    expect(getDoc(s.id, doc!.id)).toMatchObject({ name: 'After', layers: [] });
+  });
+
   it('6) restoreItemVersion rejects cycles via validateContent and commitVersion revalidates cycles inside setState', async () => {
     resetStore();
     const { subject: kitB } = await createItem({ name: 'KitB', kind: 'brand-kit', space: 'library', by: 'user', draft: false });
