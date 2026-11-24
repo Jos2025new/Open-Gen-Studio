@@ -10,15 +10,29 @@ import { MEDIA_KINDS, type Asset, type GraphNode } from './types';
 import { addAssets, setComposer, setUi, toast, useStore } from '../store/store';
 import { editCompound } from './nodecore/edit';
 import { clearGenerationPass } from './budget';
+import { libraryAssetOwners } from './libraryGraph';
 
 const get = useStore.getState;
+
+function partitionLibraryAssets(ids: string[]): { deletable: string[]; notify: () => void } {
+  const owners = libraryAssetOwners(get().library);
+  const deletable: string[] = [], usedNames = new Set<string>();
+  let kept = 0;
+  for (const id of ids) {
+    const list = owners.get(id);
+    if (list?.length) { kept++; list.forEach((s) => usedNames.add(s.name)); }
+    else deletable.push(id);
+  }
+  return { deletable, notify: () => { if (kept) toast(`Kept ${kept} asset${kept === 1 ? '' : 's'} used by Library: ${[...usedNames].join(', ')}.`, 'info'); } };
+}
 
 export function deleteGeneration(generationId: string): void {
   clearGenerationPass(generationId, true);
   const g = get().generations[generationId];
   if (!g) return;
-  const assetIds = [...g.assetIds];
-  if (assetsInUse(assetIds)) { toast('A result is in use by a running flow.', 'error'); return; }
+  const { deletable: assetIds, notify } = partitionLibraryAssets([...g.assetIds]);
+  if (assetIds.length && assetsInUse(assetIds)) { toast('A result is in use by a running flow.', 'error'); return; }
+  notify();
   useStore.setState((st) => {
     const { generations, sessions: moved } = dropResults(st, new Set(assetIds));
     delete generations[generationId];
@@ -29,20 +43,23 @@ export function deleteGeneration(generationId: string): void {
     return { generations, assets, sessions, composer: { ...st.composer, attachments: st.composer.attachments.filter((a) => !assetIds.includes(a)) } };
   });
   if (g.sessionId in get().sessions) editCompound(g.sessionId, 'delete generation', (gr) => ({ ...gr, nodes: gr.nodes.map((n) => runsGeneration(n.data) && n.data.generationId === generationId ? { ...n, data: { ...n.data, generationId: undefined } as GraphNode['data'] } : n) }), { silent: true });
-  void deleteAssetBlobs(assetIds);
+  if (assetIds.length) void deleteAssetBlobs(assetIds);
 }
 
 export function deleteAssets(ids: string[]): void {
   if (!ids.length) return;
-  if (assetsInUse(ids)) { toast('An asset is in use by a running flow. Wait for it to finish.', 'error'); return; }
-  const set = new Set(ids);
+  const { deletable, notify } = partitionLibraryAssets(ids);
+  if (deletable.length && assetsInUse(deletable)) { toast('An asset is in use by a running flow. Wait for it to finish.', 'error'); return; }
+  notify();
+  if (!deletable.length) return;
+  const set = new Set(deletable);
   useStore.setState((st) => {
     const assets = { ...st.assets };
-    ids.forEach((id) => delete assets[id]);
+    deletable.forEach((id) => delete assets[id]);
     const { generations, sessions } = dropResults(st, set);
     return { assets, generations, sessions, composer: { ...st.composer, attachments: st.composer.attachments.filter((a) => !set.has(a)) } };
   });
-  void deleteAssetBlobs(ids);
+  void deleteAssetBlobs(deletable);
 }
 
 export function toggleFavorite(assetId: string): void {

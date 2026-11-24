@@ -12,6 +12,7 @@ import { partialRetryCharge } from './retryPartial';
 import { markSendsDone } from './sendMark';
 import { bookDelivered, deliverSend, ledgerCost, usesLedger } from './sendLedger';
 import { generationTicketId, hasActiveTicketSend } from './money/storeBridge';
+import { libraryAssetSet } from './libraryGraph';
 import type { Asset, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, RemoteJob } from './types';
 
 const get = useStore.getState;
@@ -157,7 +158,7 @@ export function purgeDiscarded(id: string): void {
   const g = get().generations[id];
   if (!g?.discard || running.has(id) || g.status === 'running' || g.status === 'queued' || hasPendingSendTrail(g)) return;
   const st = get();
-  const kept = new Set(st.library.flatMap((x) => [x.frontalAssetId, ...x.refAssetIds, x.videoAssetId]));
+  const kept = libraryAssetSet(st.library);
   const ids = Object.values(st.assets).filter((a) => (a.generationId === id || g.assetIds.includes(a.id)) && !kept.has(a.id)).map((a) => a.id);
   useStore.setState((cur) => {
     const generations = { ...cur.generations };

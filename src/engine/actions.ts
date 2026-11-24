@@ -39,6 +39,8 @@ import { keptDrafts } from '../store/homeDrafts';
 import { applyEdit, editCompound } from './nodecore/edit';
 import { deleteAssets } from './assetActions';
 import { COMMAND_REVIEW_CHANGED } from './commands/types';
+import { libraryAssetSet } from './libraryGraph';
+import { mentionableSubjects } from './libraryTypes';
 import { resolveSendPlan, sendFingerprint } from './sendInputs';
 
 export {
@@ -142,7 +144,7 @@ export function checkDirect(kind: MediaKind): DirectCheck {
     if (shots) return { ok: false, reason: `Multi-shot: ${shots}`, estimate };
     const el = schema.slots.elements;
     if (el) {
-      const mentioned = mentionSubjects(text, st.library).ids.length;
+      const mentioned = mentionSubjects(text, mentionableSubjects(st.library)).ids.length;
       if (mentioned > el.max) return { ok: false, reason: `This model takes up to ${el.max} subjects.`, estimate };
     }
     if (!text && !attachments.length && !settings.shots?.length) return { ok: false, reason: 'Write a prompt.', estimate };
@@ -486,7 +488,7 @@ export function deleteSession(sessionId: string): void {
   if (!s) return;
   stopSession(sessionId);
   // Images of library items outlive the session that made them.
-  const kept = new Set(st.library.flatMap((x) => [x.frontalAssetId, ...x.refAssetIds, x.videoAssetId]));
+  const kept = libraryAssetSet(st.library);
   // Running generations are not canceled (the provider may charge anyway): they finish and jobs.purgeDiscarded removes them.
   const active = new Set(Object.values(st.generations).filter((g) => g.sessionId === sessionId && isRunning(g.id)).map((g) => g.id));
   const assetIds = Object.values(st.assets).filter((a) => a.sessionId === sessionId && !kept.has(a.id) && !(a.generationId && active.has(a.generationId))).map((a) => a.id);

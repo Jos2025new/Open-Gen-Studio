@@ -56,8 +56,10 @@ import { createKit, openKit, readKitVersion, restoreKitVersion, saveKit, updateK
 import { createDoc, newRasterLayer, newVectorLayer } from '../src/engine/design/doc';
 import { addDoc } from '../src/engine/design/actions';
 import { deleteSession } from '../src/engine/actions';
+import { deleteAssets, deleteGeneration } from '../src/engine/assetActions';
+import { purgeDiscarded } from '../src/engine/jobState';
 import { createSession, useStore } from '../src/store/store';
-import type { RasterLayer, Subject } from '../src/engine/types';
+import type { Asset, Generation, RasterLayer, Subject } from '../src/engine/types';
 
 async function blobBytes(b: Blob | undefined): Promise<Uint8Array> {
   if (!b) return new Uint8Array();
@@ -307,5 +309,76 @@ describe('Contract 3: versions, pixels, copy, restore, failures, lock, delete', 
     expect(libraryItem('RenamedKit')).toBeUndefined();
     saveSubject({ id: 'sub_classic', name: 'ClassicHero', kind: 'character', refAssetIds: [] });
     expect(libraryItem('ClassicHero')?.id).toBe('sub_classic');
+  });
+});
+
+describe('Contract 4: image protection across deleteSession, purgeDiscarded, deleteAssets, deleteGeneration', () => {
+  const mkAsset = (id: string, sessionId: string, generationId?: string): Asset => ({
+    id, kind: 'image', mime: 'image/png', width: 100, height: 100, sessionId, generationId,
+    origin: 'generated', stored: true, favorite: false, createdAt: 1,
+  });
+
+  it('protects assets from OLD kit versions on deleteSession and purgeDiscarded, and keeps library-used assets with toast on deleteAssets/deleteGeneration', async () => {
+    const s = resetStore();
+    const { subject: kit } = createKit({
+      name: 'BrandKit', kind: 'brand-kit', space: 'studio', sessionId: s.id, by: 'user',
+      pieces: [{ id: 'p1', kind: 'asset', assetId: 'ast_old_v1' }],
+    });
+    await saveKit({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, space: 'studio', by: 'user', label: 'v1' });
+    // Overwrite v2 removing ast_old_v1 from current pieces (now only in v1!)
+    await saveKit({
+      subjectId: kit.id, mode: 'overwrite', sessionId: s.id, space: 'studio', by: 'user', label: 'v2',
+      pieces: [{ id: 'p2', kind: 'asset', assetId: 'ast_v2' }],
+    });
+    saveSubject({ id: 'sub_c', name: 'Hero', kind: 'character', frontalAssetId: 'ast_subj', refAssetIds: [] });
+
+    const gen: Generation = {
+      id: 'gen_1', sessionId: s.id, kind: 'image', prompt: 'p', modelRef: 'm',
+      settings: { count: 1, advanced: {} }, inputs: { refs: [] }, status: 'done',
+      assetIds: ['ast_old_v1', 'ast_free_gen'], origin: 'composer', estimate: { usd: 0, approximate: false }, createdAt: 1,
+    };
+    const discGen: Generation = { ...gen, id: 'gen_disc', discard: true, assetIds: ['ast_old_v1', 'ast_disc_free'] };
+    useStore.setState({
+      assets: {
+        ast_old_v1: mkAsset('ast_old_v1', s.id, 'gen_1'),
+        ast_v2: mkAsset('ast_v2', s.id),
+        ast_subj: mkAsset('ast_subj', s.id),
+        ast_free: mkAsset('ast_free', s.id),
+        ast_free_gen: mkAsset('ast_free_gen', s.id, 'gen_1'),
+        ast_disc_free: mkAsset('ast_disc_free', s.id, 'gen_disc'),
+      },
+      generations: { gen_1: gen, gen_disc: discGen },
+      ui: { ...useStore.getState().ui, toasts: [] },
+    });
+    for (const id of ['ast_old_v1', 'ast_v2', 'ast_subj', 'ast_free', 'ast_free_gen', 'ast_disc_free']) {
+      hoisted.blobs.set(`asset:${id}`, new Blob(['img']));
+    }
+
+    // 1) deleteAssets keeps ast_old_v1 and ast_subj, deletes ast_free, and toasts the entry names
+    deleteAssets(['ast_old_v1', 'ast_subj', 'ast_free']);
+    expect(useStore.getState().assets.ast_old_v1).toBeDefined();
+    expect(useStore.getState().assets.ast_subj).toBeDefined();
+    expect(useStore.getState().assets.ast_free).toBeUndefined();
+    expect(useStore.getState().ui.toasts.some((t) => t.text.includes('BrandKit') && t.text.includes('Hero'))).toBe(true);
+
+    // 2) deleteGeneration keeps ast_old_v1, deletes ast_free_gen, toasts BrandKit
+    useStore.setState((st) => ({ ui: { ...st.ui, toasts: [] } }));
+    deleteGeneration('gen_1');
+    expect(useStore.getState().generations.gen_1).toBeUndefined();
+    expect(useStore.getState().assets.ast_old_v1).toBeDefined();
+    expect(useStore.getState().assets.ast_free_gen).toBeUndefined();
+    expect(useStore.getState().ui.toasts.some((t) => t.text.includes('BrandKit'))).toBe(true);
+
+    // 3) purgeDiscarded keeps ast_old_v1 and deletes ast_disc_free
+    purgeDiscarded('gen_disc');
+    expect(useStore.getState().assets.ast_old_v1).toBeDefined();
+    expect(useStore.getState().assets.ast_disc_free).toBeUndefined();
+
+    // 4) deleteSession keeps ast_old_v1 (OLD version!) and ast_v2 and ast_subj
+    deleteSession(s.id);
+    expect(useStore.getState().assets.ast_old_v1).toBeDefined();
+    expect(useStore.getState().assets.ast_v2).toBeDefined();
+    expect(useStore.getState().assets.ast_subj).toBeDefined();
+    expect(hoisted.blobs.has('asset:ast_old_v1')).toBe(true);
   });
 });
