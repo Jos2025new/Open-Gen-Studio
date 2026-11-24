@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { LucideIcon } from '../ui/icons';
 import {
   ArrowLeft,
@@ -6,6 +6,7 @@ import {
   AudioLines,
   Image as ImageIcon,
   ChevronDown,
+  ChevronLeft,
   Brush,
   Eraser,
   Clapperboard,
@@ -19,10 +20,12 @@ import {
   Frame,
   Grid3x3,
   IdCard,
+  Images,
   LayoutGrid,
   Maximize,
   Paperclip,
   PenTool,
+  Plus,
   Rotate3d,
   Scissors,
   Send,
@@ -38,10 +41,12 @@ import {
 } from '../ui/icons';
 import { OPS, opsFor } from '../../engine/ops';
 import { downloadAsset, libraryItem, saveSheetViews, sendToNodes, SUBJECT_KINDS, subjectFromAsset, toggleFavorite, addAsReference } from '../../engine/actions';
+import { createItem, saveItem } from '../../engine/libraryVersions';
+import { uid } from '../../lib/id';
 import { beginAssetEdit } from '../../engine/assetRevisions';
 import { openAssetInDesigner } from '../../engine/design/actions';
-import type { OpId, SubjectKind } from '../../engine/types';
-import { setUi, useStore } from '../../store/store';
+import type { Graph, OpId, Subject, SubjectKind } from '../../engine/types';
+import { setUi, toast, useStore } from '../../store/store';
 import { Popover, usePopover } from '../ui/Popover';
 import { Button, Chip, IconButton, MenuItem, Segmented } from '../ui/primitives';
 import { DOCK_GROUP_LABEL, DOCK_GROUP_ORDER, opGroup, type OpGroupId } from './opGroups';
@@ -231,11 +236,11 @@ export function AssetActions({ assetId, parentId, compact = false, menuOnly = fa
 
 /** Where else an asset can go: Designer, the composer (reference), the subject library, the Node canvas. */
 export function SendToMenu({ assetId, size = 'sm' }: { assetId: string; size?: 'sm' | 'md' }) {
-  const asset = useStore((s) => s.assets[assetId]);
-  const sessionId = useStore((s) => s.activeSessionId);
+  const asset = useStore((s) => s.assets[assetId]), sessionId = useStore((s) => s.activeSessionId);
+  const library = useStore((s) => s.library), workspace = useStore((s) => s.ui.workspace);
   const pop = usePopover();
-  const [subject, setSubject] = useState(false);
-  const [styleForm, setStyleForm] = useState(false);
+  const [subject, setSubject] = useState(false), [styleForm, setStyleForm] = useState(false);
+  const [mood, setMood] = useState(false), [moodBusy, setMoodBusy] = useState(false), moodRef = useRef(false);
   const [subjectName, setSubjectName] = useState('');
   const [subjectKind, setSubjectKind] = useState<SubjectKind>('character');
   // A reference sheet can be saved as its four views (Grid-split); on by default for sheets only.
@@ -246,26 +251,37 @@ export function SendToMenu({ assetId, size = 'sm' }: { assetId: string; size?: '
   const [split, setSplit] = useState(true);
   const taken = subjectName.trim() ? libraryItem(subjectName) : undefined;
   if (!asset) return null;
-  const close = () => {
-    pop.close();
-    setSubject(false);
-    setStyleForm(false);
+  const moodboards = library.filter((s) => s.kind === 'moodboard' && !s.userHidden);
+  const close = () => { pop.close(); setSubject(false); setStyleForm(false); setMood(false); };
+  const addToMoodboard = async (target?: Subject) => {
+    if (moodRef.current) return;
+    moodRef.current = true; setMoodBusy(true);
+    try {
+      const space = workspace === 'chat' ? 'studio' : workspace === 'node' ? 'nodes' : 'designer';
+      const node = { id: uid('nd'), position: { x: 0, y: 0 }, data: { kind: 'asset' as const, title: asset.name || 'Image', assetId } };
+      if (target) {
+        const prev = target.graph ?? { nodes: [], edges: [] };
+        await saveItem({ subjectId: target.id, mode: 'overwrite', space, by: 'user', sessionId, graph: { ...prev, nodes: [...prev.nodes, node] } as Graph });
+        toast(`Added to "${target.name}".`, 'success');
+      } else {
+        const name = `Moodboard ${moodboards.length + 1}`;
+        await createItem({ name, kind: 'moodboard', space, by: 'user', sessionId, graph: { nodes: [node], edges: [] }, draft: false, open: false });
+        toast(`Added to "${name}".`, 'success');
+      }
+      close();
+    } catch (e) { toast((e as Error).message, 'error'); } finally { moodRef.current = false; setMoodBusy(false); }
   };
   return (
     <>
-      <IconButton
-        ref={pop.ref}
-        icon={Send}
-        label="Send to"
-        size={size}
-        active={pop.open}
-        onClick={() => {
-          setSubject(false);
-          pop.toggle();
-        }}
-      />
+      <IconButton ref={pop.ref} icon={Send} label="Send to" size={size} active={pop.open} onClick={() => { setSubject(false); setMood(false); pop.toggle(); }} />
       <Popover open={pop.open} anchor={pop.ref} onClose={close} width={subject || styleForm ? 320 : 240} label="Send to">
-        {styleForm ? (
+        {mood ? (
+          <div className="menu">
+            <MenuItem icon={ChevronLeft} label="Add to moodboard" onClick={() => setMood(false)} />
+            {moodboards.map((m) => <MenuItem key={m.id} icon={Images} label={m.name} disabled={moodBusy} onClick={() => void addToMoodboard(m)} />)}
+            <MenuItem icon={Plus} label="New moodboard" disabled={moodBusy} onClick={() => void addToMoodboard()} />
+          </div>
+        ) : styleForm ? (
           <SaveStyleForm assetId={assetId} onDone={close} />
         ) : subject ? (
           <form
@@ -320,6 +336,7 @@ export function SendToMenu({ assetId, size = 'sm' }: { assetId: string; size?: '
                   }}
                 />
                 <MenuItem icon={UserPlus} label="Save to library" tip="Keep this character, object, product or style as @Name" onClick={() => setSubject(true)} />
+                <MenuItem icon={Images} label="Add to moodboard" onClick={() => setMood(true)} />
               </>
             ) : null}
             {asset.kind !== 'audio' && asset.kind !== 'model3d' && captureOfAsset(assetId) ? <MenuItem icon={Camera} label="Guardar como estilo" tip="Guarda la cámara, el tono, la luz y la textura de este resultado" onClick={() => setStyleForm(true)} /> : null}
