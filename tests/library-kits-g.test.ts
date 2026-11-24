@@ -135,6 +135,9 @@ describe('Lote G fixes', () => {
     // Add C to moodboard (new version) and reopen: brings ONLY C, does NOT resurrect A
     const v2 = await saveItem({ subjectId: mb.id, mode: 'overwrite', space: 'library', by: 'user', graph: { nodes: [nA, nB, nC], edges: [] } });
     const afterAddC = await libraryToDesigner(s.id, mb.id);
+    const addedC = afterAddC.layers.find((l) => 'sourceAssetId' in l && l.sourceAssetId === 'c') as { x: number; y: number; width: number; height: number };
+    expect(addedC.width <= afterAddC.width / 3 + 1 && addedC.height <= afterAddC.height / 3 + 1).toBe(true);
+    expect(addedC.x >= 0 && addedC.x + addedC.width <= afterAddC.width).toBe(true);
     expect(afterAddC.id).toBe(doc1.id);
     expect(rasterSources(afterAddC)).toEqual(['b', 'c']);
     expect(afterAddC.library?.versionId).toBe(v2.versionId);
