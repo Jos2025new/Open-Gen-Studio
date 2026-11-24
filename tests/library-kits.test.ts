@@ -226,7 +226,7 @@ describe('Contract 3: versions, pixels, copy, restore, failures, lock, delete', 
     const s2 = useStore.getState().activeSessionId;
     const openedStudio = await openKit(kit.id, { sessionId: s2, space: 'studio' });
     expect(openedStudio.library).toMatchObject({ subjectId: kit.id, versionId: v3.versionId, view: 'studio' });
-    expect(openedStudio.library?.linkedAt).toBe(openedStudio.updatedAt);
+    expect(openedStudio.library?.docRev).toBe(v3.docRev);
     expect(await blobBytes(hoisted.blobs.get(`raster:${openedStudio.layers[0].id}`))).toEqual(bytesHeroV1);
     const reopenedDesigner = await openKit(kit.id, { sessionId: s2, space: 'designer' });
     expect(reopenedDesigner.id).toBe(openedStudio.id);
@@ -251,7 +251,7 @@ describe('Contract 3: versions, pixels, copy, restore, failures, lock, delete', 
     expect(copySnap!.doc!.layers[0].id).not.toBe(origSnap!.doc!.layers[0].id);
 
     // Edit working doc locally so delete detaches it with its pixels instead of removing an unchanged copy
-    setDoc(s.id, doc.id, (d) => touch(d));
+    setDoc(s.id, doc.id, (d) => touch({ ...d, background: '#123456' }));
     // Delete original -> copy keeps its pixels, modified working doc keeps its pixels and loses library link
     deleteSubject(orig.id);
     await waitKitQueue(orig.id);

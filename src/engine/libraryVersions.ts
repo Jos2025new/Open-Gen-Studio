@@ -3,7 +3,7 @@ import { blobDb } from '../lib/idb';
 import { setDoc, useStore } from '../store/store';
 import { addDoc, deleteDoc, getDoc, selectDoc } from './design/actions';
 import * as D from './design/doc';
-import { flushRaster, isUnreadable, rasterBufferIds } from './design/raster';
+import { flushRaster, isUnreadable, pendingRaster, rasterBufferIds } from './design/raster';
 import { wouldCreateKitCycle } from './libraryGraph';
 import { isKit, type KitActor, type KitKind, type KitLink, type KitPiece, type KitTokens, type KitVersionRef, type LibrarySpace } from './libraryTypes';
 import type { DesignDoc, Layer, Subject } from './types';
@@ -13,14 +13,13 @@ import type { DesignDoc, Layer, Subject } from './types';
 export interface KitVersionSnapshot {
   id: string; subjectId: string; at: number; by: KitActor; space: LibrarySpace;
   label?: string; pieces: KitPiece[]; links: KitLink[]; tokens?: KitTokens; doc?: DesignDoc;
-  storedRasterIds?: string[];
+  docRev?: string; storedRasterIds?: string[];
 }
 
 const get = useStore.getState;
 const rKey = (id: string) => `raster:${id}`;
 const vKey = (id: string) => `libver:${id}`;
 const queues = new Map<string, Promise<void>>();
-const freshStamp = () => Date.now() - 1;
 const cleanupKeys = (keys: readonly string[]) => (keys.length ? blobDb.delMany([...new Set(keys)]).catch(() => undefined) : Promise.resolve());
 
 function serialize<T>(id: string, fn: () => Promise<T>): Promise<T> {
@@ -80,7 +79,7 @@ function expectedRasterIds(snap: KitVersionSnapshot): Set<string> {
   return snap.storedRasterIds !== undefined ? new Set([...snap.storedRasterIds, ...baseIds]) : new Set(rasterBufferIds(snap.doc.layers));
 }
 
-function remapDoc(doc: DesignDoc, map: ReadonlyMap<string, string>, opts: { newDocId: boolean; library?: DesignDoc['library']; stamp?: number }): DesignDoc {
+function remapDoc(doc: DesignDoc, map: ReadonlyMap<string, string>, opts: { newDocId: boolean; library?: DesignDoc['library'] }): DesignDoc {
   const { library: _drop, ...rest } = structuredClone(doc);
   const remap = (id: string) => map.get(id) ?? id;
   const layers: Layer[] = rest.layers.map((l) => {
@@ -91,8 +90,12 @@ function remapDoc(doc: DesignDoc, map: ReadonlyMap<string, string>, opts: { newD
     }
     return l;
   });
-  const times = opts.stamp !== undefined ? { createdAt: opts.stamp, updatedAt: opts.stamp } : {};
-  return { ...rest, ...times, id: opts.newDocId ? uid('doc') : rest.id, layers, activeLayerId: rest.activeLayerId ? remap(rest.activeLayerId) : null, ...(opts.library ? { library: opts.library } : {}) };
+  const groups = rest.groups?.map((g) => ({
+    ...g,
+    ...(g.keptHidden ? { keptHidden: g.keptHidden.map(remap) } : {}),
+    ...(g.keptLocked ? { keptLocked: g.keptLocked.map(remap) } : {}),
+  }));
+  return { ...rest, ...(groups ? { groups } : {}), id: opts.newDocId ? uid('doc') : rest.id, layers, activeLayerId: rest.activeLayerId ? remap(rest.activeLayerId) : null, ...(opts.library ? { library: opts.library } : {}) };
 }
 
 async function copyDocPixels(doc: DesignDoc, reuseFrom: DesignDoc | null | undefined, expectedIds: ReadonlySet<string> | undefined, written: string[]): Promise<{ map: Map<string, string>; storedIds: string[] }> {
@@ -168,17 +171,80 @@ async function writeSnapshot(snap: KitVersionSnapshot, written: string[]): Promi
   await writeVerified(vKey(snap.id), new Blob([encoded], { type: 'application/json' }), encoded, written);
 }
 
-const isWorkingCopyDirty = (doc: DesignDoc): boolean => doc.library?.linkedAt === undefined || doc.updatedAt !== doc.library.linkedAt;
+function canonicalJson(v: unknown): string {
+  if (v === null || typeof v !== 'object') return JSON.stringify(v);
+  if (Array.isArray(v)) return `[${v.map(canonicalJson).join(',')}]`;
+  const entries = Object.entries(v as Record<string, unknown>).filter(([, val]) => val !== undefined).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return `{${entries.map(([k, val]) => `${JSON.stringify(k)}:${canonicalJson(val)}`).join(',')}}`;
+}
+
+function docFingerprint(doc: DesignDoc): { json: string; pixelIds: string[] } {
+  const map = new Map<string, string>(), pixelIds: string[] = [];
+  doc.layers.forEach((l, i) => {
+    if (l.type === 'raster') {
+      map.set(l.id, `@r${i}`); pixelIds.push(l.id);
+      if (l.paintBaseId) { map.set(l.paintBaseId, `@b${i}`); pixelIds.push(l.paintBaseId); }
+    } else if (l.type === 'vector' && l.pixelMask) {
+      map.set(l.pixelMask.id, `@m${i}`); pixelIds.push(l.pixelMask.id);
+      if (l.pixelMask.paintBaseId) { map.set(l.pixelMask.paintBaseId, `@mb${i}`); pixelIds.push(l.pixelMask.paintBaseId); }
+    }
+  });
+  const norm = remapDoc(doc, map, { newDocId: false });
+  const { id: _i, createdAt: _c, updatedAt: _u, library: _l, lastExport: _e, activeLayerId: _a, groups, guides, ...rest } = norm;
+  const clean = {
+    ...rest,
+    ...(groups?.length ? { groups } : {}),
+    ...(guides && (guides.x.length || guides.y.length) ? { guides } : {}),
+  };
+  return { json: canonicalJson(clean), pixelIds };
+}
+
+async function sameDocContent(workDoc: DesignDoc, baseDoc: DesignDoc, baseSnap: KitVersionSnapshot): Promise<boolean> {
+  const a = docFingerprint(workDoc), b = docFingerprint(baseDoc);
+  if (a.json !== b.json || a.pixelIds.length !== b.pixelIds.length) return false;
+  const expected = expectedRasterIds(baseSnap);
+  for (let i = 0; i < a.pixelIds.length; i++) {
+    const wId = a.pixelIds[i], bId = b.pixelIds[i];
+    const [wBlob, bBlob] = await Promise.all([blobDb.get(rKey(wId)), blobDb.get(rKey(bId))]);
+    if (expected.has(bId) && !bBlob) return false;
+    if (!wBlob && !bBlob) continue;
+    if (!wBlob || !bBlob) return false;
+    if (!sameBytes(new Uint8Array(await wBlob.arrayBuffer()), new Uint8Array(await bBlob.arrayBuffer()))) return false;
+  }
+  return true;
+}
+
+function isBlankWorkingDoc(doc: DesignDoc, expectedName?: string): boolean {
+  return doc.layers.length === 0 && !(doc.groups?.length) && !(doc.guides && (doc.guides.x.length || doc.guides.y.length))
+    && doc.background === null && doc.width === 1080 && doc.height === 1080
+    && (expectedName === undefined || doc.name === expectedName);
+}
+
+async function isWorkingCopyDirty(doc: DesignDoc): Promise<boolean> {
+  if (!doc.library) return true;
+  const pending = new Set(pendingRaster());
+  for (const rid of rasterBufferIds(doc.layers)) if (pending.has(rid) || isUnreadable(rid)) return true;
+  const sub = get().library.find((s) => s.id === doc.library!.subjectId);
+  if (!doc.library.versionId) return !isBlankWorkingDoc(doc, sub?.name);
+  try {
+    const snap = await readKitVersion(doc.library.versionId);
+    if (!snap) return true;
+    if (!snap.doc) return !isBlankWorkingDoc(doc, sub?.name);
+    return !(await sameDocContent(doc, snap.doc, snap));
+  } catch {
+    return true;
+  }
+}
+
 const detachedName = (name: string): string => (name.endsWith(' (local copy)') ? name : `${name} (local copy)`);
 
-function reconcileWorkingDoc(sessionId: string, doc: DesignDoc): void {
-  if (!isWorkingCopyDirty(doc)) deleteDoc(sessionId, doc.id);
+async function reconcileWorkingDoc(sessionId: string, doc: DesignDoc): Promise<void> {
+  if (!(await isWorkingCopyDirty(doc))) deleteDoc(sessionId, doc.id);
   else setDoc(sessionId, doc.id, (d) => { const { library: _drop, ...rest } = d; return { ...rest, name: detachedName(d.name) }; });
 }
 
-function linkedBlankDoc(name: string, subjectId: string, versionId: string, view?: 'studio'): DesignDoc {
-  const stamp = freshStamp();
-  return { ...D.createDoc(name, 1080, 1080, null), createdAt: stamp, updatedAt: stamp, library: { subjectId, versionId, linkedAt: stamp, ...(view ? { view } : {}) } };
+function linkedBlankDoc(name: string, subjectId: string, versionId: string, docRev?: string, view?: 'studio'): DesignDoc {
+  return { ...D.createDoc(name, 1080, 1080, null), library: { subjectId, versionId, ...(docRev ? { docRev } : {}), ...(view ? { view } : {}) } };
 }
 
 export async function createKit(opts: {
@@ -212,7 +278,7 @@ export async function createKit(opts: {
   }
   useStore.setState((st) => ({ library: [...st.library, subject] }));
   if (session && opts.space === 'studio') {
-    const doc = linkedBlankDoc(name, id, subject.versionId ?? '', 'studio');
+    const doc = linkedBlankDoc(name, id, subject.versionId ?? '', subject.docRev, 'studio');
     addDoc(session.id, doc);
     return { subject, doc };
   }
@@ -224,6 +290,8 @@ export async function updateKit(id: string, patch: {
   by?: KitActor; space?: LibrarySpace; label?: string;
 }): Promise<Subject> {
   const versioned = patch.pieces !== undefined || patch.links !== undefined || patch.tokens !== undefined;
+  const by = patch.by ?? 'user';
+  const clearsDraft = patch.name !== undefined && by === 'user';
   if (!versioned) {
     let result: Subject | null = null;
     useStore.setState((st) => {
@@ -231,7 +299,7 @@ export async function updateKit(id: string, patch: {
       if (!cur || !isKit(cur)) return {};
       const name = patch.name !== undefined ? patch.name.trim() : cur.name;
       if (!name) throw new Error('Kit name cannot be empty.');
-      result = { ...cur, name, ...(patch.description !== undefined ? { description: patch.description } : {}), origin: cur.origin };
+      result = { ...cur, name, ...(patch.description !== undefined ? { description: patch.description } : {}), draft: clearsDraft ? false : cur.draft, origin: cur.origin };
       return { library: st.library.map((x) => (x.id === id ? result! : x)) };
     });
     if (!result) throw new Error(`No kit "${id}".`);
@@ -245,14 +313,15 @@ export async function updateKit(id: string, patch: {
     validateGraph(id, pieces, links, patch.pieces !== undefined);
     const prevSnap = cur.versionId ? await readKitVersion(cur.versionId) : null;
     if (cur.versionId && !prevSnap) throw new Error(`Cannot update kit "${id}": current version "${cur.versionId}" blob is missing.`);
-    const written: string[] = [], verId = uid('lv'), at = Date.now(), by = patch.by ?? 'user', space = patch.space ?? 'library';
+    const docRev = prevSnap?.doc ? (prevSnap.docRev ?? cur.docRev) : undefined;
+    const written: string[] = [], verId = uid('lv'), at = Date.now(), space = patch.space ?? 'library';
     try {
       await writeSnapshot({
         id: verId, subjectId: id, at, by, space, ...(patch.label ? { label: patch.label } : {}),
         pieces, links, ...(tokens ? { tokens } : {}),
-        ...(prevSnap?.doc ? { doc: prevSnap.doc, ...(prevSnap.storedRasterIds ? { storedRasterIds: prevSnap.storedRasterIds } : {}) } : {}),
+        ...(prevSnap?.doc ? { doc: prevSnap.doc, ...(docRev ? { docRev } : {}), ...(prevSnap.storedRasterIds ? { storedRasterIds: prevSnap.storedRasterIds } : {}) } : {}),
       }, written);
-      const ref: KitVersionRef = { id: verId, at, by, space, ...(patch.label ? { label: patch.label } : {}), assetIds: snapshotAssets(cur, pieces, prevSnap?.doc) };
+      const ref: KitVersionRef = { id: verId, at, by, space, ...(patch.label ? { label: patch.label } : {}), assetIds: snapshotAssets(cur, pieces, prevSnap?.doc), ...(docRev ? { docRev } : {}) };
       let next: Subject | null = null;
       useStore.setState((st) => {
         const live = st.library.find((x) => x.id === id);
@@ -261,7 +330,7 @@ export async function updateKit(id: string, patch: {
           ...live, name: patch.name !== undefined ? name : live.name,
           ...(patch.description !== undefined ? { description: patch.description } : {}),
           pieces, links, ...(patch.tokens !== undefined ? { tokens } : {}),
-          draft: false, versionId: verId, versions: [...(live.versions ?? []), ref], origin: live.origin,
+          draft: clearsDraft ? false : live.draft, versionId: verId, ...(docRev ? { docRev } : { docRev: undefined }), versions: [...(live.versions ?? []), ref], origin: live.origin,
         };
         return { library: st.library.map((x) => (x.id === id ? next! : x)) };
       });
@@ -278,10 +347,10 @@ export function openKit(subjectId: string, opts: { sessionId?: string; space: 's
   return serialize(subjectId, async () => {
     const subject = requireKit(subjectId), sessionId = opts.sessionId ?? get().activeSessionId, session = get().sessions[sessionId];
     if (!session) throw new Error(`No session "${sessionId}".`);
-    const curVer = subject.versionId ?? '', existing = session.docs.find((d) => d.library?.subjectId === subjectId);
-    if (existing && existing.library?.versionId === curVer) {
+    const curVer = subject.versionId ?? '', curDocRev = subject.docRev ?? '', existing = session.docs.find((d) => d.library?.subjectId === subjectId);
+    if (existing && (existing.library?.docRev ?? '') === curDocRev) {
       if (opts.space === 'designer' && existing.library?.view) {
-        setDoc(sessionId, existing.id, (d) => ({ ...d, library: d.library ? { subjectId: d.library.subjectId, versionId: d.library.versionId, ...(d.library.linkedAt !== undefined ? { linkedAt: d.library.linkedAt } : {}) } : undefined }));
+        setDoc(sessionId, existing.id, (d) => ({ ...d, library: d.library ? { subjectId: d.library.subjectId, versionId: d.library.versionId, ...(d.library.docRev ? { docRev: d.library.docRev } : {}) } : undefined }));
       }
       selectDoc(sessionId, existing.id);
       return getDoc(sessionId, existing.id) ?? existing;
@@ -290,13 +359,13 @@ export function openKit(subjectId: string, opts: { sessionId?: string; space: 's
     if (curVer && !snap) throw new Error(`Version "${curVer}" blob is missing.`);
     const written: string[] = [];
     try {
-      const stamp = freshStamp();
-      const link: NonNullable<DesignDoc['library']> = { subjectId, versionId: curVer, linkedAt: stamp, ...(opts.space === 'studio' ? { view: 'studio' as const } : {}) };
+      const docRev = snap?.doc ? (snap.docRev ?? subject.docRev) : undefined;
+      const link: NonNullable<DesignDoc['library']> = { subjectId, versionId: curVer, ...(docRev ? { docRev } : {}), ...(opts.space === 'studio' ? { view: 'studio' as const } : {}) };
       const doc = snap?.doc
-        ? remapDoc(snap.doc, (await copyDocPixels(snap.doc, null, expectedRasterIds(snap), written)).map, { newDocId: true, library: link, stamp })
-        : linkedBlankDoc(subject.name, subjectId, curVer, opts.space === 'studio' ? 'studio' : undefined);
+        ? remapDoc(snap.doc, (await copyDocPixels(snap.doc, null, expectedRasterIds(snap), written)).map, { newDocId: true, library: link })
+        : linkedBlankDoc(subject.name, subjectId, curVer, docRev, opts.space === 'studio' ? 'studio' : undefined);
       const liveExisting = get().sessions[sessionId]?.docs.find((d) => d.id === existing?.id && d.library?.subjectId === subjectId);
-      if (liveExisting) reconcileWorkingDoc(sessionId, liveExisting);
+      if (liveExisting) await reconcileWorkingDoc(sessionId, liveExisting);
       addDoc(sessionId, doc);
       return doc;
     } catch (err) {
@@ -318,32 +387,35 @@ export function saveKit(opts: {
     const session = opts.sessionId ? get().sessions[opts.sessionId] : undefined;
     const workDoc = opts.docId ? (opts.sessionId ? getDoc(opts.sessionId, opts.docId) : undefined) : session?.docs.find((d) => d.library?.subjectId === cur.id);
     if (opts.docId && !workDoc) throw new Error(`No document "${opts.docId}".`);
-    const workUpdatedAt = workDoc?.updatedAt;
     const prevSnap = cur.versionId ? (workDoc ? await readKitVersion(cur.versionId).catch(() => null) : await readKitVersion(cur.versionId)) : null;
     if (!workDoc && cur.versionId && !prevSnap) throw new Error(`Cannot save kit "${cur.id}": current version "${cur.versionId}" blob is missing.`);
     const written: string[] = [];
     try {
-      let storedDoc: DesignDoc | undefined, storedRasterIds: string[] | undefined;
+      let storedDoc: DesignDoc | undefined, storedRasterIds: string[] | undefined, docRev: string | undefined;
       if (workDoc) {
         await flushRaster();
+        const unchanged = opts.mode === 'overwrite' && Boolean(prevSnap?.doc) && await sameDocContent(workDoc, prevSnap!.doc!, prevSnap!);
         const copied = await copyDocPixels(workDoc, opts.mode === 'overwrite' ? prevSnap?.doc : null, undefined, written);
         storedDoc = remapDoc(workDoc, copied.map, { newDocId: false });
         storedRasterIds = copied.storedIds;
+        docRev = unchanged ? (prevSnap!.docRev ?? cur.docRev ?? uid('drev')) : uid('drev');
       } else if (prevSnap?.doc) {
         const expected = expectedRasterIds(prevSnap);
         if (opts.mode === 'overwrite') {
           for (const rid of expected) if (!(await blobDb.get(rKey(rid)))) throw new Error(`Missing expected pixel blob "${rKey(rid)}".`);
           storedDoc = prevSnap.doc;
           storedRasterIds = prevSnap.storedRasterIds ?? rasterBufferIds(prevSnap.doc.layers);
+          docRev = prevSnap.docRev ?? cur.docRev ?? uid('drev');
         } else {
           const copied = await copyDocPixels(prevSnap.doc, null, expected, written);
           storedDoc = remapDoc(prevSnap.doc, copied.map, { newDocId: false });
           storedRasterIds = copied.storedIds;
+          docRev = uid('drev');
         }
       }
       const verId = uid('lv'), at = Date.now();
-      await writeSnapshot({ id: verId, subjectId: targetId, at, by: opts.by, space: opts.space, ...(opts.label ? { label: opts.label } : {}), pieces, links, ...(tokens ? { tokens } : {}), ...(storedDoc ? { doc: storedDoc, ...(storedRasterIds ? { storedRasterIds } : {}) } : {}) }, written);
-      const ref: KitVersionRef = { id: verId, at, by: opts.by, space: opts.space, ...(opts.label ? { label: opts.label } : {}), assetIds: snapshotAssets(cur, pieces, storedDoc) };
+      await writeSnapshot({ id: verId, subjectId: targetId, at, by: opts.by, space: opts.space, ...(opts.label ? { label: opts.label } : {}), pieces, links, ...(tokens ? { tokens } : {}), ...(storedDoc ? { doc: storedDoc, ...(docRev ? { docRev } : {}), ...(storedRasterIds ? { storedRasterIds } : {}) } : {}) }, written);
+      const ref: KitVersionRef = { id: verId, at, by: opts.by, space: opts.space, ...(opts.label ? { label: opts.label } : {}), assetIds: snapshotAssets(cur, pieces, storedDoc), ...(docRev ? { docRev } : {}) };
       let saved: Subject | null = null;
       useStore.setState((st) => {
         const live = st.library.find((x) => x.id === cur.id);
@@ -352,7 +424,7 @@ export function saveKit(opts: {
           saved = {
             id: targetId, name: opts.name?.trim() || `${live.name} copy`, kind: live.kind, refAssetIds: [], pieces, links,
             ...(live.description ? { description: live.description } : {}), ...(tokens ? { tokens } : {}),
-            copiedFrom: live.id, draft: false, versionId: verId, versions: [ref],
+            copiedFrom: live.id, draft: opts.by === 'user' ? false : Boolean(live.draft), versionId: verId, ...(docRev ? { docRev } : {}), versions: [ref],
             origin: { space: opts.space, by: opts.by, at, ...(session ? { sessionId: session.id, sessionTitle: session.title } : {}) },
           };
           return { library: [...st.library, saved] };
@@ -362,7 +434,7 @@ export function saveKit(opts: {
           pieces: opts.pieces !== undefined ? pieces : live.pieces,
           links: opts.links !== undefined ? links : live.links,
           ...(opts.tokens !== undefined ? { tokens } : {}),
-          draft: false, versionId: verId, versions: [...(live.versions ?? []), ref], origin: live.origin,
+          draft: opts.by === 'user' ? false : live.draft, versionId: verId, ...(docRev ? { docRev } : { docRev: undefined }), versions: [...(live.versions ?? []), ref], origin: live.origin,
         };
         return { library: st.library.map((x) => (x.id === cur.id ? saved! : x)) };
       });
@@ -370,11 +442,7 @@ export function saveKit(opts: {
       if (opts.mode === 'overwrite' && workDoc && opts.sessionId && workDoc.library?.subjectId === cur.id) {
         setDoc(opts.sessionId, workDoc.id, (d) => {
           if (!d.library || d.library.subjectId !== cur.id) return d;
-          if (d.updatedAt === workUpdatedAt) {
-            const stamp = Math.min(d.updatedAt, freshStamp());
-            return { ...d, createdAt: Math.min(d.createdAt, stamp), updatedAt: stamp, library: { ...d.library, versionId: verId, linkedAt: stamp } };
-          }
-          return { ...d, library: { ...d.library, versionId: verId, linkedAt: workUpdatedAt } };
+          return { ...d, library: { ...d.library, versionId: verId, ...(docRev ? { docRev } : {}) } };
         });
       }
       return saved;
@@ -390,15 +458,16 @@ export function restoreKitVersion(opts: { subjectId: string; versionId: string; 
     const cur = requireKit(opts.subjectId), snap = await readKitVersion(opts.versionId);
     if (!snap) throw new Error(`Version "${opts.versionId}" blob is missing and cannot be restored.`);
     if (snap.doc) for (const id of expectedRasterIds(snap)) if (!(await blobDb.get(rKey(id)))) throw new Error(`Cannot restore version "${opts.versionId}": missing pixel blob "${rKey(id)}".`);
+    const docRev = snap.doc ? (snap.docRev ?? uid('drev')) : undefined;
     const written: string[] = [], verId = uid('lv'), at = Date.now(), label = opts.label ?? `Restore ${opts.versionId}`;
     try {
-      await writeSnapshot({ ...snap, id: verId, subjectId: cur.id, at, by: opts.by, space: opts.space, label }, written);
-      const ref: KitVersionRef = { id: verId, at, by: opts.by, space: opts.space, label, assetIds: snapshotAssets(cur, snap.pieces, snap.doc) };
+      await writeSnapshot({ ...snap, id: verId, subjectId: cur.id, at, by: opts.by, space: opts.space, label, ...(docRev ? { docRev } : { docRev: undefined }) }, written);
+      const ref: KitVersionRef = { id: verId, at, by: opts.by, space: opts.space, label, assetIds: snapshotAssets(cur, snap.pieces, snap.doc), ...(docRev ? { docRev } : {}) };
       let restored: Subject | null = null;
       useStore.setState((st) => {
         const live = st.library.find((x) => x.id === cur.id);
         if (!live || !isKit(live)) return {};
-        restored = { ...live, pieces: snap.pieces, links: snap.links, tokens: snap.tokens, draft: false, versionId: verId, versions: [...(live.versions ?? []), ref], origin: live.origin };
+        restored = { ...live, pieces: snap.pieces, links: snap.links, tokens: snap.tokens, draft: opts.by === 'user' ? false : live.draft, versionId: verId, ...(docRev ? { docRev } : { docRev: undefined }), versions: [...(live.versions ?? []), ref], origin: live.origin };
         return { library: st.library.map((x) => (x.id === cur.id ? restored! : x)) };
       });
       if (!restored) throw new Error(`Kit "${cur.id}" was deleted while restoring.`);
@@ -415,7 +484,7 @@ export function deleteKit(id: string): Promise<void> {
     const live = get().library.find((s) => s.id === id);
     if (!live || !isKit(live)) return;
     for (const [sid, s] of Object.entries(get().sessions)) {
-      for (const d of [...s.docs]) if (d.library?.subjectId === id) reconcileWorkingDoc(sid, d);
+      for (const d of [...s.docs]) if (d.library?.subjectId === id) await reconcileWorkingDoc(sid, d);
     }
     useStore.setState((st) => ({ library: st.library.filter((x) => x.id !== id) }));
     const verIds = [...new Set([...(live.versions ?? []).map((v) => v.id), ...(live.versionId ? [live.versionId] : [])])];

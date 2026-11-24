@@ -15,7 +15,7 @@ export interface KitTokens {
   radii?: Record<string, number | string>;
 }
 export interface KitOrigin { space: LibrarySpace; sessionId?: string; sessionTitle?: string; by: KitActor; from?: string[]; at: number; }
-export interface KitVersionRef { id: string; at: number; by: KitActor; space: LibrarySpace; label?: string; assetIds: string[]; }
+export interface KitVersionRef { id: string; at: number; by: KitActor; space: LibrarySpace; label?: string; assetIds: string[]; docRev?: string; }
 
 export interface LibraryKitFields {
   pieces?: KitPiece[];
@@ -26,6 +26,7 @@ export interface LibraryKitFields {
   copiedFrom?: string;
   draft?: boolean;
   versionId?: string;
+  docRev?: string;
   versions?: KitVersionRef[];
 }
 
