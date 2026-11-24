@@ -1,4 +1,4 @@
-import { expect, it, vi } from 'vitest';
+import { expect, it } from 'vitest';
 import { asset, graphOf, hoisted, mkAsset, notesOf, putImageBlob, resetStore, text, tool } from './library-kits-final-fixtures';
 import { createItem, libraryToDesigner, readKitVersion, restoreItemVersion, saveItem } from '../src/engine/libraryVersions';
 import { addTextLayer, getDoc, undoDoc } from '../src/engine/design/actions';

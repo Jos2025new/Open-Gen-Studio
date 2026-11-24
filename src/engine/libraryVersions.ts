@@ -121,9 +121,8 @@ function graphImageRevs(graph: Graph | undefined): Record<string, number> {
   const assets = get().assets;
   return Object.fromEntries((graph?.nodes ?? []).flatMap(({ data }) => {
     const asset = data.kind === 'asset' && data.assetId ? assets[data.assetId] : undefined;
-    if (asset?.kind !== 'image') return [];
-    const { index } = normalizeAssetRevisions(asset);
-    return index ? [[asset.id, index]] : [];
+    const index = asset?.kind === 'image' && normalizeAssetRevisions(asset).index;
+    return asset && index ? [[asset.id, index]] : [];
   }));
 }
 
@@ -205,7 +204,7 @@ export async function createItem(opts: {
       if (!getDoc(session.id, doc.id)) throw new Error(`Could not open the new item in session "${session.id}".`);
       return { subject, doc };
     } catch (error) {
-      if (get().library.some((item) => item.id === id)) await deleteItem(id);
+      await deleteItem(id);
       throw error;
     }
   });

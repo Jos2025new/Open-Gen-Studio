@@ -1,8 +1,9 @@
 import { expect, it } from 'vitest';
 import { asset, graphOf, hoisted, mkAsset, notesOf, putImageBlob, resetStore, text } from './library-kits-final-fixtures';
-import { addTextLayer, getDoc, patchLayer, undoDoc } from '../src/engine/design/actions';
+import { addTextLayer, getDoc, newBlankDoc, patchLayer, undoDoc } from '../src/engine/design/actions';
 import { saveAssetEdit } from '../src/engine/assetRevisions';
 import { createItem, libraryToDesigner, restoreItemVersion, saveItem } from '../src/engine/libraryVersions';
+import { run } from '../src/engine/commands';
 import { getBuffer } from '../src/engine/design/raster';
 import { libraryToNodes, nodesToLibrary } from '../src/engine/flow/fromLibrary';
 import { editCompound } from '../src/engine/nodecore/edit';
@@ -62,7 +63,7 @@ it('undoes a new library image without removing a text layer added during loadin
   hoisted.setOnGetAsset(id => { if (id === 'c') { started(); return blocked; } });
   const opening = libraryToDesigner(s.id, subject.id);
   await loading;
-  addTextLayer(s.id, doc.id, 'Own', { x: 30, y: 30, width: 200, height: 60 });
+  addTextLayer(s.id, doc.id, 'Own', { x: 30, y: 30, width: 200 }, {});
   unblock();
   await opening;
   expect(getDoc(s.id, doc.id)!.layers.some(l => l.type === 'raster' && l.sourceAssetId === 'c')).toBe(true);
@@ -103,4 +104,25 @@ it.each(['untouched', 'direct paint', 'paint base', 'locked'] as const)('handles
       expect(useStore.getState().ui.toasts.at(-1)?.text).toContain('Kept');
     }
   }
+});
+
+it('keeps base placement and the aspect change of the regular replace-pixels command', async () => {
+  const s = resetStore();
+  useStore.setState({ assets: { a: mkAsset('a', s.id), b: mkAsset('b', s.id, 200, 400) } });
+  putImageBlob('a');
+  putImageBlob('b', 200, 400);
+  const doc = newBlankDoc(s.id, { label: 'Existing', width: 400, height: 300 });
+  const on = { session: s.id, doc: doc.id };
+  const placed = await run({ cmd: 'designer.layer.place_asset', on, args: { asset: 'a', target: 'base' } }, { caller: 'agent' });
+  expect(placed.ok).toBe(true);
+  const layer = getDoc(s.id, doc.id)!.layers[0];
+  expect(layer).toMatchObject({ x: 0, y: 0, width: 400, height: 300, sourceAssetId: 'a' });
+
+  const replaced = await run({ cmd: 'designer.layer.replace_pixels', on, args: { asset: 'b', layer: layer.id } }, { caller: 'agent' });
+  expect(replaced.ok).toBe(true);
+  const live = getDoc(s.id, doc.id)!.layers[0];
+  expect(live).toMatchObject({ id: layer.id, width: 400, height: 800, sourceAssetId: 'b' });
+  expect(live).not.toHaveProperty('libraryImageRev');
+  undoDoc(s.id, doc.id);
+  expect(getDoc(s.id, doc.id)!.layers).toEqual([layer]);
 });

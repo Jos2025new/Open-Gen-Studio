@@ -125,7 +125,7 @@ export default [
   },
   {
     id: 'library-kits-engine',
-    what: 'Entradas de Library (`KIT_KINDS`, `isKit`, `library.item.*`): grafo existente (`Graph`, nodo `part`, `GraphEdge.label`, `kits?: string[]`), índice puro acotado (`formatLibraryItemIndex`), tokens validados (`libraryTokens.ts`), versiones inmutables con `commitVersion` e índices estables para restaurar imágenes del grafo, apertura de Designer en un paso de historial, Nodes ida y vuelta (`flow/fromLibrary.ts`), inserción por copia con caja compartida (`libraryInsert.ts`, `approxLayerBox`), auto-versionado por base de turno (`libraryAutoSave.ts`), protección de assets, exclusión de envíos y ocultación de `view === studio` en Designer completo.',
+    what: 'Entradas de Library (`KIT_KINDS`, `isKit`, `library.item.*`): grafo existente (`Graph`, nodo `part`, `GraphEdge.label`, `kits?: string[]`), índice puro acotado (`formatLibraryItemIndex`), tokens validados (`libraryTokens.ts`), versiones inmutables con `commitVersion` e índices estables para restaurar imágenes del grafo, precarga de las imágenes fuera del historial y sincronización de Designer en un paso para documentos ya abiertos, Nodes ida y vuelta (`flow/fromLibrary.ts`), inserción por copia con caja compartida (`libraryInsert.ts`, `approxLayerBox`), auto-versionado por base de turno (`libraryAutoSave.ts`), protección de assets, exclusión de envíos y ocultación de `view === studio` en Designer completo.',
     sides: [
       ['src/engine/libraryTypes.ts', 'export const KIT_KINDS'],
       ['src/engine/nodecore/types/part.node.ts', "kind: 'part'"],
@@ -136,6 +136,7 @@ export default [
       ['src/engine/libraryVersions.ts', 'export function saveItem'],
       ['src/engine/libraryVersions.ts', 'export function restoreItemVersion'],
       ['src/engine/assetRevisions.ts', 'export async function copyAssetRevision'],
+      ['src/engine/libraryBoard.ts', 'export async function loadBoardImages'],
       ['src/engine/libraryBoard.ts', 'openHistoryGroup(docId, { join: true })'],
       ['src/engine/flow/fromLibrary.ts', 'export function libraryToNodes'],
       ['src/engine/libraryInsert.ts', 'export async function insertComponent'],
@@ -173,6 +174,7 @@ export default [
       'tests/library-kits-e-open.test.ts', 'tests/library-kits-e-nodes.test.tsx',
       'tests/library-kits-e-components.test.tsx', 'tests/library-kits-e-index.test.ts',
       'tests/library-kits-e-sendto.test.tsx', 'tests/library-kits-final.test.ts', 'tests/library-kits-final-gallery.test.tsx',
+      'tests/library-kits-final-opening.test.ts', 'tests/library-kits-final-undo.test.ts', 'tests/library-kits-final-revisions.test.ts',
     ],
   },
   {
