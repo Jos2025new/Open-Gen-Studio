@@ -240,7 +240,10 @@ describe('Library source selector', () => {
   it('lists All, Character, Location, Product, Object and Style with counts, and switches to saved items', () => {
     click(q('.pc-source'));
     const items = [...document.querySelectorAll('[role="menuitem"]')];
-    expect(items.map((b) => b.textContent)).toEqual(['All', 'Character2', 'Location1', 'Product0', 'Object0', 'Style0']);
+    expect(items.map((b) => b.textContent)).toEqual([
+      'All', 'Character2', 'Location1', 'Product0', 'Object0', 'Style0',
+      'Moodboards0', 'Design systems0', 'Brand kits0',
+    ]);
     expect(document.querySelector('.pc-menu-sep')).not.toBeNull();
     expect(items[0].getAttribute('aria-current')).toBe('true');
     click(items[1]);
