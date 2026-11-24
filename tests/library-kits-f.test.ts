@@ -52,6 +52,7 @@ vi.mock('../src/lib/media', async () => {
 });
 
 import { createItem, deleteItem, libraryToDesigner, readKitVersion, saveItem } from '../src/engine/libraryVersions';
+import { subjectAssetIds } from '../src/engine/libraryGraph';
 import { nodesToLibrary } from '../src/engine/flow/fromLibrary';
 import { editCompound } from '../src/engine/nodecore/edit';
 import { run } from '../src/engine/commands';
@@ -171,5 +172,24 @@ describe('Lote F fixes', () => {
     const g2: Graph = { nodes: [{ id: 'n2', position: { x: 0, y: 0 }, data: { kind: 'asset', title: 'Pic2', assetId: 'ast_new2' } }], edges: [] };
     await expect(saveItem({ subjectId: kit.id, mode: 'overwrite', space: 'library', by: 'user', graph: g2 })).rejects.toThrow(/asset|deleted|missing/i);
     expect([...hoisted.blobs.keys()].filter((k) => !keysBeforeSave.has(k))).toEqual([]);
+  });
+
+  it('4) nodesToLibrary normalizes asset nodes with nodeOutputAsset (including sketch) and strips sketchAssetId/extra fields', async () => {
+    const s = resetStore();
+    useStore.setState({ assets: { ast_orig: mkAsset('ast_orig', s.id), ast_sketch: mkAsset('ast_sketch', s.id) } });
+    expect(editCompound(s.id, 'seed-sketch', (g) => ({
+      ...g,
+      nodes: [
+        { id: 'na1', position: { x: 0, y: 0 }, data: { kind: 'asset', title: 'Sketched', assetId: 'ast_orig', sketchAssetId: 'ast_sketch', extra: 1 } as never },
+        { id: 'na2', position: { x: 200, y: 0 }, data: { kind: 'asset', title: 'Plain', assetId: 'ast_orig', extra: 2 } as never },
+      ],
+    }))).toBeNull();
+
+    const saved = await nodesToLibrary({ sessionId: s.id, mode: 'new', kind: 'moodboard', nodeIds: ['na1', 'na2'], name: 'SketchKit', by: 'user' });
+    const d1 = saved.graph!.nodes.find((n) => n.id === 'na1')!.data;
+    const d2 = saved.graph!.nodes.find((n) => n.id === 'na2')!.data;
+    expect(d1).toEqual({ kind: 'asset', title: 'Sketched', assetId: 'ast_sketch' });
+    expect(d2).toEqual({ kind: 'asset', title: 'Plain', assetId: 'ast_orig' });
+    expect(subjectAssetIds(saved)).toContain('ast_sketch');
   });
 });

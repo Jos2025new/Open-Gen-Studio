@@ -68,7 +68,7 @@ export async function nodesToLibrary(opts: {
   const nodes: GraphNode[] = [...new Set(rawIds)].map((nid) => {
     const n = byId.get(nid);
     if (!n) throw new Error(`No node "${nid}" in this session.`);
-    if (n.data.kind === 'asset' || n.data.kind === 'text' || n.data.kind === 'part') return { id: n.id, position: { ...n.position }, data: structuredClone(n.data) };
+    if (n.data.kind === 'text' || n.data.kind === 'part') return { id: n.id, position: { ...n.position }, data: structuredClone(n.data) };
     const out = nodeOutputAsset(n, st.generations);
     if (!out) throw new Error(`Node "${n.id}" (${n.data.kind}) cannot be saved to Library without a finished asset.`);
     return { id: n.id, position: { ...n.position }, data: { kind: 'asset', title: n.data.title, assetId: out } };
