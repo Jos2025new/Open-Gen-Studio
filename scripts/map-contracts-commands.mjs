@@ -143,7 +143,7 @@ export default [
       ['src/components/designer/DesignerWorkspace.tsx', "d.library?.view !== 'studio'"],
       ['src/components/designer/DocumentPicker.tsx', "d.library?.view !== 'studio'"],
     ],
-    tests: ['tests/library-kits.test.ts', 'tests/library-kits-ui.test.tsx'],
+    tests: ['tests/library-kits.test.ts', 'tests/library-kits-a2.test.ts', 'tests/library-kits-ui.test.tsx'],
   },
   {
     id: 'catalog-commands',

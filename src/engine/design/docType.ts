@@ -15,7 +15,7 @@ export interface DesignDoc {
   guides?: { x: number[]; y: number[] };
   activeLayerId: string | null;
   /** Working-copy link to a Library kit entry (`view: 'studio'` hides it from the full Designer). */
-  library?: { subjectId: string; versionId: string; view?: 'studio' };
+  library?: { subjectId: string; versionId: string; view?: 'studio'; linkedAt?: number };
   lastExport?: RememberedExport;
   createdAt: number;
   updatedAt: number;

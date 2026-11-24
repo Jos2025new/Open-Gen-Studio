@@ -53,12 +53,12 @@ import { SUBJECT_KINDS, deleteSubject, libraryItem, saveSubject } from '../src/e
 import { isKit, KIT_KINDS, mentionableSubjects } from '../src/engine/libraryTypes';
 import { buildLibraryIndex, kitDependencies, kitUsedBy, libraryAssetOwners, libraryAssetSet, subjectAssetIds, wouldCreateKitCycle } from '../src/engine/libraryGraph';
 import { createKit, openKit, readKitVersion, restoreKitVersion, saveKit, updateKit, waitKitQueue } from '../src/engine/libraryVersions';
-import { createDoc, newRasterLayer, newVectorLayer } from '../src/engine/design/doc';
+import { createDoc, newRasterLayer, newVectorLayer, touch } from '../src/engine/design/doc';
 import { addDoc } from '../src/engine/design/actions';
 import { deleteSession } from '../src/engine/actions';
 import { deleteAssets, deleteGeneration } from '../src/engine/assetActions';
 import { purgeDiscarded } from '../src/engine/jobState';
-import { createSession, useStore } from '../src/store/store';
+import { createSession, setDoc, useStore } from '../src/store/store';
 import { resolveSendPlan } from '../src/engine/sendInputs';
 import { run, setApprover } from '../src/engine/commands';
 import { runCommandsTool } from '../src/engine/agent/commandCalls';
@@ -155,7 +155,7 @@ describe('Contract 1 & 2: kit types, graph, cycles, missing refs and assets', ()
 describe('Contract 3: versions, pixels, copy, restore, failures, lock, delete', () => {
   it('round-trips through serialized persistence, edits pixels, overwrites, restores v1 with exact bytes, and reuses unchanged bytes', async () => {
     const s = resetStore();
-    const { subject: kit } = createKit({ name: 'AcmeDS', kind: 'design-system', space: 'studio', sessionId: s.id, by: 'agent', tokens: { colors: { bg: '#111' } } });
+    const { subject: kit } = await createKit({ name: 'AcmeDS', kind: 'design-system', space: 'studio', sessionId: s.id, by: 'agent', tokens: { colors: { bg: '#111' } } });
     // Build a working doc with 2 raster layers (one with paintBaseId) and a vector layer with pixelMask
     const baseLayer: RasterLayer = { ...newRasterLayer('Hero', { x: 0, y: 0, width: 10, height: 10 }, { width: 10, height: 10 }), paintBaseId: 'pb_1', rev: 1 };
     const staticLayer: RasterLayer = { ...newRasterLayer('Static', { x: 0, y: 0, width: 10, height: 10 }, { width: 10, height: 10 }), rev: 1 };
@@ -225,7 +225,8 @@ describe('Contract 3: versions, pixels, copy, restore, failures, lock, delete', 
     // Open in new active session -> creates working copy; opening again reuses it and drops studio view in designer
     const s2 = useStore.getState().activeSessionId;
     const openedStudio = await openKit(kit.id, { sessionId: s2, space: 'studio' });
-    expect(openedStudio.library).toEqual({ subjectId: kit.id, versionId: v3.versionId, view: 'studio' });
+    expect(openedStudio.library).toMatchObject({ subjectId: kit.id, versionId: v3.versionId, view: 'studio' });
+    expect(openedStudio.library?.linkedAt).toBe(openedStudio.updatedAt);
     expect(await blobBytes(hoisted.blobs.get(`raster:${openedStudio.layers[0].id}`))).toEqual(bytesHeroV1);
     const reopenedDesigner = await openKit(kit.id, { sessionId: s2, space: 'designer' });
     expect(reopenedDesigner.id).toBe(openedStudio.id);
@@ -234,7 +235,7 @@ describe('Contract 3: versions, pixels, copy, restore, failures, lock, delete', 
 
   it('gives copies independent pixels so deleting original or copy never affects the other, and unlinks open working docs', async () => {
     const s = resetStore();
-    const { subject: orig } = createKit({ name: 'Orig', kind: 'moodboard', space: 'designer', sessionId: s.id, by: 'user' });
+    const { subject: orig } = await createKit({ name: 'Orig', kind: 'moodboard', space: 'designer', sessionId: s.id, by: 'user' });
     const lyr = { ...newRasterLayer('Img', { x: 0, y: 0, width: 4, height: 4 }, { width: 4, height: 4 }), rev: 1 };
     const doc = { ...createDoc('Orig', 100, 100, null), layers: [lyr], library: { subjectId: orig.id, versionId: '' } };
     addDoc(s.id, doc);
@@ -249,7 +250,9 @@ describe('Contract 3: versions, pixels, copy, restore, failures, lock, delete', 
     const copySnap = await readKitVersion(copy.versionId!);
     expect(copySnap!.doc!.layers[0].id).not.toBe(origSnap!.doc!.layers[0].id);
 
-    // Delete original -> copy keeps its pixels, open working doc keeps its pixels and loses library link
+    // Edit working doc locally so delete detaches it with its pixels instead of removing an unchanged copy
+    setDoc(s.id, doc.id, (d) => touch(d));
+    // Delete original -> copy keeps its pixels, modified working doc keeps its pixels and loses library link
     deleteSubject(orig.id);
     await waitKitQueue(orig.id);
     expect(hoisted.blobs.has(`libver:${savedOrig.versionId}`)).toBe(false);
@@ -270,7 +273,7 @@ describe('Contract 3: versions, pixels, copy, restore, failures, lock, delete', 
 
   it('aborts with previous version intact on pixel write failure, blob write failure, missing blob, or missing writer lock', async () => {
     const s = resetStore();
-    const { subject: kit } = createKit({ name: 'SafeKit', kind: 'design-system', space: 'designer', sessionId: s.id, by: 'user' });
+    const { subject: kit } = await createKit({ name: 'SafeKit', kind: 'design-system', space: 'designer', sessionId: s.id, by: 'user' });
     const lyr = { ...newRasterLayer('Img', { x: 0, y: 0, width: 4, height: 4 }, { width: 4, height: 4 }), rev: 1 };
     const doc = { ...createDoc('SafeKit', 100, 100, null), layers: [lyr], library: { subjectId: kit.id, versionId: '' } };
     addDoc(s.id, doc);
@@ -307,7 +310,7 @@ describe('Contract 3: versions, pixels, copy, restore, failures, lock, delete', 
 
     // 6) Origin is immutable on updateKit, and kits are invisible to libraryItem()
     const origOrigin = v1.origin;
-    const updated = updateKit(kit.id, { name: 'RenamedKit' });
+    const updated = await updateKit(kit.id, { name: 'RenamedKit' });
     expect(updated.origin).toEqual(origOrigin);
     expect(libraryItem('RenamedKit')).toBeUndefined();
     saveSubject({ id: 'sub_classic', name: 'ClassicHero', kind: 'character', refAssetIds: [] });
@@ -323,7 +326,13 @@ describe('Contract 4: image protection across deleteSession, purgeDiscarded, del
 
   it('protects assets from OLD kit versions on deleteSession and purgeDiscarded, and keeps library-used assets with toast on deleteAssets/deleteGeneration', async () => {
     const s = resetStore();
-    const { subject: kit } = createKit({
+    useStore.setState({
+      assets: {
+        ast_old_v1: mkAsset('ast_old_v1', s.id, 'gen_1'),
+        ast_v2: mkAsset('ast_v2', s.id),
+      },
+    });
+    const { subject: kit } = await createKit({
       name: 'BrandKit', kind: 'brand-kit', space: 'studio', sessionId: s.id, by: 'user',
       pieces: [{ id: 'p1', kind: 'asset', assetId: 'ast_old_v1' }],
     });
@@ -387,9 +396,10 @@ describe('Contract 4: image protection across deleteSession, purgeDiscarded, del
 });
 
 describe('Contract 5 (engine) & 6: kits out of sends + library.kit.* commands + DOC_CREATORS', () => {
-  it('treats @KitName as nonexistent in resolveSendPlan and excludes kits from legacy nodeLibrary capture', () => {
+  it('treats @KitName as nonexistent in resolveSendPlan and excludes kits from legacy nodeLibrary capture', async () => {
     const s = resetStore();
-    createKit({ name: 'AcmeBrand', kind: 'brand-kit', space: 'library', by: 'user', pieces: [{ id: 'p1', kind: 'asset', assetId: 'ast_1' }] });
+    useStore.setState({ assets: { ast_1: { id: 'ast_1', kind: 'image', mime: 'image/png', width: 100, height: 100, sessionId: s.id, origin: 'upload', stored: true, favorite: false, createdAt: 1 } } });
+    await createKit({ name: 'AcmeBrand', kind: 'brand-kit', space: 'library', by: 'user', pieces: [{ id: 'p1', kind: 'asset', assetId: 'ast_1' }] });
     saveSubject({ id: 'sub_hero', name: 'Hero', kind: 'character', frontalAssetId: 'ast_hero', refAssetIds: [] });
     const gen: Generation = {
       id: 'g_node', sessionId: s.id, kind: 'image', prompt: 'Portrait of @Hero', modelRef: 'm::1', modelName: 'M', provider: 'local',
@@ -446,13 +456,14 @@ describe('Contract 5 (engine) & 6: kits out of sends + library.kit.* commands + 
 
     const brandRes = await run({ cmd: 'library.kit.create', args: { name: 'MasterKit', kind: 'brand-kit', space: 'library', pieces: [{ id: 'pk', kind: 'kit', kitId: createdKit.id }] } }, { caller: 'agent' });
     expect(brandRes.ok).toBe(true);
-    const brandId = (brandRes.results[0] as { subject: Subject }).subject.id;
+    const brandSubject = (brandRes.results[0] as { subject: Subject }).subject;
+    const brandId = brandSubject.id;
 
     // Opening a kit without any saved document creates a new blank linked document
     const blankOpen = await run({ cmd: 'library.kit.open', on: { session: s.id }, args: { id: brandId, space: 'designer' } }, { caller: 'agent' });
     expect(blankOpen.ok).toBe(true);
     const blankDocId = (blankOpen.results[0] as { doc: string }).doc;
-    expect(useStore.getState().sessions[s.id].docs.find((d) => d.id === blankDocId)?.library).toEqual({ subjectId: brandId, versionId: '' });
+    expect(useStore.getState().sessions[s.id].docs.find((d) => d.id === blankDocId)?.library).toMatchObject({ subjectId: brandId, versionId: brandSubject.versionId });
 
     const listed = await run({ cmd: 'library.kit.list', args: {} }, { caller: 'agent' });
     expect(listed.ok).toBe(true);
@@ -468,7 +479,7 @@ describe('Contract 5 (engine) & 6: kits out of sends + library.kit.* commands + 
 
     const restored = await run({ cmd: 'library.kit.restore', args: { id: createdKit.id, versionId: v1Id, space: 'library' } }, { caller: 'agent' });
     expect(restored.ok).toBe(true);
-    expect((restored.results[0] as Subject).versions?.length).toBe(2);
+    expect((restored.results[0] as Subject).versions?.length).toBe(3);
 
     // 4) delete via library.subject.delete cleans blobs
     const delRes = await run({ cmd: 'library.subject.delete', args: { id: createdKit.id } }, { caller: 'agent' });
