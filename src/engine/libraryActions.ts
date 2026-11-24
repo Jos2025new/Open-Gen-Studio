@@ -7,6 +7,8 @@ import { createGeneration, opSpec, runGeneration } from './jobs';
 import { mentionSubjects } from './params';
 import { sheetCut } from './sheet';
 import type { Subject, SubjectKind, Workspace } from './types';
+import { isKit, mentionableSubjects } from './libraryTypes';
+import { purgeKitBlobs, unlinkKitDocs } from './libraryVersions';
 import { appendFeed, patchSession, setComposer, setComposerMedia, toast, useStore } from '../store/store';
 
 const get = useStore.getState;
@@ -34,7 +36,7 @@ function rememberNodeLibrary(name: string): void {
     for (const id of attached) {
       const g = generations[id];
       if (g && !g.nodeRequest && !g.inputs.nodeLibrary && mentionSubjects(g.prompt, [{ id: name, name }]).ids.length) {
-        generations[id] = { ...g, inputs: { ...g.inputs, nodeLibrary: structuredClone(st.library) } };
+        generations[id] = { ...g, inputs: { ...g.inputs, nodeLibrary: structuredClone(mentionableSubjects(st.library)) } };
       }
     }
     return { generations };
@@ -43,7 +45,7 @@ function rememberNodeLibrary(name: string): void {
 
 export function saveSubject(subject: Subject): void {
   const previous = get().library.find(s => s.id === subject.id);
-  if (previous) rememberNodeLibrary(previous.name);
+  if (previous && !isKit(previous)) rememberNodeLibrary(previous.name);
   useStore.setState((st) => ({
     library: st.library.some((x) => x.id === subject.id) ? st.library.map((x) => (x.id === subject.id ? subject : x)) : [...st.library, subject],
   }));
@@ -51,13 +53,16 @@ export function saveSubject(subject: Subject): void {
 
 export function deleteSubject(id: string): void {
   const previous = get().library.find(s => s.id === id);
-  if (previous) rememberNodeLibrary(previous.name);
+  if (previous) {
+    if (isKit(previous)) { unlinkKitDocs(id); void purgeKitBlobs(previous); }
+    else rememberNodeLibrary(previous.name);
+  }
   useStore.setState((st) => ({ library: st.library.filter((x) => x.id !== id) }));
 }
 
 export function libraryItem(name: string): Subject | undefined {
   const clean = name.trim().replace(/^@/, '').toLowerCase();
-  return get().library.find((x) => x.name.toLowerCase() === clean);
+  return mentionableSubjects(get().library).find((x) => x.name.toLowerCase() === clean);
 }
 
 /** Save to library: a taken name is refused unless `replace`; the item keeps its id and @Name. */

@@ -49,10 +49,26 @@ vi.mock('../src/lib/idb', () => ({
   deleteAssetBlobs: async (ids: string[]) => { for (const id of ids) hoisted.blobs.delete(`asset:${id}`); },
 }));
 
-import { SUBJECT_KINDS } from '../src/engine/libraryActions';
+import { SUBJECT_KINDS, deleteSubject, libraryItem, saveSubject } from '../src/engine/libraryActions';
 import { isKit, KIT_KINDS, mentionableSubjects } from '../src/engine/libraryTypes';
 import { buildLibraryIndex, kitDependencies, kitUsedBy, libraryAssetOwners, libraryAssetSet, subjectAssetIds, wouldCreateKitCycle } from '../src/engine/libraryGraph';
-import type { Subject } from '../src/engine/types';
+import { createKit, openKit, readKitVersion, restoreKitVersion, saveKit, updateKit, waitKitQueue } from '../src/engine/libraryVersions';
+import { createDoc, newRasterLayer, newVectorLayer } from '../src/engine/design/doc';
+import { addDoc } from '../src/engine/design/actions';
+import { deleteSession } from '../src/engine/actions';
+import { createSession, useStore } from '../src/store/store';
+import type { RasterLayer, Subject } from '../src/engine/types';
+
+async function blobBytes(b: Blob | undefined): Promise<Uint8Array> {
+  if (!b) return new Uint8Array();
+  return new Uint8Array(await b.arrayBuffer());
+}
+
+function resetStore() {
+  const s = createSession('Origin');
+  useStore.setState({ sessions: { [s.id]: s }, activeSessionId: s.id, library: [], assets: {}, generations: {} });
+  return s;
+}
 
 beforeEach(() => {
   hoisted.blobs.clear();
@@ -128,5 +144,168 @@ describe('Contract 1 & 2: kit types, graph, cycles, missing refs and assets', ()
     expect(libraryAssetSet(lib).has('ast_logo_v1')).toBe(true);
     expect(libraryAssetSet(lib).has('ast_mood')).toBe(true);
     expect(libraryAssetOwners(lib).get('ast_logo_v1')?.map((s) => s.id)).toEqual(['ds1']);
+  });
+});
+
+describe('Contract 3: versions, pixels, copy, restore, failures, lock, delete', () => {
+  it('round-trips through serialized persistence, edits pixels, overwrites, restores v1 with exact bytes, and reuses unchanged bytes', async () => {
+    const s = resetStore();
+    const { subject: kit } = createKit({ name: 'AcmeDS', kind: 'design-system', space: 'studio', sessionId: s.id, by: 'agent', tokens: { colors: { bg: '#111' } } });
+    // Build a working doc with 2 raster layers (one with paintBaseId) and a vector layer with pixelMask
+    const baseLayer: RasterLayer = { ...newRasterLayer('Hero', { x: 0, y: 0, width: 10, height: 10 }, { width: 10, height: 10 }), paintBaseId: 'pb_1', rev: 1 };
+    const staticLayer: RasterLayer = { ...newRasterLayer('Static', { x: 0, y: 0, width: 10, height: 10 }, { width: 10, height: 10 }), rev: 1 };
+    const maskLayer: RasterLayer = { ...newRasterLayer('Mask', { x: 0, y: 0, width: 10, height: 10 }, { width: 10, height: 10 }), rev: 1 };
+    const vecLayer = { ...newVectorLayer('Shapes', []), pixelMask: maskLayer };
+    const workDoc = { ...createDoc('AcmeDS', 100, 100, '#111'), layers: [baseLayer, staticLayer, vecLayer], library: { subjectId: kit.id, versionId: '', view: 'studio' as const } };
+    addDoc(s.id, workDoc);
+
+    const bytesHeroV1 = new Uint8Array([1, 2, 3, 4]);
+    const bytesBaseV1 = new Uint8Array([9, 8, 7, 6]);
+    const bytesStatic = new Uint8Array([5, 5, 5, 5]);
+    const bytesMaskV1 = new Uint8Array([2, 4, 6, 8]);
+    hoisted.blobs.set(`raster:${baseLayer.id}`, new Blob([bytesHeroV1], { type: 'image/png' }));
+    hoisted.blobs.set('raster:pb_1', new Blob([bytesBaseV1], { type: 'image/png' }));
+    hoisted.blobs.set(`raster:${staticLayer.id}`, new Blob([bytesStatic], { type: 'image/png' }));
+    hoisted.blobs.set(`raster:${maskLayer.id}`, new Blob([bytesMaskV1], { type: 'image/png' }));
+
+    const v1 = await saveKit({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: workDoc.id, space: 'studio', by: 'user', label: 'v1' });
+    expect(v1.draft).toBe(false);
+    expect(v1.versions?.length).toBe(1);
+    const v1Id = v1.versionId!;
+    const snap1 = await readKitVersion(v1Id);
+    expect(snap1?.doc?.layers.length).toBe(3);
+
+    // Simulate reload: serialize library & sessions to JSON and restore into store
+    const serialized = JSON.stringify({ library: useStore.getState().library, sessions: useStore.getState().sessions });
+    const reloaded = JSON.parse(serialized) as { library: Subject[]; sessions: ReturnType<typeof useStore.getState>['sessions'] };
+    useStore.setState({ library: reloaded.library, sessions: reloaded.sessions });
+
+    // Edit hero pixels (different bytes) and bump static rev WITHOUT changing static bytes (must reuse static id by bytes, not rev!)
+    const bytesHeroV2 = new Uint8Array([99, 98, 97, 96]);
+    hoisted.blobs.set(`raster:${baseLayer.id}`, new Blob([bytesHeroV2], { type: 'image/png' }));
+    useStore.setState((st) => ({
+      sessions: {
+        ...st.sessions,
+        [s.id]: {
+          ...st.sessions[s.id],
+          docs: st.sessions[s.id].docs.map((d) => d.id === workDoc.id ? { ...d, layers: d.layers.map((l) => l.id === staticLayer.id ? { ...l, rev: 99 } : l) } : d),
+        },
+      },
+    }));
+
+    const v2 = await saveKit({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: workDoc.id, space: 'designer', by: 'user', label: 'v2' });
+    expect(v2.versions?.length).toBe(2);
+    const snap2 = await readKitVersion(v2.versionId!);
+    const v1StaticId = snap1!.doc!.layers[1].id;
+    const v2StaticId = snap2!.doc!.layers[1].id;
+    const v1HeroId = snap1!.doc!.layers[0].id;
+    const v2HeroId = snap2!.doc!.layers[0].id;
+    expect(v2StaticId).toBe(v1StaticId); // identical bytes -> reused despite rev bump
+    expect(v2HeroId).not.toBe(v1HeroId); // changed bytes -> new id
+    expect(await blobBytes(hoisted.blobs.get(`raster:${v2HeroId}`))).toEqual(bytesHeroV2);
+
+    // Restore v1 -> appends v3 without deleting v1/v2, bytes match v1 exactly
+    const v3 = await restoreKitVersion({ subjectId: kit.id, versionId: v1Id, space: 'library', by: 'user' });
+    expect(v3.versions?.length).toBe(3);
+    const snap3 = await readKitVersion(v3.versionId!);
+    const restoredHero = snap3!.doc!.layers[0] as RasterLayer;
+    expect(await blobBytes(hoisted.blobs.get(`raster:${restoredHero.id}`))).toEqual(bytesHeroV1);
+    expect(await blobBytes(hoisted.blobs.get(`raster:${restoredHero.paintBaseId}`))).toEqual(bytesBaseV1);
+
+    // Delete origin session -> kit versions and pixels survive intact
+    deleteSession(s.id);
+    expect(useStore.getState().library.some((x) => x.id === kit.id)).toBe(true);
+    expect(await blobBytes(hoisted.blobs.get(`raster:${restoredHero.id}`))).toEqual(bytesHeroV1);
+
+    // Open in new active session -> creates working copy; opening again reuses it and drops studio view in designer
+    const s2 = useStore.getState().activeSessionId;
+    const openedStudio = await openKit(kit.id, { sessionId: s2, space: 'studio' });
+    expect(openedStudio.library).toEqual({ subjectId: kit.id, versionId: v3.versionId, view: 'studio' });
+    expect(await blobBytes(hoisted.blobs.get(`raster:${openedStudio.layers[0].id}`))).toEqual(bytesHeroV1);
+    const reopenedDesigner = await openKit(kit.id, { sessionId: s2, space: 'designer' });
+    expect(reopenedDesigner.id).toBe(openedStudio.id);
+    expect(reopenedDesigner.library?.view).toBeUndefined();
+  });
+
+  it('gives copies independent pixels so deleting original or copy never affects the other, and unlinks open working docs', async () => {
+    const s = resetStore();
+    const { subject: orig } = createKit({ name: 'Orig', kind: 'moodboard', space: 'designer', sessionId: s.id, by: 'user' });
+    const lyr = { ...newRasterLayer('Img', { x: 0, y: 0, width: 4, height: 4 }, { width: 4, height: 4 }), rev: 1 };
+    const doc = { ...createDoc('Orig', 100, 100, null), layers: [lyr], library: { subjectId: orig.id, versionId: '' } };
+    addDoc(s.id, doc);
+    const px = new Uint8Array([10, 20, 30, 40]);
+    hoisted.blobs.set(`raster:${lyr.id}`, new Blob([px], { type: 'image/png' }));
+
+    const savedOrig = await saveKit({ subjectId: orig.id, mode: 'overwrite', sessionId: s.id, docId: doc.id, space: 'designer', by: 'user' });
+    const copy = await saveKit({ subjectId: orig.id, mode: 'copy', sessionId: s.id, docId: doc.id, space: 'designer', by: 'user', name: 'Copy' });
+    expect(copy.copiedFrom).toBe(orig.id);
+
+    const origSnap = await readKitVersion(savedOrig.versionId!);
+    const copySnap = await readKitVersion(copy.versionId!);
+    expect(copySnap!.doc!.layers[0].id).not.toBe(origSnap!.doc!.layers[0].id);
+
+    // Delete original -> copy keeps its pixels, open working doc keeps its pixels and loses library link
+    deleteSubject(orig.id);
+    await waitKitQueue(orig.id);
+    expect(hoisted.blobs.has(`libver:${savedOrig.versionId}`)).toBe(false);
+    expect(hoisted.blobs.has(`raster:${origSnap!.doc!.layers[0].id}`)).toBe(false);
+    expect(await blobBytes(hoisted.blobs.get(`raster:${copySnap!.doc!.layers[0].id}`))).toEqual(px);
+    const stillOpen = useStore.getState().sessions[s.id].docs.find((d) => d.id === doc.id)!;
+    expect(stillOpen.library).toBeUndefined();
+    expect(await blobBytes(hoisted.blobs.get(`raster:${lyr.id}`))).toEqual(px);
+
+    // Make a second copy from copy, then delete copy -> second copy survives
+    const copyDoc = await openKit(copy.id, { sessionId: s.id, space: 'designer' });
+    const copy2 = await saveKit({ subjectId: copy.id, mode: 'copy', sessionId: s.id, docId: copyDoc.id, space: 'designer', by: 'user', name: 'Copy2' });
+    const copy2Snap = await readKitVersion(copy2.versionId!);
+    deleteSubject(copy.id);
+    await waitKitQueue(copy.id);
+    expect(await blobBytes(hoisted.blobs.get(`raster:${copy2Snap!.doc!.layers[0].id}`))).toEqual(px);
+  });
+
+  it('aborts with previous version intact on pixel write failure, blob write failure, missing blob, or missing writer lock', async () => {
+    const s = resetStore();
+    const { subject: kit } = createKit({ name: 'SafeKit', kind: 'design-system', space: 'designer', sessionId: s.id, by: 'user' });
+    const lyr = { ...newRasterLayer('Img', { x: 0, y: 0, width: 4, height: 4 }, { width: 4, height: 4 }), rev: 1 };
+    const doc = { ...createDoc('SafeKit', 100, 100, null), layers: [lyr], library: { subjectId: kit.id, versionId: '' } };
+    addDoc(s.id, doc);
+    hoisted.blobs.set(`raster:${lyr.id}`, new Blob([new Uint8Array([1, 1])], { type: 'image/png' }));
+    const v1 = await saveKit({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: doc.id, space: 'designer', by: 'user' });
+
+    // Edit pixels
+    hoisted.blobs.set(`raster:${lyr.id}`, new Blob([new Uint8Array([2, 2])], { type: 'image/png' }));
+
+    // 1) Pixel write failure
+    hoisted.setFailSet((k) => k.startsWith('raster:') ? new Error('disk full on pixels') : null);
+    await expect(saveKit({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: doc.id, space: 'designer', by: 'user' })).rejects.toThrow(/disk full/i);
+    expect(useStore.getState().library.find((x) => x.id === kit.id)?.versionId).toBe(v1.versionId);
+
+    // 2) Version blob write failure
+    hoisted.setFailSet((k) => k.startsWith('libver:') ? new Error('disk full on libver') : null);
+    await expect(saveKit({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: doc.id, space: 'designer', by: 'user' })).rejects.toThrow(/disk full/i);
+    expect(useStore.getState().library.find((x) => x.id === kit.id)?.versionId).toBe(v1.versionId);
+    hoisted.setFailSet(null);
+
+    // 3) Writer lock missing (blobDb.set returns silently -> re-read catches it and pointer does NOT move)
+    hoisted.setLock(false);
+    await expect(saveKit({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: doc.id, space: 'designer', by: 'user' })).rejects.toThrow(/verify|lock/i);
+    expect(useStore.getState().library.find((x) => x.id === kit.id)?.versionId).toBe(v1.versionId);
+    hoisted.setLock(true);
+
+    // 4) Missing expected source pixel blob
+    hoisted.blobs.delete(`raster:${lyr.id}`);
+    await expect(saveKit({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: doc.id, space: 'designer', by: 'user' })).rejects.toThrow(/missing/i);
+    expect(useStore.getState().library.find((x) => x.id === kit.id)?.versionId).toBe(v1.versionId);
+
+    // 5) Restore when version blob is missing -> clear error
+    await expect(restoreKitVersion({ subjectId: kit.id, versionId: 'lv_missing', space: 'library', by: 'user' })).rejects.toThrow(/missing/i);
+
+    // 6) Origin is immutable on updateKit, and kits are invisible to libraryItem()
+    const origOrigin = v1.origin;
+    const updated = updateKit(kit.id, { name: 'RenamedKit' });
+    expect(updated.origin).toEqual(origOrigin);
+    expect(libraryItem('RenamedKit')).toBeUndefined();
+    saveSubject({ id: 'sub_classic', name: 'ClassicHero', kind: 'character', refAssetIds: [] });
+    expect(libraryItem('ClassicHero')?.id).toBe('sub_classic');
   });
 });
