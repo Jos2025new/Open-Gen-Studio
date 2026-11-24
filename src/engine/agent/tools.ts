@@ -368,6 +368,7 @@ export function toRawPlan(v: z.infer<typeof proposePlanSchema>): RawPlan {
 export const CAPABILITIES = [
   'YOU HAVE these tools (call them; do not wonder whether you can):',
   ...TOOLS.map((t) => `- ${t.function.name}: ${t.function.description.split(/(?<=\.)\s/)[0]}`),
+  'LIBRARY KITS (moodboard, design-system, brand-kit): reusable component/token/asset collections (copied with origin on insert, no live link). Read the kit index (library.kit.list/read) before designing; build via library.kit.create → Designer commands → designer.group.create → library.kit.update (components, styles, tokens).',
   'YOU DO NOT HAVE: files, the internet, a shell, or anything outside these tools and <app_context>. Never claim results you did not get from them.',
 ].join('\n');
 

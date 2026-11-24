@@ -37,7 +37,7 @@ const AREAS: Record<string, string> = {
   designer: 'documents, layers, text, shapes, filters and effects of the Designer',
   nodes: 'the node graph: nodes, connections, layout and runs',
   studio: 'assets and generations: attach, estimate, regenerate, delete, start a generation',
-  library: 'saved subjects, styles and voices',
+  library: 'saved subjects, styles, voices and kits',
   skills: 'read skills, workflows and guides',
   models: 'the model catalog (read only)',
   sessions: 'list, rename, pin and title sessions',

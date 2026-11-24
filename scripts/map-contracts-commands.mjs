@@ -125,12 +125,18 @@ export default [
   },
   {
     id: 'library-kits-engine',
-    what: 'Kits de Library (`KIT_KINDS`, `isKit`): grafo sin ciclos (`libraryGraph.ts`), versiones inmutables verificadas (`libver:<id>` + `raster:<id>` en `libraryVersions.ts`), protección de assets en todas las versiones (`deleteSession`, `purgeDiscarded`, `deleteAssets`, `deleteGeneration`), exclusión de envíos y menciones (`mentionableSubjects`, `libraryContextLines`) y ocultación de `library.view === studio` en el Designer completo.',
+    what: 'Kits de Library (`KIT_KINDS`, `isKit`): grafo sin ciclos (`libraryGraph.ts`), tokens planos con alias (`libraryTokens.ts`), versiones inmutables verificadas con `docRev` (`libraryVersions.ts`), inserción por copia con origen (`libraryInsert.ts`), auto-versionado de drafts al fin de turno (`libraryAutoSave.ts`), protección de assets en todas las versiones, exclusión de envíos y menciones, ocultación de `library.view === studio` en el Designer completo y comandos de grupo del Designer.',
     sides: [
       ['src/engine/libraryTypes.ts', 'export const KIT_KINDS'],
+      ['src/engine/libraryTokens.ts', 'export function resolveTokens'],
       ['src/engine/libraryGraph.ts', 'export function libraryAssetOwners'],
       ['src/engine/libraryGraph.ts', 'export function libraryContextLines'],
       ['src/engine/libraryVersions.ts', 'export function saveKit'],
+      ['src/engine/libraryInsert.ts', 'export async function insertComponent'],
+      ['src/engine/libraryAutoSave.ts', 'export async function autoVersionDraftKits'],
+      ['src/engine/agent/llmTurn.ts', 'autoVersionDraftKits('],
+      ['src/engine/design/commands.ts', "id: 'designer.group.create'"],
+      ['src/engine/agent/tools.ts', 'LIBRARY KITS (moodboard, design-system, brand-kit)'],
       ['src/engine/actions.ts', 'libraryAssetSet(st.library)'],
       ['src/engine/jobState.ts', 'libraryAssetSet(st.library)'],
       ['src/engine/assetActions.ts', 'libraryAssetOwners(get().library)'],
@@ -143,7 +149,7 @@ export default [
       ['src/components/designer/DesignerWorkspace.tsx', "d.library?.view !== 'studio'"],
       ['src/components/designer/DocumentPicker.tsx', "d.library?.view !== 'studio'"],
     ],
-    tests: ['tests/library-kits.test.ts', 'tests/library-kits-a2.test.ts', 'tests/library-kits-ui.test.tsx'],
+    tests: ['tests/library-kits.test.ts', 'tests/library-kits-a2.test.ts', 'tests/library-kits-ui.test.tsx', 'tests/library-kits-b1.test.ts', 'tests/library-kits-tokens.test.ts', 'tests/library-kits-components.test.ts', 'tests/library-kits-insert.test.ts', 'tests/library-kits-designer-agent.test.ts', 'tests/library-kits-autosave.test.ts', 'tests/library-kits-rules.test.ts'],
   },
   {
     id: 'catalog-commands',

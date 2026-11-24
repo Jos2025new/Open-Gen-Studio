@@ -33,7 +33,7 @@ vi.mock('../src/lib/idb', () => ({
 }));
 
 import { insertComponent } from '../src/engine/libraryInsert';
-import { createKit, readKitVersion, saveKit, updateKit, waitKitQueue } from '../src/engine/libraryVersions';
+import { createKit, readKitVersion, saveKit, waitKitQueue } from '../src/engine/libraryVersions';
 import { deleteSubject } from '../src/engine/libraryActions';
 import { addDoc, getDoc, undoDoc } from '../src/engine/design/actions';
 import { createDoc, newRasterLayer, newTextLayer, newVectorLayer } from '../src/engine/design/doc';
