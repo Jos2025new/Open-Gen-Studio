@@ -41,7 +41,7 @@ export function SaveToLibrary({ space, sessionId, doc, group, nodeIds, onDone }:
     <form className="subject-new" onSubmit={(e) => { e.preventDefault(); void run(linked ? 'overwrite' : 'new'); }}>
       <input autoFocus aria-label="Library item name" placeholder="Name" value={name} disabled={busy} onChange={(e) => setName(e.target.value)} />
       <Segmented size="sm" value={kind} options={KIT_OPTIONS.map((o) => ({ ...o, disabled: Boolean(linked) || busy }))} onChange={setKind} />
-      {linked && group?.library?.versionId && group.library.versionId !== linked.versionId && <p className="field-hint">Changed since it was opened here. Save replaces it; the previous one stays in Versions.</p>}
+      {linked && group?.library && (!group.library.versionId || group.library.versionId !== linked.versionId) && <p className="field-hint">Changed since it was opened here. Save replaces it; the previous one stays in Versions.</p>}
       {linked ? <div className="confirm-pop-actions">
         <Button size="sm" variant="secondary" disabled={busy || !clean} onClick={() => void run('copy')}>Save a copy</Button>
         <Button size="sm" variant="primary" type="submit" loading={busy} disabled={busy || !clean}>Save</Button>

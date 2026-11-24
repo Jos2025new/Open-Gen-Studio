@@ -6,7 +6,7 @@ import {
 import { setUi, toast, useStore } from '../../store/store';
 import { setUserHidden } from '../../store/userHidden';
 import { deleteSubject, SUBJECT_KINDS } from '../../engine/actions';
-import { isKit, KIT_KINDS, type KitKind, type KitVersionRef } from '../../engine/libraryTypes';
+import { isKit, KIT_KINDS, KIT_KIND_LIST, type KitKind, type KitVersionRef } from '../../engine/libraryTypes';
 import { kitUsedBy, subjectAssetIds } from '../../engine/libraryGraph';
 import { deleteItem, libraryToDesigner, libraryToStudio, readKitVersion, restoreItemVersion } from '../../engine/libraryVersions';
 import { insertComponent } from '../../engine/libraryInsert';
@@ -33,20 +33,21 @@ type OpenSpace = 'studio' | 'designer' | 'nodes';
 const SUBJECT_ICONS: Record<SubjectKind, LucideIcon> = { character: UserRound, object: Shapes, product: Tag, location: Box, style: Palette };
 /** All shows what was generated; each category shows the saved library items of that kind. */
 const ORDER: SubjectKind[] = ['character', 'location', 'product', 'object', 'style'];
-const KIT_ORDER: KitKind[] = ['moodboard', 'design-system', 'brand-kit'];
 const isKitKind = (k: string): k is KitKind => Object.prototype.hasOwnProperty.call(KIT_KINDS, k);
 const itemKind = (x: Subject): LibraryKind => (isKit(x) ? (x.kind as KitKind) : ((x.kind as SubjectKind | undefined) ?? 'character'));
 const spaceOf = (w: Workspace): OpenSpace => (w === 'chat' ? 'studio' : w === 'node' ? 'nodes' : 'designer');
 const SOURCES: RailItem<Category>[] = [
   { id: 'all', label: 'All', icon: Grid2X2 },
   ...ORDER.map((k) => ({ id: k, label: SUBJECT_KINDS.find((x) => x.value === k)!.label, icon: SUBJECT_ICONS[k] })),
-  ...KIT_ORDER.map((k) => ({ id: k, label: KIT_META[k].label, icon: KIT_META[k].icon })),
+  ...KIT_KIND_LIST.map((k) => ({ id: k, label: KIT_META[k].label, icon: KIT_META[k].icon })),
 ];
 function coverOf(item: Subject, assets: Record<string, Asset>): string | undefined {
   if (!isKit(item)) return item.frontalAssetId ?? item.videoAssetId;
-  const ver = item.versions?.find((v) => v.id === item.versionId) ?? item.versions?.at(-1);
+  const last = item.versions?.at(-1);
+  const ver = last?.id === item.versionId ? last : item.versions?.find((v) => v.id === item.versionId) ?? last;
   const gAssets = (item.graph?.nodes ?? []).map((n) => (n.data.kind === 'asset' ? n.data.assetId ?? undefined : undefined));
-  return [item.frontalAssetId, ...gAssets, ...(ver?.assetIds ?? []), ...subjectAssetIds(item)].find((id): id is string => Boolean(id && assets[id]?.kind === 'image'));
+  const hasImage = (id?: string): id is string => Boolean(id && assets[id]?.kind === 'image');
+  return [item.frontalAssetId, ...gAssets, ...(ver?.assetIds ?? [])].find(hasImage) ?? subjectAssetIds(item).find(hasImage);
 }
 const canOpenNodes = (item: Subject, assets: Record<string, Asset>) => Boolean(item.graph?.nodes.length || kitImageAssetIds(item, assets).length);
 function goSpace(space: OpenSpace) {
