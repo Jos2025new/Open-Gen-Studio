@@ -52,10 +52,11 @@ vi.mock('../src/lib/media', async () => {
 });
 
 import { createItem, deleteItem, libraryToDesigner, readKitVersion, restoreItemVersion, saveItem } from '../src/engine/libraryVersions';
+import { createSubjectVoice } from '../src/engine/libraryActions';
 import { subjectAssetIds } from '../src/engine/libraryGraph';
 import { nodesToLibrary } from '../src/engine/flow/fromLibrary';
 import { editCompound } from '../src/engine/nodecore/edit';
-import { run } from '../src/engine/commands';
+import { run, setApprover } from '../src/engine/commands';
 import { addTextLayer, getDoc, redoDoc, undoDoc } from '../src/engine/design/actions';
 import { newRasterLayer } from '../src/engine/design/doc';
 import { createSession, setDoc, useStore } from '../src/store/store';
@@ -247,5 +248,26 @@ describe('Lote F fixes', () => {
     });
     await expect(saveItem({ subjectId: kitA.id, mode: 'overwrite', space: 'library', by: 'user', kits: [kitB.id] })).rejects.toThrow(/cycle/i);
     expect([...hoisted.blobs.keys()].filter((k) => !keysBefore.has(k))).toEqual([]);
+  });
+
+  it('7) library.voice.create and createSubjectVoice reject a kit before preparing generation', async () => {
+    const s = resetStore();
+    const audio: Asset = { id: 'aud_1', sessionId: s.id, kind: 'audio', mime: 'audio/mpeg', width: 0, height: 0, origin: 'upload', stored: true, favorite: false, createdAt: 1 };
+    useStore.setState((st) => ({ assets: { aud_1: audio }, composer: { ...st.composer, attachments: ['aud_1'] }, ui: { ...st.ui, toasts: [] } }));
+    const { subject: kit } = await createItem({ name: 'MoodVoice', kind: 'moodboard', space: 'library', by: 'user', draft: false });
+
+    const approver = vi.fn(() => true);
+    setApprover(approver);
+    try {
+      const cmdRes = await run({ cmd: 'library.voice.create', on: { session: s.id }, args: { subject: kit.id } }, { caller: 'agent' });
+      expect(cmdRes).toMatchObject({ ok: false, error: { code: 'unavailable' } });
+      expect(Object.keys(useStore.getState().generations)).toEqual([]);
+
+      await createSubjectVoice(s.id, kit.id);
+      expect(Object.keys(useStore.getState().generations)).toEqual([]);
+      expect(useStore.getState().ui.toasts.some((t) => /kit|library item|voice/i.test(t.text))).toBe(true);
+    } finally {
+      setApprover(null);
+    }
   });
 });

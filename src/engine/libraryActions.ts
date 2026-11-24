@@ -138,6 +138,8 @@ export async function createRecraftStyle(sessionId: string, name: string, budget
 /** Create a Kling voice and bind it to the subject when ready (after cost confirmation). */
 export async function createSubjectVoice(sessionId: string, subjectId: string, budgetPass?: BudgetPass, approvalTicketId?: string, approvedFingerprint?: string): Promise<void> {
   const st = get();
+  const target = st.library.find((x) => x.id === subjectId);
+  if (target && isKit(target)) { toast('Library items cannot have a voice.', 'error'); return; }
   const audio = st.composer.attachments.find((id) => st.assets[id]?.kind === 'audio');
   if (!audio) {
     toast('Attach 5–30 s of clean speech first.', 'error');
