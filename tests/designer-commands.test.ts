@@ -43,8 +43,8 @@ beforeEach(() => {
 
 describe('the Designer actions as commands', () => {
   it('every exported action is a command or says why it is not', () => {
-    const exported = [...readFileSync('src/engine/design/actions.ts', 'utf8').matchAll(/^export (?:async )?function (\w+)/gm)].map((m) => m[1]);
-    expect(Object.keys(DESIGNER_ACTIONS).sort()).toEqual(exported.sort());
+    const exported = new Set(Array.from(readFileSync('src/engine/design/actions.ts', 'utf8').matchAll(/^export (?:async )?function (\w+)/gm), (m) => m[1]));
+    expect(Object.keys(DESIGNER_ACTIONS).sort()).toEqual([...exported].sort());
     const ids = new Set(Object.values(DESIGNER_ACTIONS).filter((to) => !to.startsWith('- ')));
     for (const id of ids) expect(command(id), id).toBeDefined();
     const designer = allCommands().filter((c) => c.id.startsWith('designer.')).map((c) => c.id);

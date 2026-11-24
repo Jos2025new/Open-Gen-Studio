@@ -225,6 +225,7 @@ export const DESIGNER_ACTIONS: Record<string, string> = {
   deleteDoc: 'designer.doc.delete',
   assetCanvas: '- returns a canvas, not data',
   placeAsset: 'designer.layer.place_asset',
+  placeAssetCanvas: '- places an already decoded canvas for a Library board',
   openAssetInDesigner: 'designer.doc.from_asset',
   addTextLayer: 'designer.layer.add_text',
   rebasePaintLayer: 'designer.layer.rebase_paint',
