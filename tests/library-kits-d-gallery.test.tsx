@@ -23,13 +23,15 @@ vi.mock('../src/components/ui/AssetMedia', () => ({
 
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { NewKitItems } from '../src/components/gallery/newKit';
+import { formatLibraryItemIndex } from '../src/engine/libraryGraph';
 import { useNodeFocus } from '../src/engine/flow/selection';
 import { GalleryPanel } from '../src/components/gallery/GalleryPanel';
 import { createDoc } from '../src/engine/design/doc';
 import { addDoc } from '../src/engine/design/actions';
 import { createItem, libraryToDesigner, saveItem } from '../src/engine/libraryVersions';
 import { createSession, setUi, useStore } from '../src/store/store';
-import type { Asset, Graph, Subject } from '../src/engine/types';
+import type { DesignDoc, Asset, Graph, Subject } from '../src/engine/types';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 (globalThis as { ResizeObserver?: unknown }).ResizeObserver ??= class {
@@ -243,5 +245,40 @@ describe('Lote D Parte 1: Library kit categories, cards, menu, versions, compone
     expect(mbs).toHaveLength(1);
     expect(mbs[0].name).toBe('Moodboard 1');
     expect(useStore.getState().sessions[sid()].docs.some((d) => d.library?.subjectId === mbs[0].id)).toBe(true);
+  });
+
+  it('New from Nodes or Omnicanvas keeps Library open with the new entry', async () => {
+    for (const ui of [{ workspace: 'node' as const, omni: false }, { workspace: 'chat' as const, omni: true }]) {
+      act(() => { useStore.setState({ library: [] }); setUi({ ...ui, home: false, panel: 'gallery' }); });
+      await act(async () => root.render(createElement(GalleryPanel)));
+      await openSource('Brand kits');
+      const btn = [...host.querySelectorAll<HTMLButtonElement>('.pc-bar button')].find((b) => b.textContent?.includes('New'))!;
+      await click(btn);
+      const st = useStore.getState();
+      expect(st.library).toMatchObject([{ name: 'Brand kit 1', kind: 'brand-kit', origin: { space: 'nodes' } }]);
+      expect(st.ui).toMatchObject({ panel: 'gallery', workspace: ui.workspace });
+      await openSource('Moodboards');
+    }
+  });
+
+  it('Designer offers the three kinds where a document is created', async () => {
+    act(() => { useStore.setState({ library: [] }); });
+    const done = vi.fn();
+    await act(async () => root.render(createElement('div', { role: 'menu' }, createElement(NewKitItems, { sessionId: sid(), space: 'designer', onDone: done }))));
+    expect([...host.querySelectorAll('[role="menuitem"],button')].map((b) => b.textContent)).toEqual(['Moodboard', 'Design system', 'Brand kit']);
+    await click([...host.querySelectorAll('button')].find((b) => b.textContent === 'Design system')!);
+    const kit = useStore.getState().library[0];
+    expect(kit).toMatchObject({ name: 'Design system 1', kind: 'design-system', origin: { space: 'designer' } });
+    expect(useStore.getState().sessions[sid()].docs.some((d) => d.library?.subjectId === kit.id)).toBe(true);
+    expect(done).toHaveBeenCalledOnce();
+    // The entry is a group with its own relation to itself even before anything is attached.
+    expect(formatLibraryItemIndex(kit, [kit], {}).text).toContain('members: none yet');
+    const doc = { ...useStore.getState().sessions[sid()].docs.find((d) => d.library?.subjectId === kit.id)!, groups: [{ id: 'g1', name: 'Button' }], layers: [{ id: 'l1', type: 'text', name: 'Label', groupId: 'g1' }, { id: 'l2', type: 'vector', name: 'Loose', shapes: [] }] } as unknown as DesignDoc;
+    const text = formatLibraryItemIndex(kit, [kit], {}, 2500, doc).text;
+    expect(text).toContain('members: 2');
+    expect(text).toContain('component g1 "Button"');
+    expect(text).toContain('layer l1 [text] "Label" in g1');
+    expect(text).toContain('layer l2 [vector] "Loose"');
+    expect(formatLibraryItemIndex({ ...kit, kind: 'moodboard' }, [kit], {}, 2500, doc).text).toContain('group g1 "Button"');
   });
 });

@@ -1,17 +1,18 @@
 import { useRef, useState, type ReactNode } from 'react';
 import {
-  BookOpen, Box, ChevronLeft, Eye, EyeOff, Funnel, Grid2X2, History, Images, Layers, LayoutGrid, Maximize2, MessageSquare,
-  Minimize2, Palette, PenTool, Plus, Shapes, SwatchBook, Tag, Trash, UserRound, Workflow, X, type LucideIcon,
+  Box, ChevronLeft, Eye, EyeOff, Funnel, Grid2X2, History, Layers, LayoutGrid, Maximize2, MessageSquare,
+  Minimize2, Palette, PenTool, Plus, Shapes, Tag, Trash, UserRound, Workflow, X, type LucideIcon,
 } from '../ui/icons';
 import { setUi, toast, useStore } from '../../store/store';
 import { setUserHidden } from '../../store/userHidden';
 import { deleteSubject, SUBJECT_KINDS } from '../../engine/actions';
 import { isKit, KIT_KINDS, type KitKind, type KitVersionRef } from '../../engine/libraryTypes';
 import { kitUsedBy, subjectAssetIds } from '../../engine/libraryGraph';
-import { createItem, deleteItem, libraryToDesigner, libraryToStudio, readKitVersion, restoreItemVersion } from '../../engine/libraryVersions';
+import { deleteItem, libraryToDesigner, libraryToStudio, readKitVersion, restoreItemVersion } from '../../engine/libraryVersions';
 import { insertComponent } from '../../engine/libraryInsert';
 import { kitImageAssetIds, libraryToNodes } from '../../engine/flow/fromLibrary';
 import { focusNodes } from '../../engine/flow/selection';
+import { KIT_META, useNewKit } from './newKit';
 import { setStudioBoard } from '../../lib/studioBoard';
 import { formatDateTime } from '../../lib/format';
 import { Button, IconButton } from '../ui/primitives';
@@ -30,11 +31,6 @@ type LibraryKind = SubjectKind | KitKind;
 type Category = 'all' | LibraryKind;
 type OpenSpace = 'studio' | 'designer' | 'nodes';
 const SUBJECT_ICONS: Record<SubjectKind, LucideIcon> = { character: UserRound, object: Shapes, product: Tag, location: Box, style: Palette };
-const KIT_META: Record<KitKind, { label: string; singular: string; icon: LucideIcon }> = {
-  moodboard: { label: 'Moodboards', singular: 'Moodboard', icon: Images },
-  'design-system': { label: 'Design systems', singular: 'Design system', icon: SwatchBook },
-  'brand-kit': { label: 'Brand kits', singular: 'Brand kit', icon: BookOpen },
-};
 /** All shows what was generated; each category shows the saved library items of that kind. */
 const ORDER: SubjectKind[] = ['character', 'location', 'product', 'object', 'style'];
 const KIT_ORDER: KitKind[] = ['moodboard', 'design-system', 'brand-kit'];
@@ -95,16 +91,13 @@ function LibraryAssets({ source, chrome, kind, view, setView, cols, setCols }: {
   const sessionId = useStore((s) => s.activeSessionId), workspace = useStore((s) => s.ui.workspace);
   const { expanded, embedded } = usePanelExpanded();
   const [q, setQ] = useState(''), [sort, setSort] = useState<SortState>({ by: 'name', asc: true });
-  const [showHidden, setShowHidden] = useState(false), [creating, setCreating] = useState(false);
-  const creatingRef = useRef(false), needle = q.trim().toLowerCase(), kitKind = isKitKind(kind);
+  const [showHidden, setShowHidden] = useState(false), omni = useStore((s) => !!s.ui.omni);
+  const needle = q.trim().toLowerCase(), kitKind = isKitKind(kind);
   const list = library.filter((x) => itemKind(x) === kind && x.name.toLowerCase().includes(needle) && (showHidden || !x.userHidden))
     .sort((a, b) => (sort.asc ? 1 : -1) * a.name.localeCompare(b.name));
-  const createNew = async () => {
-    if (!kitKind || creatingRef.current) return;
-    creatingRef.current = true; setCreating(true);
-    try { const sp = spaceOf(workspace); await createItem({ name: `${KIT_META[kind].singular} ${library.filter((x) => itemKind(x) === kind).length + 1}`, kind, space: sp, by: 'user', sessionId }); goSpace(sp); }
-    catch (e) { toast((e as Error).message, 'error'); } finally { creatingRef.current = false; setCreating(false); }
-  };
+  // Nodes has nothing to show for an empty entry: Library stays open with its new card.
+  const space = omni ? 'nodes' : spaceOf(workspace);
+  const { busy: creating, create } = useNewKit(sessionId, space, () => { if (space !== 'nodes') goSpace(space); });
   const emptyMsg = library.some((x) => itemKind(x) === kind) ? 'Nothing matches this search.'
     : kitKind ? 'No saved items yet.' : 'Save a result with Send to → Save to library, or let the agent create references. Mention them as @Name in any prompt.';
   const gridItems = list.map((x) => {
@@ -129,7 +122,7 @@ function LibraryAssets({ source, chrome, kind, view, setView, cols, setCols }: {
           </div>
         </div>
         <div className="pc-grp pc-right">
-          {kitKind ? <div className="pc-flags"><Button size="sm" icon={Plus} disabled={creating} onClick={() => void createNew()}>New</Button></div> : null}
+          {kitKind ? <div className="pc-flags"><Button size="sm" icon={Plus} disabled={creating} onClick={() => void create(kind as KitKind)}>New</Button></div> : null}
           {chrome}
         </div>
       </div></div>

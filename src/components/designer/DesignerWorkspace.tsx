@@ -20,6 +20,8 @@ import { IMPORT_ACCEPT, importDesignFiles, runDesignOutput } from './designerFil
 import { TopbarActions } from '../shell/TopBar';
 import { Button, IconButton, MenuItem } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
+import { KIT_KIND_LIST } from '../../engine/libraryTypes';
+import { KIT_META, NewKitItems, useNewKit } from '../gallery/newKit';
 import { ExportPanel } from './ExportPanel';
 import { Stage } from './Stage';
 import { ToolPalette } from './ToolPalette';
@@ -32,6 +34,7 @@ export function DesignerWorkspace() {
   const visibleDocs = session.docs.filter((d) => d.view !== 'studio' && d.library?.view !== 'studio');
   const doc = visibleDocs.find((d) => d.id === session.activeDocId) ?? visibleDocs[0];
   const presets = usePopover();
+  const newKit = useNewKit(session.id, 'designer');
   const exportMenu = usePopover();
   const saveConfirm = usePopover();
   const [saveView, setSaveView] = useState<'gallery' | 'library'>('gallery');
@@ -108,6 +111,7 @@ export function DesignerWorkspace() {
       <Popover open={presets.open} anchor={presets.ref} onClose={presets.close} label="Document presets">
         <DocBackgroundChoice />
         {DOC_PRESETS.map((p) => <MenuItem key={p.id} label={<span className="preset-menu-label"><span className="preset-menu-glyph"><AspectGlyph value={`${p.width}:${p.height}`} size={16} /></span>{p.label}</span>} detail={`${p.width} × ${p.height}`} onClick={() => { newBlankDoc(session.id, p); presets.close(); }} />)}
+        <NewKitItems sessionId={session.id} space="designer" onDone={presets.close} />
       </Popover>
       {doc && trimmed > 0 && <span className="muted" title="Older undo steps were dropped to keep the history within its memory limit" style={{ fontSize: 'var(--fs-xs)', alignSelf: 'center' }}>History trimmed</span>}
     </TopbarActions>
@@ -172,6 +176,6 @@ export function DesignerWorkspace() {
       <DrawingChoicePrompt sessionId={session.id} doc={doc} />
       <LayersPanel sessionId={session.id} doc={doc} selectedCurve={selectedCurve} />
     </> :
-      <div className="designer-empty"><h1>Start a design</h1><p className="muted">Choose a canvas, or open an image from the gallery.</p><div className="preset-grid">{DOC_PRESETS.map((p) => <button className="preset" key={p.id} onClick={() => newBlankDoc(session.id, p)}><span className="preset-glyph"><AspectGlyph value={`${p.width}:${p.height}`} size={30} /></span><span className="preset-text"><strong>{p.label}</strong><span className="muted num">{p.width} × {p.height}</span></span></button>)}</div><DocBackgroundChoice /></div>}
+      <div className="designer-empty"><h1>Start a design</h1><p className="muted">Choose a canvas, or open an image from the gallery.</p><div className="preset-grid">{DOC_PRESETS.map((p) => <button className="preset" key={p.id} onClick={() => newBlankDoc(session.id, p)}><span className="preset-glyph"><AspectGlyph value={`${p.width}:${p.height}`} size={30} /></span><span className="preset-text"><strong>{p.label}</strong><span className="muted num">{p.width} × {p.height}</span></span></button>)}{KIT_KIND_LIST.map((k) => { const { icon: Icon, singular } = KIT_META[k]; return <button className="preset" key={k} disabled={newKit.busy} onClick={() => void newKit.create(k)}><span className="preset-glyph"><Icon size={24} /></span><span className="preset-text"><strong>{singular}</strong><span className="muted">Library</span></span></button>; })}</div><DocBackgroundChoice /></div>}
   </div>;
 }

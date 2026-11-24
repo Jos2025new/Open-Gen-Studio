@@ -73,7 +73,7 @@ const assetMeta = (assets: Record<string, unknown>, aid?: string | null): string
   const a = aid && assets[aid] && typeof assets[aid] === 'object' ? (assets[aid] as Partial<Asset>) : undefined;
   return a ? `${a.width && a.height ? ` ${a.width}x${a.height}` : ''}${a.origin ? ` (${a.origin})` : ''}` : '';
 };
-function docSummaryLines(doc: DesignDoc, assets: Record<string, unknown>, seen: ReadonlySet<string>): string[] {
+function docSummaryLines(doc: DesignDoc, assets: Record<string, unknown>, seen: ReadonlySet<string>, groupWord: string): string[] {
   const fonts = uniq(doc.layers.map((l) => (l.type === 'text' ? l.fontFamily : undefined)));
   const colors = uniq(doc.layers.flatMap((l) => {
     if (l.type === 'text') return [l.color];
@@ -84,7 +84,7 @@ function docSummaryLines(doc: DesignDoc, assets: Record<string, unknown>, seen: 
   }));
   const f = fonts.length ? `, fonts: ${fonts.join(', ')}` : '', c = colors.length ? `, colors: ${colors.join(', ')}` : '';
   const out = [`doc: ${doc.width}x${doc.height}, bg ${doc.background ?? 'none'}, ${doc.layers.length} layers${f}${c}`];
-  for (const g of (doc.groups ?? []).filter((gr) => doc.layers.some((l) => l.groupId === gr.id))) out.push(`component ${g.id} "${shortText(g.name, 60)}"`);
+  for (const g of (doc.groups ?? []).filter((gr) => doc.layers.some((l) => l.groupId === gr.id))) out.push(`${groupWord} ${g.id} "${shortText(g.name, 60)}"`);
   for (const aid of uniq(doc.layers.map((l) => ('sourceAssetId' in l ? l.sourceAssetId : undefined)))) if (!seen.has(aid)) out.push(`image ${aid}${assetMeta(assets, aid)}`);
   return out;
 }
@@ -97,7 +97,10 @@ export function formatLibraryItemIndex(subject: Subject, library: readonly Subje
   if (subject.origin) lines.push(`origin: ${subject.origin.space} by ${subject.origin.by}${subject.origin.sessionTitle ? ` (${shortText(subject.origin.sessionTitle, 60)})` : ''}${subject.copiedFrom ? `, copiedFrom ${subject.copiedFrom}` : ''}`);
   const vers = subject.versions ?? [];
   lines.push(`versions: ${vers.length}${subject.versionId ? ` (current ${subject.versionId})` : ''}${vers.length ? ` — ${vers.slice(-3).map((v) => `${v.id}:${v.space}/${v.by}${v.label ? ` "${shortText(v.label, 40)}"` : ''}`).join(', ')}` : ''}`);
-  if (doc) lines.push(...docSummaryLines(doc, assets, new Set(dep.assetIds)));
+  // Belonging to the entry is itself a relation, declared even while it is empty; links and contains are the explicit ones.
+  const count = (doc?.layers.length ?? 0) + (subject.graph?.nodes.length ?? 0) + (subject.kits?.length ?? 0) + Object.keys(subject.tokens ?? {}).length;
+  lines.push(`members: ${count || 'none yet'}${count ? ' (everything listed below belongs to this entry)' : ''}`);
+  if (doc) lines.push(...docSummaryLines(doc, assets, new Set(dep.assetIds), isKit(subject) && subject.kind !== 'moodboard' ? 'component' : 'group'));
   for (const [k, tok] of Object.entries(subject.tokens ?? {})) lines.push(`token ${k} (${tok.type}): ${shortText(String(tok.value), 80)}`);
   const nodes = subject.graph?.nodes ?? [], byNode = new Map(nodes.map((n) => [n.id, n]));
   for (const { id, data: d } of nodes) {
@@ -111,6 +114,8 @@ export function formatLibraryItemIndex(subject: Subject, library: readonly Subje
   for (const u of usedBy) lines.push(`usedBy: ${u.id} "${shortText(u.name, 60)}" (${u.kind ?? 'item'})`);
   const missing = [...dep.missingKitIds.map((id) => `kit:${id}`), ...dep.missingGroupIds.map((id) => `group:${id}`), ...dep.missingTokenIds.map((id) => `token:${id}`), ...dep.assetIds.filter((id) => !assets[id]).map((id) => `asset:${id}`)];
   if (missing.length) lines.push(`missing: ${missing.join(', ')}`);
+  // Last: a long layer list must not push declared relations out of the cap.
+  for (const l of doc?.layers ?? []) lines.push(`layer ${l.id} [${l.type}] "${shortText(l.name, 60)}"${l.groupId ? ` in ${l.groupId}` : ''}`);
 
   const out: string[] = [];
   for (let i = 0, len = 0; i < lines.length; i++) {

@@ -48,6 +48,7 @@ import { openAssetInDesigner } from '../../engine/design/actions';
 import type { Graph, OpId, Subject, SubjectKind } from '../../engine/types';
 import { setUi, toast, useStore } from '../../store/store';
 import { Popover, usePopover } from '../ui/Popover';
+import { newKitName } from '../gallery/newKit';
 import { Button, Chip, IconButton, MenuItem, Segmented } from '../ui/primitives';
 import { DOCK_GROUP_LABEL, DOCK_GROUP_ORDER, opGroup, type OpGroupId } from './opGroups';
 import { OpForm } from './OpForm';
@@ -266,7 +267,7 @@ export function SendToMenu({ assetId, size = 'sm' }: { assetId: string; size?: '
         });
         toast(`Added to "${saved.name}".`, 'success');
       } else {
-        const name = `Moodboard ${useStore.getState().library.filter((s) => s.kind === 'moodboard' && !s.userHidden).length + 1}`;
+        const name = newKitName('moodboard', useStore.getState().library);
         await createItem({ name, kind: 'moodboard', space, by: 'user', sessionId, graph: { nodes: [node], edges: [] }, draft: false, open: false });
         toast(`Added to "${name}".`, 'success');
       }

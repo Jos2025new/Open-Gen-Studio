@@ -10,6 +10,7 @@ import { newBlankDoc } from '../../engine/design/actions';
 import { ExportPanel } from '../designer/ExportPanel';
 import { DocumentChoices } from '../designer/DocumentPicker';
 import { IMPORT_ACCEPT, importDesignFiles, runDesignOutput } from '../designer/designerFile';
+import { NewKitItems } from '../gallery/newKit';
 import { SaveToLibrary } from '../gallery/SaveToLibrary';
 
 type View = 'menu' | 'new' | 'open' | 'export' | 'save' | 'library';
@@ -54,6 +55,7 @@ export function EmbeddedFileMenu({ sessionId, docs, doc }: { sessionId: string; 
         </>}
         {view === 'new' && <DocBackgroundChoice />}
         {view === 'new' && DOC_PRESETS.map((p) => <MenuItem key={p.id} label={<span className="preset-menu-label"><span className="preset-menu-glyph"><AspectGlyph value={`${p.width}:${p.height}`} size={16} /></span>{p.label}</span>} detail={`${p.width} × ${p.height}`} onClick={() => { newBlankDoc(sessionId, p); close(); }} />)}
+        {view === 'new' && <NewKitItems sessionId={sessionId} space="studio" onDone={close} />}
         {view === 'open' && doc && <DocumentChoices sessionId={sessionId} docs={docs} active={doc} />}
         {view === 'save' && doc && <div className="confirm-pop">
           <p>Save <strong>{doc.name}</strong> to the gallery as an image?</p>

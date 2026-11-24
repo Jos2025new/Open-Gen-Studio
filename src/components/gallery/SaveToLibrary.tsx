@@ -1,14 +1,13 @@
 import { useRef, useState } from 'react';
-import { isKit, type KitKind } from '../../engine/libraryTypes';
+import { isKit, KIT_KIND_LIST, type KitKind } from '../../engine/libraryTypes';
 import { createItem, deleteItem, saveItem } from '../../engine/libraryVersions';
 import { nodesToLibrary } from '../../engine/flow/fromLibrary';
 import type { DesignDoc, GraphGroup, Subject } from '../../engine/types';
 import { setDoc, toast, useStore } from '../../store/store';
 import { Button, Segmented } from '../ui/primitives';
+import { KIT_META } from './newKit';
 
-const KIT_OPTIONS: Array<{ value: KitKind; label: string }> = [
-  { value: 'moodboard', label: 'Moodboard' }, { value: 'design-system', label: 'Design system' }, { value: 'brand-kit', label: 'Brand kit' },
-];
+const KIT_OPTIONS = KIT_KIND_LIST.map((value) => ({ value, label: KIT_META[value].singular }));
 
 export function SaveToLibrary({ space, sessionId, doc, group, nodeIds, onDone }: {
   space: 'studio' | 'designer' | 'nodes'; sessionId: string; doc?: DesignDoc; group?: GraphGroup; nodeIds?: string[]; onDone: () => void;
