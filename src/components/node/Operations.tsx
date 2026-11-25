@@ -1,11 +1,11 @@
-import { memo, useState } from 'react';
-import { NodeToolbar, Position, type Node, type NodeProps } from '@xyflow/react';
+import { memo, useRef, useState } from 'react';
+import { NodeToolbar, Position, useStore as useRfStore, type Node, type NodeProps } from '@xyflow/react';
 import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalDistributeCenter,
   AlignStartHorizontal, AlignStartVertical, AlignVerticalDistributeCenter, ChevronDown, ChevronRight, ClipboardCopy,
   Group, Library, Scissors, Trash, Ungroup, X,
 } from '../ui/icons';
-import { alignNodes, copyNodes, cutNodes, groupNodes, renameGroup, setGroupColor, ungroup, wholeGroup, type AlignMode, type AlignTo, type Sizes } from '../../engine/flow/arrange';
+import { alignNodes, copyNodes, cutNodes, DEFAULT_GROUP_BOUNDS, groupNodes, renameGroup, resizeGroup, setGroupColor, ungroup, wholeGroup, type AlignMode, type AlignTo, type Sizes } from '../../engine/flow/arrange';
 import { deleteNodes } from '../../engine/flow/actions';
 import { useDeleteRequestContext } from './LinkBar';
 import type { Graph, GraphGroup } from '../../engine/types';
@@ -112,7 +112,7 @@ export function Operations({ sessionId, graph, ids, sizes, onSelect, onDelete }:
 
 const COLORS = [undefined, '#d8ff3a', '#5ec8ff', '#b892ff', '#ff7ab6', '#ffc25e', '#86e3a5'];
 
-export type GroupFlowNode = Node<{ group: GraphGroup; sessionId: string; collapsed: boolean; problems: number; hasErrors?: boolean; toggle(groupId: string): void }, 'group'>;
+export type GroupFlowNode = Node<{ group: GraphGroup; sessionId: string; collapsed: boolean; problems: number; hasErrors?: boolean; empty?: boolean; toggle(groupId: string): void }, 'group'>;
 
 /**
  * A group as a container on the canvas: a frame behind its nodes, sized from them (it follows them as they move).
@@ -120,11 +120,23 @@ export type GroupFlowNode = Node<{ group: GraphGroup; sessionId: string; collaps
  * optional background color (none by default).
  */
 export const GroupNode = memo(function GroupNode({ data, selected }: NodeProps<GroupFlowNode>) {
-  const { group, sessionId, collapsed, problems, hasErrors, toggle } = data;
+  const { group, sessionId, collapsed, problems, hasErrors, empty, toggle } = data;
   const [editing, setEditing] = useState(false);
   const [palette, setPalette] = useState(false);
+  const [preview, setPreview] = useState<{ w: number; h: number } | null>(null);
+  const drag = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
+  const zoom = useRfStore((s) => s.transform[2]) || 1;
+  const base = group.bounds ?? DEFAULT_GROUP_BOUNDS;
+  const sizeAt = (e: React.PointerEvent) => ({
+    w: Math.max(160, Math.round(drag.current!.w + (e.clientX - drag.current!.x) / zoom)),
+    h: Math.max(100, Math.round(drag.current!.h + (e.clientY - drag.current!.y) / zoom)),
+  });
+  const frameStyle = {
+    ...(!collapsed && group.color ? { background: `color-mix(in srgb, ${group.color} 10%, transparent)`, borderColor: `color-mix(in srgb, ${group.color} 55%, transparent)` } : {}),
+    ...(preview ? { width: preview.w, height: preview.h } : {}),
+  };
   return (
-    <div className={`group-frame ${selected ? 'is-selected' : ''}${collapsed ? ' is-collapsed' : ''}`} style={!collapsed && group.color ? { background: `color-mix(in srgb, ${group.color} 10%, transparent)`, borderColor: `color-mix(in srgb, ${group.color} 55%, transparent)` } : undefined}>
+    <div className={`group-frame ${selected ? 'is-selected' : ''}${collapsed ? ' is-collapsed' : ''}`} style={Object.keys(frameStyle).length ? frameStyle : undefined}>
       <div className="group-head">
         <button type="button" className="nt-btn nodrag" aria-expanded={!collapsed}
           aria-label={collapsed ? 'Expand group' : 'Collapse group'} data-tip={collapsed ? 'Expand group' : 'Collapse group'}
@@ -160,6 +172,22 @@ export const GroupNode = memo(function GroupNode({ data, selected }: NodeProps<G
           </span>
         ) : null}
       </div>
+      {empty && !collapsed ? (
+        <div
+          className="group-resize nodrag"
+          aria-label="Resize group"
+          onPointerDown={(e) => { e.stopPropagation(); e.currentTarget.setPointerCapture?.(e.pointerId); drag.current = { x: e.clientX, y: e.clientY, w: base.width, h: base.height }; }}
+          onPointerMove={(e) => { if (!drag.current) return; e.stopPropagation(); setPreview(sizeAt(e)); }}
+          onPointerUp={(e) => {
+            if (!drag.current) return;
+            e.stopPropagation();
+            const { w, h } = sizeAt(e);
+            drag.current = null;
+            setPreview(null);
+            if (w !== base.width || h !== base.height) resizeGroup(sessionId, group.id, { ...base, width: w, height: h });
+          }}
+        />
+      ) : null}
     </div>
   );
 });

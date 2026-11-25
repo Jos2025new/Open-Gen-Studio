@@ -54,9 +54,10 @@ describe('arrange several nodes', () => {
     const id = groupNodes(sid, ['a', 'b'])!;
     expect(wholeGroup(g(sid), ['b', 'a'])?.id).toBe(id);
     groupNodes(sid, ['b', 'c']);
-    expect(g(sid).groups!.map((x) => x.nodeIds)).toEqual([['b', 'c']]); // a group of one is dropped
+    expect(g(sid).groups!.map((x) => x.nodeIds)).toEqual([['a'], ['b', 'c']]); // groups survive down to 1 or 0 nodes
     deleteNodes(sid, ['c']);
-    expect(g(sid).groups).toEqual([]);
+    expect(g(sid).groups!.map((x) => x.nodeIds)).toEqual([['a'], ['b']]);
+    for (const gr of [...(g(sid).groups ?? [])]) ungroup(sid, gr.id);
     const again = groupNodes(sid, ['a', 'b'])!;
     ungroup(sid, again);
     expect(g(sid).groups).toEqual([]);

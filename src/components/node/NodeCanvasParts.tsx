@@ -47,7 +47,7 @@ export const CanvasChatImport = memo(function CanvasChatImport({ sessionId, cont
 });
 
 /** Add node: the first tool of the canvas toolbox; its list opens to the right. */
-export function AddNodeMenu({ onAdd, onImport, omni }: { onAdd: (data: GraphNodeData) => void; onImport: () => void; omni?: OmniEntries }) {
+export function AddNodeMenu({ onAdd, onImport, onGroup, omni }: { onAdd: (data: GraphNodeData) => void; onImport: () => void; onGroup?: () => void; omni?: OmniEntries }) {
   const pop = usePopover();
   return (
     <>
@@ -68,6 +68,7 @@ export function AddNodeMenu({ onAdd, onImport, omni }: { onAdd: (data: GraphNode
             pop.close();
             onImport();
           }}
+          onGroup={onGroup ? () => { pop.close(); onGroup(); } : undefined}
         />
       </Popover>
     </>

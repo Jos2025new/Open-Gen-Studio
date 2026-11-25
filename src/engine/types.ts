@@ -504,6 +504,7 @@ export type Layer = RasterLayer | VectorLayer | TextLayer | FxLayer;
 export interface LayerGroup {
   id: string;
   name: string;
+  parentId?: string;
   collapsed?: boolean;
   /** Layers hidden or locked before the group was: showing/unlocking it keeps them so. */
   keptHidden?: string[];

@@ -148,6 +148,10 @@ export interface GraphGroup {
   id: string;
   title: string;
   nodeIds: string[];
+  /** Outer group id when nested; absent or unknown means root. */
+  parentId?: string;
+  /** Frame rectangle when the group has no members (with members, bounds are computed). */
+  bounds?: { x: number; y: number; width: number; height: number };
   /** Optional background tint (hex); none by default. */
   color?: string;
   /** Set when the group came from or was saved to a Library entry. */

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { ChevronRight, FileImage, MessageSquare, PenTool, Search, Upload, Wand, Workflow, type LucideIcon } from '../ui/icons';
+import { ChevronRight, FileImage, Group, MessageSquare, PenTool, Search, Upload, Wand, Workflow, type LucideIcon } from '../ui/icons';
 import { OPS, OP_IDS } from '../../engine/ops';
 import { newNodeData } from '../../engine/flow/actions';
 import { inputPorts, portFits } from '../../engine/flow/graph';
@@ -23,12 +23,13 @@ export interface OmniEntries { /** False on the ordinary Nodes canvas: system pa
 const SPACE_ICON: Record<OmniSpace, LucideIcon> = { studio: MessageSquare, nodes: Workflow, designer: PenTool };
 const SPACE_SUB: Record<OmniSpace, string> = { studio: 'Chat and results', nodes: 'Connected flows of cards', designer: 'Layers: raster, vector and text' };
 /** The same node kinds and tools as AddNodeItems, as one flat list for the library panel. */
-function libraryEntries({ onPick, onAsset, onImport, omni }: { onPick: (data: GraphNodeData) => void; onAsset?: () => void; onImport?: () => void; omni?: OmniEntries }): Entry[] {
+function libraryEntries({ onPick, onAsset, onImport, onGroup, omni }: { onPick: (data: GraphNodeData) => void; onAsset?: () => void; onImport?: () => void; onGroup?: () => void; omni?: OmniEntries }): Entry[] {
   const node = (ui: NodeUi): Entry => ({ id: ui.kind, section: 'nodes', kind: ui.chip, icon: ui.icon, label: ui.label, sub: ui.sub, keywords: ui.keywords, run: () => onPick(newNodeData(ui.kind)) });
   return [
     ...(onImport ? [{ id: 'import', section: 'media' as const, icon: Upload, label: 'Import images', sub: 'From your computer', keywords: 'upload import images files', run: onImport }] : []),
     ...(onAsset ? [{ id: 'asset', section: 'media' as const, icon: FileImage, label: 'Asset', sub: 'Drag one from the Library', keywords: 'asset gallery library', run: onAsset }] : []),
     ...NODE_UIS.map(node),
+    ...(onGroup ? [{ id: 'group', section: 'nodes' as const, icon: Group, label: 'Group', sub: 'Empty frame', keywords: 'group frame container', run: onGroup }] : []),
     ...(omni && omni.spaces !== false ? OMNI_SPACES.map((space): Entry => ({ id: `space-${space}`, section: 'spaces', icon: SPACE_ICON[space], label: OMNI_SPACE_TITLES[space], sub: omni.has(space) ? 'Already here: selects it (one per session)' : SPACE_SUB[space], keywords: `space ${space} thumbnail`, run: () => omni.onSpace(space) })) : []),
     ...(omni && omni.spaces !== false ? SYSTEM_MENU_ORDER.map((type): Entry => { const ui = SYSTEM_UIS[type]!; return { id: `sys-${type}`, section: 'system', icon: ui.icon, label: SYSTEM_NODE_TYPES[type].title, sub: ui.sub, keywords: `system ${ui.keywords}`, run: () => omni.onSystem(type) }; }) : []),
     ...OP_IDS.filter((id) => !OPS[id].multiInput).map((id): Entry => ({ id, section: 'tools', kind: OPS[id].input as Kind, icon: OP_ICONS[id], label: OPS[id].label, sub: `${OPS[id].input} → ${OPS[id].output}`, keywords: `${OPS[id].label} ${OPS[id].description} tool`, run: () => onPick(newNodeData('tool', { op: id as OpId })) })),
@@ -38,7 +39,7 @@ function libraryEntries({ onPick, onAsset, onImport, omni }: { onPick: (data: Gr
 /** Add node from the canvas toolbox (2026-10-31): a library panel. A search field, kind chips, Media / Nodes / Tools
  *  sections with each entry's kind tinted on its icon and a line under its name, and the keyboard: type to filter,
  *  ↑↓ to move, Enter to add. Same entries as AddNodeItems (one list of node kinds). */
-export function NodeLibrary({ onPick, onAsset, onImport, omni }: { onPick: (data: GraphNodeData) => void; onAsset?: () => void; onImport?: () => void; omni?: OmniEntries }) {
+export function NodeLibrary({ onPick, onAsset, onImport, onGroup, omni }: { onPick: (data: GraphNodeData) => void; onAsset?: () => void; onImport?: () => void; onGroup?: () => void; omni?: OmniEntries }) {
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<Kind | 'all'>('all');
   const [at, setAt] = useState(0);
@@ -47,7 +48,7 @@ export function NodeLibrary({ onPick, onAsset, onImport, omni }: { onPick: (data
   const field = useRef<HTMLInputElement>(null);
   // The popover places itself after mounting, so the field takes the focus on the next frame (autoFocus is lost).
   useEffect(() => { const t = window.setTimeout(() => field.current?.focus(), 0); return () => window.clearTimeout(t); }, []);
-  const entries = useMemo(() => libraryEntries({ onPick, onAsset, onImport, omni }), [onPick, onAsset, onImport, omni]);
+  const entries = useMemo(() => libraryEntries({ onPick, onAsset, onImport, onGroup, omni }), [onPick, onAsset, onImport, onGroup, omni]);
   const q = query.trim().toLowerCase();
   const shown = entries.filter((e) => (kind === 'all' || e.kind === kind) && (!q || `${e.label} ${e.keywords}`.toLowerCase().includes(q)));
   useEffect(() => { navByKey.current = false; setAt(0); }, [query, kind]);
@@ -86,7 +87,7 @@ export function NodeLibrary({ onPick, onAsset, onImport, omni }: { onPick: (data
 }
 
 /** Node kinds (and tools) to add; with `accepts`, only those that take that port type as input. */
-export function AddNodeItems({ accepts, onPick, onAsset, onImport, searchable = false }: { accepts?: PortType | null; onPick: (data: GraphNodeData) => void; onAsset?: () => void; onImport?: () => void; searchable?: boolean }) {
+export function AddNodeItems({ accepts, onPick, onAsset, onImport, onGroup, searchable = false }: { accepts?: PortType | null; onPick: (data: GraphNodeData) => void; onAsset?: () => void; onImport?: () => void; onGroup?: () => void; searchable?: boolean }) {
   const [tools, setTools] = useState(false);
   const [query, setQuery] = useState('');
   const matches = (text: string) => text.toLowerCase().includes(query.trim().toLowerCase());
@@ -114,6 +115,7 @@ export function AddNodeItems({ accepts, onPick, onAsset, onImport, searchable = 
       {!query.trim() && toolIds.length ? <MenuItem icon={Wand} label="Tool" tip="Relight, angle, upscale, animate…" tipDelay={MENU_TIP_DELAY} right={<ChevronRight size={14} />} onClick={() => setTools(true)} /> : null}
       {query.trim() ? toolIds.filter((id) => matches(`${OPS[id].label} ${OPS[id].description}`)).map((id) => <MenuItem key={id} icon={OP_ICONS[id]} label={OPS[id].label} tip={`${OPS[id].input} → ${OPS[id].output}`} tipDelay={MENU_TIP_DELAY} onClick={() => onPick(newNodeData('tool', { op: id as OpId }))} />) : null}
       {onAsset && !accepts && matches('Asset gallery') ? <MenuItem icon={FileImage} label="Asset" tip="Drag one from the Library onto the canvas" tipDelay={MENU_TIP_DELAY} onClick={onAsset} /> : null}
+      {onGroup && !accepts && matches('Group frame') ? <MenuItem icon={Group} label="Group" onClick={onGroup} /> : null}
     </div>
   );
 }

@@ -37,7 +37,7 @@ import { CanvasNavigation, NODE_MAX_ZOOM, NODE_MIN_ZOOM, type NodeTool } from '.
 import { useCutTool } from './CutTool';
 import { GroupNode, Operations } from './Operations';
 import { DeleteRequestContext, LinkBar, useDeleteRequest } from './LinkBar';
-import { copyNodes, groupNodes, hasNodeClipboard, pasteNodes, ungroup, wholeGroup } from '../../engine/flow/arrange';
+import { copyNodes, createEmptyGroup, groupNodes, hasNodeClipboard, pasteNodes, ungroup, wholeGroup } from '../../engine/flow/arrange';
 import { liveGroupsMap, useNodeDrag } from './useNodeDrag';
 import { EmbeddedControls } from '../studio/EmbeddedControls';
 import { loadNodeTool } from './nodeToolStorage';
@@ -174,7 +174,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     setSelectedEdges(new Set());
   }, []);
   const groupNotices = useMemo(() => closedGroupNotices(revision.groups, closed, notices), [revision.groups, closed, notices]);
-  const { frames, hidden } = useCanvasGroups(graph, measured, sessionId, closed, groupNotices, toggleGroup, dragPos);
+  const { frames, hidden } = useCanvasGroups(graph, measured, sessionId, closed, groupNotices, toggleGroup, dragPos, selected);
   const jumpToNode = useCallback((id: string) => {
     const groups = revision.groups?.filter(g => g.nodeIds.includes(id)) ?? [];
     if (groups.some(g => closed.has(g.id))) {
@@ -199,7 +199,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         // A group frame: selecting it selects its nodes; deleting it ungroups; positions go to useNodeDrag.
         if ('id' in c && groupById.has(c.id)) {
           const g = groupById.get(c.id)!;
-          if (c.type === 'select' && c.selected) picks.push(...g.nodeIds.map((id) => [id, true] as [string, boolean]));
+          if (c.type === 'select') picks.push([g.id, c.selected], ...(c.selected ? g.nodeIds.map((id) => [id, true] as [string, boolean]) : []));
           else if (c.type === 'remove') ungroup(sessionId, g.id);
           continue;
         }
@@ -265,27 +265,20 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     return findFreePositionFor(data, desired, liveOccupied(), { width: omni ? omniWidth(data, NODE_WIDTH) : nodeWidth(data) });
   }, [omni, liveOccupied]);
 
+  const centerPos = () => { const r = canvasRef.current?.getBoundingClientRect(); return r ? rf.screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2.6 }) : { x: 0, y: 0 }; };
   const addAtCenter = (data: GraphNodeData) => {
-    const el = canvasRef.current;
-    const r = el?.getBoundingClientRect();
-    const center = r ? rf.screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2.6 }) : { x: 0, y: 0 };
-    const pos = freePos({ x: center.x - NODE_WIDTH / 2, y: center.y }, data);
-    const id = addNode(sessionId, data, pos);
+    const c = centerPos(), pos = freePos({ x: c.x - NODE_WIDTH / 2, y: c.y }, data), id = addNode(sessionId, data, pos);
     if (!id) return;
     selectNodes([id]);
     revealRect(rf, canvasRef.current, { ...pos, width: omni ? omniWidth(data, NODE_WIDTH) : nodeWidth(data), height: Math.min(estimatedHeight(data), 160) });
   };
+  const addGroup = (at?: { x: number; y: number }) => { const id = createEmptyGroup(sessionId, at ?? centerPos()); if (id) selectNodes([id]); };
 
   const omniEntries = useOmniEntries({ omni, sessionId, rf, canvasRef, freePos, selectNodes });
 
   const fileInput = useRef<HTMLInputElement>(null);
   const importPosition = useRef<{ x: number; y: number } | undefined>(undefined);
-  // Import from the toolbox's library: the images land at the visible centre, like Add node.
-  const importAtCenter = () => {
-    const r = canvasRef.current?.getBoundingClientRect();
-    importPosition.current = r ? rf.screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2.6 }) : undefined;
-    fileInput.current?.click();
-  };
+  const importAtCenter = () => { importPosition.current = canvasRef.current ? centerPos() : undefined; fileInput.current?.click(); };
   const importImages = useCallback(async (files: File[], position?: { x: number; y: number }) => {
     // EPS and HEIC/HEIF become PNG first (the same conversion as the Designer); unreadable files say why.
     const ready: File[] = [];
@@ -369,6 +362,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   const runIds = useMemo(() => runnableIds(revision.nodes), [revision]);
 
   const selectedNodes = useMemo(() => selected.size ? revision.nodes.filter(n => selected.has(n.id)) : [], [revision.nodes, selected]);
+  const selectedGroups = useMemo(() => selected.size ? (revision.groups ?? []).filter((g) => selected.has(g.id)).map((g) => g.id) : [], [revision.groups, selected]);
   const liveSelected = useMemo(() => selectedNodes.map(n => n.id), [selectedNodes]);
   const liveSelectedEdgeSet = useMemo(() => {
     const ids = new Set(graph.edges.map((e) => e.id));
@@ -389,6 +383,8 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   const menuOutput = useStore(s => menuSource ? outputPort(menuSource.data, s.assets) : null);
   const menuOpen = Boolean(menu) && (!menu?.from || Boolean(menuOutput));
   const menuNode = menu?.nodeId ? graph.nodes.find((n) => n.id === menu.nodeId) : undefined;
+  const menuPos = (m: { x: number; y: number }) => { const r = canvasRef.current?.getBoundingClientRect(); return rf.screenToFlowPosition({ x: m.x + (r?.left ?? 0), y: m.y + (r?.top ?? 0) }); };
+  const emptyCanvas = !graph.nodes.length && !graph.groups?.length;
 
   return (
     <div
@@ -473,7 +469,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         {embedded ? <EmbeddedControls /> : <><Operations sessionId={sessionId} graph={revision} ids={liveSelected} sizes={measured} onSelect={selectNodes} onDelete={del.request} />
         <CanvasNavigation
           sessionId={sessionId}
-          add={<AddNodeMenu onAdd={addAtCenter} onImport={importAtCenter} omni={omniEntries} />}
+          add={<AddNodeMenu onAdd={addAtCenter} onImport={importAtCenter} onGroup={() => addGroup()} omni={omniEntries} />}
           onAutoLayout={() => {
             layoutAll(sessionId);
             window.setTimeout(() => void rf.fitView({ padding: 0.2, duration: 300 }), 30);
@@ -481,9 +477,9 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
           onSelect={id => hidden.has(id) ? jumpToNode(id) : selectNodes([id])}
           tool={tool}
           onTool={pickTool}
-          selectedCount={liveSelected.length + liveSelectedEdgeSet.size}
+          selectedCount={liveSelected.length + selectedGroups.length + liveSelectedEdgeSet.size}
           selectedIds={liveSelected}
-          onDelete={() => del.request(liveSelected, [...liveSelectedEdgeSet])}
+          onDelete={() => del.request([...selectedGroups, ...liveSelected], [...liveSelectedEdgeSet])}
           omni={omni}
         /></>}
         <CanvasProblems notices={notices} onJump={jumpToNode} />
@@ -498,36 +494,25 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
         {menuNode ? (
           <NodeContextMenu onDuplicate={() => (duplicateNode(sessionId, menuNode), setMenu(null))} onDelete={() => { del.request([menuNode.id]); setMenu(null); }} />
         ) : menu ? (
-          <>
           <AddNodeItems
             searchable={Boolean(menu.from)}
             accepts={menuOutput ?? undefined}
-            onImport={menu.from ? undefined : () => {
-              const r = canvasRef.current?.getBoundingClientRect();
-              importPosition.current = rf.screenToFlowPosition({ x: menu.x + (r?.left ?? 0), y: menu.y + (r?.top ?? 0) });
-              fileInput.current?.click();
-              setMenu(null);
-            }}
+            onImport={menu.from ? undefined : () => { importPosition.current = menuPos(menu); fileInput.current?.click(); setMenu(null); }}
+            onGroup={menu.from ? undefined : () => { addGroup(menuPos(menu)); setMenu(null); }}
             onPick={(data) => {
-              const r = canvasRef.current?.getBoundingClientRect();
-              const pos = rf.screenToFlowPosition({ x: menu.x + (r?.left ?? 0), y: menu.y + (r?.top ?? 0) });
-              // From a dropped connection: the new node lands there, wired to the port that takes the source.
+              const pos = menuPos(menu);
               const id = menu.from ? addConnected(sessionId, menu.from, data, freePos({ x: pos.x, y: pos.y - 40 }, data), menu.handle) : addNode(sessionId, data, freePos(pos, data));
               if (id) selectNodes([id]);
               setMenu(null);
             }}
-            onAsset={() => {
-              setMenu(null);
-              setUi({ panel: 'gallery' });
-            }}
+            onAsset={() => { setMenu(null); setUi({ panel: 'gallery' }); }}
           />
-          </>
         ) : null}
         </div>
       </Popover>
       {menuOpen && menu?.from ? <ConnectionPreview from={menu.from} menu={connectionMenu} /> : null}
       {embedded || omni ? null : <CanvasChatImport sessionId={sessionId} content={fullRevision.nodes} />}
-      {!graph.nodes.length && omni ? null : !graph.nodes.length && embedded ? <p className="node-empty faint">No nodes yet. Ask the agent to build a flow.</p> : !graph.nodes.length ? (
+      {emptyCanvas && omni ? null : emptyCanvas && embedded ? <p className="node-empty faint">No nodes yet. Ask the agent to build a flow.</p> : emptyCanvas ? (
         <NodeEmptyState onAdd={(kind) => addAtCenter(newNodeData(kind))} />
       ) : null}
     </div>

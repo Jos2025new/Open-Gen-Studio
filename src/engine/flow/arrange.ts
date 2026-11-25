@@ -65,6 +65,9 @@ export function alignNodes(sessionId: string, ids: string[], mode: AlignMode, to
   if (pos.size) editPresentation(sessionId, (g) => ({ ...g, nodes: g.nodes.map((n) => (pos.has(n.id) ? { ...n, position: pos.get(n.id)! } : n)) }));
 }
 
+export type GroupRect = { x: number; y: number; width: number; height: number };
+export const DEFAULT_GROUP_BOUNDS: GroupRect = { x: 0, y: 0, width: 320, height: 220 };
+
 /** The group every one of `ids` is in, when they are exactly one whole group. */
 export function wholeGroup(graph: Graph, ids: string[]): GraphGroup | undefined {
   const g = graph.groups?.find((x) => x.nodeIds.includes(ids[0]));
@@ -78,9 +81,25 @@ export function groupNodes(sessionId: string, ids: string[], title?: string): st
   if (ids.some(id => detachedOutputGroup(graph, id))) { toast('Reattach these outputs before changing their group.', 'error'); return null; }
   const id = uid('grp');
   const n = (graph.groups?.length ?? 0) + 1;
-  const kept = (graph.groups ?? []).map((g) => ({ ...g, nodeIds: g.nodeIds.filter((x) => !ids.includes(x)) })).filter((g) => g.nodeIds.length > 1 || (g.nodeIds.length > 0 && 'detachedOutputs' in g));
+  const kept = (graph.groups ?? []).map((g) => ({ ...g, nodeIds: g.nodeIds.filter((x) => !ids.includes(x)) })).filter((g) => !('detachedOutputs' in g) || g.nodeIds.length > 0);
   editPresentation(sessionId, (g) => ({ ...g, groups: [...kept, { id, title: title ?? `Group ${n}`, nodeIds: [...ids] }] }));
   return id;
+}
+
+/** Create an empty group frame at `at` (survives empty, moves, resizes and deletes without prompt). */
+export function createEmptyGroup(sessionId: string, at?: { x: number; y: number }, title?: string, parentId?: string): string | null {
+  const graph = get().sessions[sessionId]?.graph;
+  if (!graph) return null;
+  const id = uid('grp'), n = (graph.groups?.length ?? 0) + 1;
+  const bounds: GroupRect = { x: Math.round(at?.x ?? 0), y: Math.round(at?.y ?? 0), width: DEFAULT_GROUP_BOUNDS.width, height: DEFAULT_GROUP_BOUNDS.height };
+  const parent = parentId && graph.groups?.some((g) => g.id === parentId) ? parentId : undefined;
+  editPresentation(sessionId, (g) => ({ ...g, groups: [...(g.groups ?? []), { id, title: title ?? `Group ${n}`, nodeIds: [], bounds, ...(parent ? { parentId: parent } : {}) }] }));
+  return id;
+}
+
+export function resizeGroup(sessionId: string, groupId: string, bounds: GroupRect): void {
+  const next: GroupRect = { x: Math.round(bounds.x), y: Math.round(bounds.y), width: Math.max(160, Math.round(bounds.width)), height: Math.max(100, Math.round(bounds.height)) };
+  editPresentation(sessionId, (g) => ({ ...g, groups: (g.groups ?? []).map((x) => (x.id === groupId ? { ...x, bounds: next } : x)) }));
 }
 
 export function ungroup(sessionId: string, groupId: string): void {
@@ -225,7 +244,7 @@ export function detachOutputs(sessionId: string, nodeId: string): string[] {
       hadGroups: graph.groups !== undefined, copiedInputIds: copied.map(e => e.id),
     },
   };
-  const groups = (graph.groups ?? []).map(g => g.nodeIds.includes(nodeId) ? { ...g, nodeIds: g.nodeIds.filter(id => id !== nodeId) } : g).filter(g => g.nodeIds.length > 1 || (g.nodeIds.length > 0 && 'detachedOutputs' in g));
+  const groups = (graph.groups ?? []).map(g => g.nodeIds.includes(nodeId) ? { ...g, nodeIds: g.nodeIds.filter(id => id !== nodeId) } : g).filter(g => !('detachedOutputs' in g) || g.nodeIds.length > 0);
   const next = { ...graph, nodes: graph.nodes.flatMap(n => n.id === nodeId ? cards : [n]), edges: [...graph.edges, ...copied], groups: [...groups, group] };
   const problem = graphEditProblem(sessionId, graph, next);
   if (problem) { toast(problem, 'error'); return []; }

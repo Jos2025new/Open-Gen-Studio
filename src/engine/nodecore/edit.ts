@@ -128,8 +128,17 @@ function planDelete(graph: Graph, ids: string[]): Graph {
   const kept = (graph.broken ?? []).filter((b) => !drop.has(b.edge.target));
   const lost = graph.edges.filter((e) => drop.has(e.source) && !drop.has(e.target));
   const broken = [...kept, ...lost.map((edge) => ({ edge, missing: 'source' as const, reason: 'deleted' as const, at: Date.now() }))];
-  // Deleted nodes leave their group; a detached output set keeps its restore snapshot.
-  const groups = graph.groups?.map((gr) => ({ ...gr, nodeIds: gr.nodeIds.filter((id) => !drop.has(id)) })).filter((gr) => gr.nodeIds.length > 1 || (gr.nodeIds.length > 0 && 'detachedOutputs' in gr));
+  // Deleted nodes leave their group; ordinary groups survive (keeping frame bounds when emptied), detached outputs drop at 0.
+  const groups = graph.groups?.flatMap((gr) => {
+    const nodeIds = gr.nodeIds.filter((id) => !drop.has(id));
+    if ('detachedOutputs' in gr) return nodeIds.length ? [{ ...gr, nodeIds }] : [];
+    if (nodeIds.length || gr.bounds || !gr.nodeIds.length || graph.groups?.some((c) => c.parentId === gr.id)) return [{ ...gr, nodeIds }];
+    const ms = graph.nodes.filter((n) => gr.nodeIds.includes(n.id));
+    if (!ms.length) return [{ ...gr, nodeIds }];
+    const l = Math.min(...ms.map((n) => n.position.x)), t = Math.min(...ms.map((n) => n.position.y));
+    const r = Math.max(...ms.map((n) => n.position.x + 300)), b = Math.max(...ms.map((n) => n.position.y + 220));
+    return [{ ...gr, nodeIds, bounds: { x: l - 28, y: t - 46, width: r - l + 56, height: b - t + 74 } }];
+  });
   return { ...graph, nodes: graph.nodes.filter((n) => !drop.has(n.id)), edges: graph.edges.filter((e) => !drop.has(e.source) && !drop.has(e.target)), ...(graph.groups ? { groups } : {}), ...(broken.length ? { broken } : {}) };
 }
 

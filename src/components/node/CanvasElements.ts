@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store/store';
-import { groupBounds, type Sizes } from '../../engine/flow/arrange';
+import { DEFAULT_GROUP_BOUNDS, groupBounds, type Sizes } from '../../engine/flow/arrange';
 import { groupNotices, type NoticeSummary, type CableNotice, type GraphNotice, type PortNotice } from '../../engine/flow/notices';
 import { NODE_WIDTH, runsGeneration } from '../../engine/flow/graph';
 import type { Asset, Generation, Graph, GraphGroup, GraphNode } from '../../engine/types';
@@ -25,7 +25,7 @@ interface GroupLayout {
 
 export function canvasGroups({ nodes, groups }: Graph, measured: Sizes, sessionId: string, closed: ReadonlySet<string>,
   summaries: ReadonlyMap<string, NoticeSummary>, toggle: (groupId: string) => void,
-  cache = new WeakMap<GraphGroup, GroupLayout>(), dragPos?: ReadonlyMap<string, { x: number; y: number }>) {
+  cache = new WeakMap<GraphGroup, GroupLayout>(), dragPos?: ReadonlyMap<string, { x: number; y: number }>, selected?: ReadonlySet<string>) {
   const frames: GroupFlowNode[] = [];
   const hidden = new Set<string>();
   if (!groups?.length) return { frames, hidden };
@@ -33,9 +33,15 @@ export function canvasGroups({ nodes, groups }: Graph, measured: Sizes, sessionI
   for (const node of nodes) byId.set(node.id, node);
   const posOf = (node: GraphNode | undefined) => (node ? (dragPos?.get(node.id) ?? node.position) : undefined);
   for (const group of groups) {
+    const empty = group.nodeIds.length === 0;
     const previous = cache.get(group);
     let layout = previous;
-    if (!previous || group.nodeIds.some((id, i) => {
+    if (empty) {
+      const base = group.bounds ?? DEFAULT_GROUP_BOUNDS, dp = dragPos?.get(group.id);
+      const bounds = dp ? { ...base, x: dp.x, y: dp.y } : base;
+      layout = { positions: [], sizes: [], bounds, frame: previous?.frame };
+      cache.set(group, layout);
+    } else if (!previous || group.nodeIds.some((id, i) => {
       const pos = posOf(byId.get(id));
       const prev = previous.positions[i];
       return pos?.x !== prev?.x || pos?.y !== prev?.y || measured.get(id) !== previous.sizes[i];
@@ -60,16 +66,18 @@ export function canvasGroups({ nodes, groups }: Graph, measured: Sizes, sessionI
     const height = collapsed ? 32 : b.height;
     const problems = summary?.count ?? 0;
     const hasErrors = summary?.hasErrors;
+    const sel = Boolean(selected?.has(group.id));
     const old = layout.frame;
     if (old && old.position.x === b.x && old.position.y === b.y && old.width === width && old.height === height &&
+        old.selected === sel && old.data.empty === empty &&
         old.data.sessionId === sessionId && old.data.collapsed === collapsed &&
         old.data.problems === problems && old.data.hasErrors === hasErrors && old.data.toggle === toggle) {
       frames.push(old);
     } else {
       const frame: GroupFlowNode = {
         id: group.id, type: 'group', position: { x: b.x, y: b.y },
-        data: { group, sessionId, collapsed, problems, hasErrors, toggle },
-        width, height, measured: { width, height },
+        data: { group, sessionId, collapsed, problems, hasErrors, empty, toggle },
+        selected: sel, width, height, measured: { width, height },
         zIndex: collapsed ? 1 : -1, draggable: true, selectable: !collapsed, connectable: false, style: { width, height },
       };
       layout.frame = frame;
@@ -81,10 +89,10 @@ export function canvasGroups({ nodes, groups }: Graph, measured: Sizes, sessionI
 
 export function useCanvasGroups(graph: Graph, measured: Sizes, sessionId: string, closed: ReadonlySet<string>,
   summaries: ReadonlyMap<string, NoticeSummary>, toggle: (groupId: string) => void,
-  dragPos?: ReadonlyMap<string, { x: number; y: number }>) {
+  dragPos?: ReadonlyMap<string, { x: number; y: number }>, selected?: ReadonlySet<string>) {
   const cache = useMemo(() => new WeakMap<GraphGroup, GroupLayout>(), []);
-  return useMemo(() => canvasGroups(graph, measured, sessionId, closed, summaries, toggle, cache, dragPos),
-    [graph, measured, sessionId, closed, summaries, toggle, cache, dragPos]);
+  return useMemo(() => canvasGroups(graph, measured, sessionId, closed, summaries, toggle, cache, dragPos, selected),
+    [graph, measured, sessionId, closed, summaries, toggle, cache, dragPos, selected]);
 }
 
 interface CanvasElements {
