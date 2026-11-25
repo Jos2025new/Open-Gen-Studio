@@ -19,6 +19,17 @@ function validLiteral({ type, value: v }: KitToken): boolean {
   return type === 'string' && typeof v === 'string';
 }
 
+/** The value a token ends in, following its aliases. */
+export function resolveToken(tokens: KitTokens, name: string): string | number | undefined {
+  let cur: string | null = name;
+  for (let i = 0; cur !== null && i < 20; i++) {
+    const value: string | number | undefined = tokens[cur]?.value, next = parseTokenAlias(value);
+    if (next === null) return value;
+    cur = next;
+  }
+  return undefined;
+}
+
 export function validateTokens(tokens: KitTokens): void {
   for (const [name, tok] of Object.entries(tokens)) {
     if (!NAME_RE.test(name)) throw new Error(`Invalid token name "${name}".`);

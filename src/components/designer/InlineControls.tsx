@@ -2,7 +2,9 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { ChevronDown } from '../ui/icons';
 import { MenuItem, Range } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
+import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store/store';
+import { activeKit, activeKitColors } from '../../engine/activeKit';
 import { rememberColor, removeSwatch, saveSwatch } from '../../engine/design/swatches';
 import { alphaFromOpacity, colorHsl, hexShown, opacityFromAlpha, parseHexAlpha } from '../../lib/color';
 import { ColorPlane } from './ColorPlane';
@@ -65,6 +67,7 @@ export function InlineColor({ label, value, onChange, showValue = false, iconOnl
   const [hex, setHex] = useState(() => hexShown(value, alpha?.value));
   const [hue, setHue] = useState(() => colorHsl(value)[0]);
   useEffect(() => { const [h, s] = colorHsl(value); if (s > 0) setHue(h); }, [value]);
+  const kit = useStore(activeKit), kitColors = useStore(useShallow(activeKitColors));
   const close = () => { rememberColor(value); pop.close(); };
   const pick = (c: string) => { onChange(c); setHex(hexShown(c, alpha?.value)); };
   const chip = (c: string, saved: boolean) => (
@@ -85,6 +88,7 @@ export function InlineColor({ label, value, onChange, showValue = false, iconOnl
           <input className="swatch-hex" value={hex} aria-label="Hex" spellCheck={false} onChange={(e) => { setHex(e.target.value); const p = parseHexAlpha(e.target.value); if (p) { onChange(p.color); if (alpha && e.target.value.trim().length === 9) alpha.onChange(opacityFromAlpha(p.alpha)); } }} />
           <button type="button" className="sb-link" onClick={() => saveSwatch(value)} disabled={sw.saved.includes(value.toLowerCase())}>Save</button>
         </div>
+        {kitColors.length > 0 && <><span className="field-label">{kit!.name}</span><div className="swatch-grid">{kitColors.map((c) => chip(c, false))}</div></>}
         {sw.recent.length > 0 && <><span className="field-label">Recent</span><div className="swatch-grid">{sw.recent.map((c) => chip(c, false))}</div></>}
         {sw.saved.length > 0 && <><span className="field-label">Saved</span><div className="swatch-grid">{sw.saved.map((c) => chip(c, true))}</div></>}
       </div>

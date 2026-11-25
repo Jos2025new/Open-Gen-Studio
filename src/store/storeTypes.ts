@@ -36,6 +36,8 @@ export interface ComposerState {
   mode: ComposerMode;
   agentStyle: AgentStyle;
   skillId: string | null;
+  /** Library entry (moodboard, design system or brand kit) the agent works with. */
+  kitId?: string | null;
   workflowId: string | null;
   text: string;
   image: { modelRef: string; settings: GenSettings };

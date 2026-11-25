@@ -1,18 +1,19 @@
 import { useRef, useState, type ReactNode } from 'react';
 import {
   Box, ChevronLeft, Eye, EyeOff, Funnel, Grid2X2, History, Layers, LayoutGrid, Maximize2, MessageSquare,
-  Minimize2, Palette, PenTool, Plus, Shapes, Tag, Trash, UserRound, Workflow, X, type LucideIcon,
+  Minimize2, Palette, PenTool, Plus, Shapes, Sparkles, Tag, Trash, UserRound, Workflow, X, type LucideIcon,
 } from '../ui/icons';
-import { setUi, toast, useStore } from '../../store/store';
+import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { setUserHidden } from '../../store/userHidden';
 import { deleteSubject, SUBJECT_KINDS } from '../../engine/actions';
 import { isKit, KIT_KINDS, KIT_KIND_LIST, type KitKind, type KitVersionRef } from '../../engine/libraryTypes';
 import { kitUsedBy, subjectAssetIds } from '../../engine/libraryGraph';
-import { deleteItem, libraryToDesigner, libraryToStudio, readKitVersion, restoreItemVersion } from '../../engine/libraryVersions';
+import { createItem, deleteItem, libraryToDesigner, libraryToStudio, readKitVersion, restoreItemVersion, saveItem } from '../../engine/libraryVersions';
 import { insertComponent } from '../../engine/libraryInsert';
 import { kitImageAssetIds, libraryToNodes } from '../../engine/flow/fromLibrary';
 import { focusNodes } from '../../engine/flow/selection';
-import { KIT_META, useNewKit } from './newKit';
+import { KIT_META, newKitName, useNewKit } from './newKit';
+import { KitTokens } from './KitTokens';
 import { setStudioBoard } from '../../lib/studioBoard';
 import { formatDateTime } from '../../lib/format';
 import { Button, IconButton } from '../ui/primitives';
@@ -138,7 +139,7 @@ function LibraryAssets({ source, chrome, kind, view, setView, cols, setCols }: {
   );
 }
 
-type KitMenuView = 'menu' | 'versions' | 'components' | 'remove' | { restore: KitVersionRef };
+type KitMenuView = 'menu' | 'versions' | 'components' | 'tokens' | 'into' | 'remove' | { restore: KitVersionRef };
 function KitMenuBody({ item, close }: { item: Subject; close: () => void }) {
   const sessionId = useStore((s) => s.activeSessionId), library = useStore((s) => s.library), assets = useStore((s) => s.assets);
   const session = useStore((s) => s.sessions[s.activeSessionId]), ui = useStore((s) => s.ui);
@@ -157,6 +158,7 @@ function KitMenuBody({ item, close }: { item: Subject; close: () => void }) {
     setComps((snap?.doc?.groups ?? []).filter((g) => snap!.doc!.layers.some((l) => l.groupId === g.id)).map((g) => ({ id: g.id, name: g.name })));
     setSub('components');
   }, undefined, true);
+  const brandKits = library.filter((s) => s.kind === 'brand-kit' && !s.userHidden), using = useStore((s) => s.composer.kitId === item.id);
   const versions = [...(item.versions ?? [])].reverse(), usedBy = kitUsedBy(item.id, library);
   if (sub === 'remove') {
     const why = usedBy.length ? `Used by: ${usedBy.map((u) => u.name).join(', ')}.` : 'Its images stay in Generated.';
@@ -167,6 +169,15 @@ function KitMenuBody({ item, close }: { item: Subject; close: () => void }) {
     const doRestore = () => void run(() => restoreItemVersion({ subjectId: item.id, versionId: v.id, space: 'library', by: 'user' }), 'Version restored.');
     return <MenuConfirm text={`Restore version from ${formatDateTime(v.at)} (${v.by})? This creates a new version.`} action="Restore" onCancel={() => setSub('versions')} onConfirm={doRestore} />;
   }
+  if (sub === 'tokens') return <>
+    <MenuItem icon={ChevronLeft} onClick={() => setSub('menu')}>Tokens</MenuItem>
+    <KitTokens item={item} onDone={close} />
+  </>;
+  if (sub === 'into') return <>
+    <MenuItem icon={ChevronLeft} onClick={() => setSub('menu')}>Add to brand kit</MenuItem>
+    {brandKits.map((k) => <MenuItem key={k.id} icon={KIT_META['brand-kit'].icon} disabled={busy} selected={k.kits?.includes(item.id)} onClick={() => void run(() => saveItem({ subjectId: k.id, mode: 'overwrite', space: 'library', by: 'user', kits: k.kits?.includes(item.id) ? k.kits.filter((x) => x !== item.id) : [...(k.kits ?? []), item.id] }))}>{k.name}</MenuItem>)}
+    <MenuItem icon={Plus} disabled={busy} onClick={() => void run(() => createItem({ name: newKitName('brand-kit', library), kind: 'brand-kit', space: 'library', by: 'user', sessionId, kits: [item.id], draft: false, open: false }), 'Brand kit created.')}>New brand kit</MenuItem>
+  </>;
   if (sub === 'versions') return <>
     <MenuItem icon={ChevronLeft} onClick={() => setSub('menu')}>Versions</MenuItem>
     {versions.map((v) => <MenuItem key={v.id} disabled={busy} onClick={() => setSub({ restore: v })}>{`${formatDateTime(v.at)} · ${v.by}${v.label ? ` · ${v.label}` : ''}`}</MenuItem>)}
@@ -182,6 +193,9 @@ function KitMenuBody({ item, close }: { item: Subject; close: () => void }) {
     <MenuItem icon={MessageSquare} disabled={busy} onClick={() => void run(() => openKitIn(sessionId, item.id, 'studio'))}>Open in Studio</MenuItem>
     <MenuItem icon={PenTool} disabled={busy} onClick={() => void run(() => openKitIn(sessionId, item.id, 'designer'))}>Open in Designer</MenuItem>
     {canOpenNodes(item, assets) ? <MenuItem icon={Workflow} disabled={busy} onClick={() => void run(() => openKitIn(sessionId, item.id, 'nodes'))}>Open in Nodes</MenuItem> : null}
+    <MenuItem icon={Sparkles} selected={using} onClick={() => { setComposer({ kitId: using ? null : item.id }); close(); }}>Use with the agent</MenuItem>
+    {KIT_KINDS[item.kind as KitKind].tokens ? <MenuItem icon={Palette} onClick={() => setSub('tokens')}>Tokens<span className="pc-count num">{Object.keys(item.tokens ?? {}).length}</span></MenuItem> : null}
+    {item.kind !== 'brand-kit' ? <MenuItem icon={KIT_META['brand-kit'].icon} onClick={() => setSub('into')}>Add to brand kit</MenuItem> : null}
     <MenuItem icon={History} disabled={!versions.length} onClick={() => setSub('versions')}>Versions<span className="pc-count num">{versions.length}</span></MenuItem>
     {designerDoc && compCount
       ? <MenuItem icon={Layers} disabled={busy} onClick={openComps}>Components<span className="pc-count num">{compCount}</span></MenuItem> : null}

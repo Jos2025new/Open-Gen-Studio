@@ -9,6 +9,7 @@ import { LLM_LABELS } from '../providers/llm';
 import { VIEWABLE_MEDIA_KINDS, type LlmMessage, type PlanFeedItem, type QuestionsFeedItem, type SettingsChoice, type SettingsFeedItem, type SettingsSection, type Workspace } from '../types';
 import { appendFeed, autoTitleSession, removeFeedItem, setComposer, updateFeedItem } from '../../store/store';
 import { buildContext } from './context';
+import { activeKit, activeKitImages, loadActiveKit } from '../activeKit';
 import { agentSeesImages, attachmentParts, stripImages, trimReferenceResults, userMessage } from './attachments';
 import { startRequest } from './metrics';
 import { skillById } from '../skills';
@@ -147,9 +148,19 @@ async function deliver(text: string, opts: { attachments?: string[]; agentNodeId
     return;
   }
   startRequest(sessionId, { request: clean, workspace, engine: engineLabel(sessionId, to.id), attachments: attachments.length });
+  if (activeKit()) {
+    await loadActiveKit();
+    if (stop.aborted) return;
+  }
   const ctx = buildContext(session(sessionId), contextOpts(sessionId, to.id, workspace, attachments));
   const parts = await visibleAttachments(sessionId, workspace, attachments, runId, to.id);
   if (stop.aborted) return;
+  // The picked Library entry is seen, not only listed.
+  const kitImages = activeKitImages().filter((id) => !attachments.includes(id));
+  if (kitImages.length && agentSeesImages(sessionId, to.id)) {
+    parts.push(...await attachmentParts(kitImages));
+    if (stop.aborted) return;
+  }
   // The Designer page travels with a new request, so "draw on this" needs no extra round.
   if (workspace === 'designer' && agentSeesImages(sessionId, to.id)) {
     const view = await canvasParts(sessionId).catch(() => 'The page could not be rendered.');

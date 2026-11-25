@@ -32,7 +32,7 @@ import { viewReferenceLabel } from './assetSearch';
 import { assetShape } from './assetShape';
 import { LAYER_DOC } from './layerDoc';
 import { mentionableSubjects } from '../libraryTypes';
-import { libraryContextLines } from '../libraryGraph';
+import { libraryLines } from '../activeKit';
 
 const get = useStore.getState;
 /** What a confirmed model takes: a plan reusing it is written for it. */
@@ -286,7 +286,7 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   const wf = workflowById(st.composer.workflowId);
   if (wf) lines.push(`workflow (${WORKFLOW_CONTRACT}):\n${describeWorkflow(wf)}`);
   const subjects = mentionableSubjects(st.library);
-  lines.push(...libraryContextLines(st.library, st.assets), ...captureLines(subjects, st.composer), ...contrastLines(session), peopleLookLine(st.settings));
+  lines.push(...libraryLines(st), ...captureLines(subjects, st.composer), ...contrastLines(session), peopleLookLine(st.settings));
   lines.push(composerChosen('image') ? `image model (picked by the user): ${describeModel('image')}` : `image model (app default, not picked by the user): ${describeModel('image')}`);
   // An unpicked video model is only an app default: steps follow the purpose table (C2).
   lines.push(composerChosen('video') ? `video model (picked by the user): ${describeModel('video')}` : `video model: none picked by the user; ${videoRouteLine()}`);

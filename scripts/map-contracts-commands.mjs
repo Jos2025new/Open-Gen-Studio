@@ -154,7 +154,7 @@ export default [
       ['src/engine/planSteps/sendSpec.ts', 'mentionableSubjects('],
       ['src/components/ui/ReferenceMentions.tsx', 'mentionableSubjects('],
       ['src/components/composer/MediaControls.tsx', 'mentionableSubjects('],
-      ['src/engine/agent/context.ts', 'libraryContextLines('],
+      ['src/engine/agent/context.ts', 'libraryLines('],
       ['src/components/designer/DesignerWorkspace.tsx', "d.view !== 'studio' && d.library?.view !== 'studio'"],
       ['src/components/designer/DocumentPicker.tsx', "d.view !== 'studio' && d.library?.view !== 'studio'"],
       ['src/components/gallery/GalleryPanel.tsx', 'function KitMenuBody'],

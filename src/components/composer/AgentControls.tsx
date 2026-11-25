@@ -1,6 +1,9 @@
-import { Check, ChevronDown, GitBranch, Sparkles, X } from '../ui/icons';
+import { Check, ChevronDown, GitBranch, Sparkles, SwatchBook, X } from '../ui/icons';
 import { SKILLS, WORKFLOWS, skillById, workflowById } from '../../engine/skills';
+import { activeKit } from '../../engine/activeKit';
+import { isKit, type KitKind } from '../../engine/libraryTypes';
 import type { AgentStyle } from '../../engine/types';
+import { KIT_META } from '../gallery/newKit';
 import { setComposer, useStore } from '../../store/store';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { Chip } from '../ui/primitives';
@@ -40,6 +43,34 @@ function SkillsChip({ onPicked }: { onPicked?: () => void }) {
                 <span className="pick-desc">{s.description}</span>
               </span>
               {s.id === skillId ? <Check size={14} className="pick-check" /> : null}
+            </button>
+          ))}
+        </div>
+      </Popover>
+    </>
+  );
+}
+
+function KitChip({ onPicked }: { onPicked?: () => void }) {
+  const kit = useStore(activeKit), library = useStore((s) => s.library);
+  const pop = usePopover();
+  const kits = library.filter((s) => isKit(s) && (!s.userHidden || s.id === kit?.id));
+  return (
+    <>
+      <Chip ref={pop.ref} icon={SwatchBook} active={pop.open || Boolean(kit)} onClick={pop.toggle} data-tip="The agent works with the one you pick from Library">
+        {kit ? kit.name : 'Brand'}
+      </Chip>
+      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={340} label="Brand" className="pop-scroll">
+        <PopoverHeader title="Brand" sub={kits.length ? 'The agent follows the one you pick.' : 'Create one in Library: moodboard, design system or brand kit.'} />
+        <div className="pick-list">
+          {kits.map((s) => (
+            <button key={s.id} type="button" className={`pick-row ${s.id === kit?.id ? 'is-active' : ''}`}
+              onClick={() => { setComposer({ kitId: s.id === kit?.id ? null : s.id }); pop.close(); onPicked?.(); }}>
+              <span className="pick-text">
+                <span className="pick-name">{s.name}</span>
+                <span className="pick-desc">{KIT_META[s.kind as KitKind].singular}</span>
+              </span>
+              {s.id === kit?.id ? <Check size={14} className="pick-check" /> : null}
             </button>
           ))}
         </div>
@@ -104,7 +135,9 @@ function WorkflowsChip({ onPicked }: { onPicked?: () => void }) {
 export function AgentOptions({ activeOnly = false, onPicked }: { activeOnly?: boolean; onPicked?: () => void }) {
   const skillId = useStore((s) => s.composer.skillId);
   const workflowId = useStore((s) => s.composer.workflowId);
+  const kit = useStore(activeKit);
   return <>
+    {!activeOnly || kit ? <KitChip onPicked={onPicked} /> : null}
     {!activeOnly || skillById(skillId) ? <SkillsChip onPicked={onPicked} /> : null}
     {!activeOnly || workflowById(workflowId) ? <WorkflowsChip onPicked={onPicked} /> : null}
   </>;

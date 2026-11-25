@@ -48,7 +48,8 @@ import { openAssetInDesigner } from '../../engine/design/actions';
 import type { Graph, OpId, Subject, SubjectKind } from '../../engine/types';
 import { setUi, toast, useStore } from '../../store/store';
 import { Popover, usePopover } from '../ui/Popover';
-import { newKitName } from '../gallery/newKit';
+import { KIT_META, newKitName } from '../gallery/newKit';
+import { isKit, KIT_KIND_LIST, type KitKind } from '../../engine/libraryTypes';
 import { Button, Chip, IconButton, MenuItem, Segmented } from '../ui/primitives';
 import { DOCK_GROUP_LABEL, DOCK_GROUP_ORDER, opGroup, type OpGroupId } from './opGroups';
 import { OpForm } from './OpForm';
@@ -252,9 +253,9 @@ export function SendToMenu({ assetId, size = 'sm' }: { assetId: string; size?: '
   const [split, setSplit] = useState(true);
   const taken = subjectName.trim() ? libraryItem(subjectName) : undefined;
   if (!asset) return null;
-  const moodboards = library.filter((s) => s.kind === 'moodboard' && !s.userHidden);
+  const kits = library.filter((s) => isKit(s) && !s.userHidden);
   const close = () => { pop.close(); setSubject(false); setStyleForm(false); setMood(false); };
-  const addToMoodboard = async (target?: Subject) => {
+  const addToKit = async (target?: Subject, kind: KitKind = 'moodboard') => {
     if (moodRef.current) return;
     moodRef.current = true; setMoodBusy(true);
     try {
@@ -267,8 +268,8 @@ export function SendToMenu({ assetId, size = 'sm' }: { assetId: string; size?: '
         });
         toast(`Added to "${saved.name}".`, 'success');
       } else {
-        const name = newKitName('moodboard', useStore.getState().library);
-        await createItem({ name, kind: 'moodboard', space, by: 'user', sessionId, graph: { nodes: [node], edges: [] }, draft: false, open: false });
+        const name = newKitName(kind, useStore.getState().library);
+        await createItem({ name, kind, space, by: 'user', sessionId, graph: { nodes: [node], edges: [] }, draft: false, open: false });
         toast(`Added to "${name}".`, 'success');
       }
       close();
@@ -280,9 +281,9 @@ export function SendToMenu({ assetId, size = 'sm' }: { assetId: string; size?: '
       <Popover open={pop.open} anchor={pop.ref} onClose={close} width={subject || styleForm ? 320 : 240} label="Send to">
         {mood ? (
           <div className="menu">
-            <MenuItem icon={ChevronLeft} label="Add to moodboard" onClick={() => setMood(false)} />
-            {moodboards.map((m) => <MenuItem key={m.id} icon={Images} label={m.name} disabled={moodBusy} onClick={() => void addToMoodboard(m)} />)}
-            <MenuItem icon={Plus} label="New moodboard" disabled={moodBusy} onClick={() => void addToMoodboard()} />
+            <MenuItem icon={ChevronLeft} label="Add to moodboard or kit" onClick={() => setMood(false)} />
+            {kits.map((m) => <MenuItem key={m.id} icon={KIT_META[m.kind as KitKind].icon} label={m.name} disabled={moodBusy} onClick={() => void addToKit(m)} />)}
+            {KIT_KIND_LIST.map((k) => <MenuItem key={k} icon={Plus} label={`New ${KIT_META[k].singular.toLowerCase()}`} disabled={moodBusy} onClick={() => void addToKit(undefined, k)} />)}
           </div>
         ) : styleForm ? (
           <SaveStyleForm assetId={assetId} onDone={close} />
@@ -339,7 +340,7 @@ export function SendToMenu({ assetId, size = 'sm' }: { assetId: string; size?: '
                   }}
                 />
                 <MenuItem icon={UserPlus} label="Save to Library" tip="Keep this character, object, product or style as @Name" onClick={() => setSubject(true)} />
-                <MenuItem icon={Images} label="Add to moodboard" onClick={() => setMood(true)} />
+                <MenuItem icon={Images} label="Add to moodboard or kit" onClick={() => setMood(true)} />
               </>
             ) : null}
             {asset.kind !== 'audio' && asset.kind !== 'model3d' && captureOfAsset(assetId) ? <MenuItem icon={Camera} label="Guardar como estilo" tip="Guarda la cámara, el tono, la luz y la textura de este resultado" onClick={() => setStyleForm(true)} /> : null}

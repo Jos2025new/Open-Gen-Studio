@@ -81,14 +81,14 @@ describe('Lote D Parte 3: SendToMenu Add to moodboard', () => {
     expect(findBtn('Add to moodboard')).toBeUndefined();
     await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); });
 
-    // Image offers Add to moodboard -> lists Warm Vibes + New moodboard (not Hero or Acme DS)
+    // Image offers Add to moodboard -> lists the Library entries and New moodboard (not Hero)
     await act(async () => root.render(createElement(SendToMenu, { assetId: img.id })));
     await click(host.querySelector('button[aria-label="Send to"]'));
     await click(findBtn('Add to moodboard'));
     const labels = [...document.querySelectorAll('.menu button')].map((b) => b.textContent);
     expect(labels.some((t) => t?.includes('Warm Vibes'))).toBe(true);
     expect(labels.some((t) => t?.includes('New moodboard'))).toBe(true);
-    expect(labels.some((t) => t?.includes('Acme DS'))).toBe(false);
+    expect(labels.some((t) => t?.includes('Acme DS'))).toBe(true);
     expect(labels.some((t) => t?.includes('Hero'))).toBe(false);
 
     // Clicking Warm Vibes adds the image node as a new version (double click does not duplicate)
