@@ -45,7 +45,9 @@ export function withoutGone(doc: DesignDoc, graph: Graph | undefined): DesignDoc
 export function graphFromDoc(graph: Graph | undefined, doc: DesignDoc, joins: boolean): { graph?: Graph; board?: KitBoard } {
   const known = new Map(Object.entries(doc.board?.at ?? {}).map(([id, a]) => [a.layer, id])), shown = shownIds(doc);
   const gone = new Set([...known].flatMap(([layer, id]) => (shown.has(layer) ? [] : [id])));
-  const fresh = joins ? doc.layers.filter((l) => !known.has(l.id) && ((l.type === 'raster' && isImageAsset(l.sourceAssetId)) || (l.type === 'text' && l.text.trim()))) : [];
+  // Saving replaces the entry with what the document shows, so an element another space removed comes back with its layer.
+  const ids = new Set(graph?.nodes.map((n) => n.id));
+  const fresh = doc.layers.filter((l) => (known.has(l.id) ? !ids.has(known.get(l.id)!) : joins) && ((l.type === 'raster' && isImageAsset(l.sourceAssetId)) || (l.type === 'text' && l.text.trim())));
   const image = fresh.find((l) => l.type === 'raster') as { width: number } | undefined, k = (image?.width ?? doc.width / 3) / NODE_WIDTH;
   const board = doc.board ?? (fresh.length ? { k, x: -100 * k, y: -100 * k, at: {} } : undefined);
   if (!board) return { graph };
@@ -60,7 +62,7 @@ export function graphFromDoc(graph: Graph | undefined, doc: DesignDoc, joins: bo
     return { ...n, position, data: text !== undefined && n.data.kind === 'text' ? { ...n.data, text } : n.data };
   });
   for (const l of fresh) {
-    const p = cornerOf(l), id = uid('nd');
+    const p = cornerOf(l), id = known.get(l.id) ?? uid('nd');
     if (!p) continue;
     const position = spot(p);
     nodes.push({ id, position, data: l.type === 'text' ? { kind: 'text', title: l.name, text: l.text } : { kind: 'asset', title: l.name, assetId: (l as { sourceAssetId: string }).sourceAssetId } });
@@ -68,6 +70,7 @@ export function graphFromDoc(graph: Graph | undefined, doc: DesignDoc, joins: bo
   }
   const edges = (graph?.edges ?? []).filter((e) => !gone.has(e.source) && !gone.has(e.target));
   const groups = graph?.groups?.map((g) => ({ ...g, nodeIds: g.nodeIds.filter((id) => !gone.has(id)) }));
+  for (const id of Object.keys(at)) if (!nodes.some((n) => n.id === id)) delete at[id];
   return { graph: { ...graph, nodes, edges, ...(groups ? { groups } : {}) }, board: { ...board, at } };
 }
 
@@ -159,10 +162,7 @@ function updateBoard(sessionId: string, docId: string, graph: Graph | undefined,
   for (const n of items) {
     const d = n.data, e = linked(doc, n.id);
     if (d.kind !== 'asset' || !d.assetId || e?.layer.type !== 'raster' || e.layer.sourceAssetId === d.assetId) continue;
-    if (!canRefresh(e.layer) || paintingLive() || !getRasterSurface(e.layer.id)) {
-      toast(`Kept "${e.layer.name}" as it is.`, 'info');
-      continue;
-    }
+    if (!canRefresh(e.layer) || paintingLive() || !getRasterSurface(e.layer.id)) continue;
     const canvas = isImageAsset(d.assetId) && images.get(n.id);
     if (!canvas) { missingImage(d.assetId, d.title); continue; }
     replaceLayerPixels(sessionId, docId, e.layer.id, d.assetId, canvas);

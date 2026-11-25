@@ -141,17 +141,34 @@ it.each(KIT_KIND_LIST)('%s brings an edited layer back with one Undo when Nodes 
   expect((await readKitVersion(saved.versionId!))!.doc!.layers.some((l) => l.type === 'raster' && l.sourceAssetId === 'a')).toBe(true);
 });
 
-it.each(KIT_KIND_LIST)('%s left open does not bring back what Nodes removed, and drops it when opened', async (kind) => {
-  const { sid, id, current, layer, save } = await fixture(kind), a = layer('na');
+it.each(KIT_KIND_LIST)('%s saves from an open document what it shows, also after Nodes removed it', async (kind) => {
+  const { sid, id, current, layer, save } = await fixture(kind), a = layer('na'), note = layer('note');
+  await save();
+  const raster = (await rasterizeLayer(sid, current().id, note))!, shown = current().layers.map((l) => l.id);
+  const { added, groupId } = libraryToNodes(sid, id);
+  expect(deleteNodes(sid, added.filter((n) => assetOf(n) === 'a' || n.data.kind === 'text').map((n) => n.id))).toBeNull();
+  const without = await nodesToLibrary({ subjectId: id, sessionId: sid, groupId: groupId!, mode: 'overwrite' });
+  expect(nodeIds(without.graph)).not.toContain('na');
+  const copy = await save('copy'), saved = await save();
+  for (const item of [copy, saved]) {
+    const snap = (await readKitVersion(item.versionId!))!;
+    expect(item.graph!.nodes.filter((n) => assetOf(n) === 'a').map((n) => n.position)).toEqual([{ x: 100, y: 100 }]);
+    expect(snap.doc!.layers).toHaveLength(shown.length);
+    expect(new Set(snap.storedRasterIds)).toEqual(new Set(snap.doc!.layers.filter((l) => l.type === 'raster').map((l) => l.id)));
+  }
+  await libraryToDesigner(sid, id);
+  expect(current().layers.map((l) => l.id)).toEqual(shown);
+  expect(shown).toEqual(expect.arrayContaining([a, raster]));
+});
+
+it('what only an earlier version of the document shows does not stop a save from Nodes', async () => {
+  const { sid, id, layer, save } = await fixture('moodboard');
+  const saved = await save(), snap = (await readKitVersion(saved.versionId!))!, a = layer('na');
+  hoisted.blobs.delete(`raster:${(snap.doc!.board!.at.na ?? { layer: a }).layer}`);
   const { added, groupId } = libraryToNodes(sid, id);
   expect(deleteNodes(sid, [added.find((n) => assetOf(n) === 'a')!.id])).toBeNull();
-  await nodesToLibrary({ subjectId: id, sessionId: sid, groupId: groupId!, mode: 'overwrite' });
-  const saved = await save(), snap = (await readKitVersion(saved.versionId!))!;
-  expect(nodeIds(saved.graph)).not.toContain('na');
-  expect(libraryToNodes(sid, id).added.map(assetOf)).not.toContain('a');
-  expect(new Set(snap.storedRasterIds)).toEqual(new Set(snap.doc!.layers.filter((l) => l.type === 'raster').map((l) => l.id)));
-  await libraryToDesigner(sid, id);
-  expect(current().layers.map((l) => l.id)).not.toContain(a);
+  const next = await nodesToLibrary({ subjectId: id, sessionId: sid, groupId: groupId!, mode: 'overwrite' });
+  expect(nodeIds(next.graph)).not.toContain('na');
 });
 
 it('an image changed in Nodes shows in a document opened anew, and an open document does not change it back', async () => {

@@ -101,7 +101,6 @@ it.each(['untouched', 'direct paint', 'paint base', 'locked'] as const)('handles
     } else {
       expect(reopened.layers[0]).toEqual(before);
       expect(getBuffer(id)?.width).toBe(800);
-      expect(useStore.getState().ui.toasts.at(-1)?.text).toContain('Kept');
     }
   }
 });

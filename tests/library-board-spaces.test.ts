@@ -332,13 +332,15 @@ describe('one position per element, across Designer, Library and Nodes', () => {
     expect(texts(entry(subject.id).graph)).toEqual(['After']);
   });
 
-  it('an element removed in Nodes does not come back from Designer', async () => {
+  it('an element removed in Nodes comes back when an older document that shows it is saved', async () => {
     const { s, id } = await board();
     const doc = await libraryToDesigner(s.id, id), { groupId } = libraryToNodes(s.id, id);
     useStore.setState((x) => ({ sessions: { ...x.sessions, [s.id]: { ...x.sessions[s.id], graph: { ...x.sessions[s.id].graph, groups: x.sessions[s.id].graph.groups!.map((g) => (g.id === groupId ? { ...g, nodeIds: g.nodeIds.slice(0, 1) } : g)) } } } }));
     await saveGroup(s.id, id, groupId!);
-    await saveDoc(s.id, id, doc.id);
     expect(entry(id).graph!.nodes.map((n) => n.id)).toEqual(['na']);
+    await saveDoc(s.id, id, doc.id);
+    expect(entry(id).graph!.nodes.map((n) => n.id)).toEqual(['na', 'nb']);
+    expect(nodeAt(entry(id).graph, 'b')).toEqual({ x: 500, y: 150 });
     expect(layerAt(s.id, doc.id, 'b')).toBeTruthy();
   });
 
