@@ -65,7 +65,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/fx` | 8 | 11 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/money` | 4 | 12 |
-| `src/engine/nodecore` | 24 | 59 |
+| `src/engine/nodecore` | 23 | 59 |
 | `src/engine/nodes` | 8 | 37 |
 | `src/engine/params` | 9 | 21 |
 | `src/engine/planSteps` | 19 | 3 |
@@ -74,7 +74,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 38 | 519 |
 | `src/store` | 19 | 430 |
 
-283 de 839 módulos no tienen ningún test que los importe directamente.
+282 de 838 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -88,7 +88,6 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [audio.node.ts](../src/engine/nodecore/types/audio.node.ts)
 - [image.node.ts](../src/engine/nodecore/types/image.node.ts)
 - [model3d.node.ts](../src/engine/nodecore/types/model3d.node.ts)
-- [part.node.ts](../src/engine/nodecore/types/part.node.ts)
 - [ref.node.ts](../src/engine/nodecore/types/ref.node.ts)
 - [text.node.ts](../src/engine/nodecore/types/text.node.ts)
 - [tool.node.ts](../src/engine/nodecore/types/tool.node.ts)

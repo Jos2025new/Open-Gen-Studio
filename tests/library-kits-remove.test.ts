@@ -20,14 +20,9 @@ async function fixture(kind: KitKind) {
   const session = resetStore(), sid = session.id;
   useStore.setState({ assets: Object.fromEntries(['a', 'b', 'c', 'missing'].map((id) => [id, mkAsset(id, sid)])) });
   for (const id of ['a', 'b', 'c']) putImageBlob(id);
-  const parts: GraphNode[] = kind === 'moodboard' ? [] : [
-    { id: 'color', position: { x: 1700, y: 100 }, data: { kind: 'part', partKind: 'color', title: 'Color', color: '#000000' } },
-    { id: 'component', position: { x: 2100, y: 100 }, data: { kind: 'part', partKind: 'component', title: 'Component', groupId: 'component-group' } },
-    { id: 'style', position: { x: 2500, y: 100 }, data: { kind: 'part', partKind: 'style', title: 'Style', styleType: 'text', values: { fontSize: 24 } } },
-  ];
   const kits = kind === 'brand-kit' ? [(await createItem({ name: 'Colors', kind: 'design-system', space: 'library', by: 'user' })).subject.id] : undefined;
   const tokens: KitTokens | undefined = kind === 'moodboard' ? undefined : { spacing: { type: 'dimension', value: 8 } };
-  const graph = graphOf(asset('a', 100, 100), asset('b', 500, 100), text('note', 'Note', 900, 100), asset('missing', 1300, 100), ...parts);
+  const graph = graphOf(asset('a', 100, 100), asset('b', 500, 100), text('note', 'Note', 900, 100), asset('missing', 1300, 100));
   const edge = { id: 'ref', source: 'na', target: 'nb', sourceHandle: 'out_ref', targetHandle: 'sys_ref', kind: 'ref' as const };
   graph.edges = [edge];
   graph.groups = [{ id: 'group', title: 'Elements', nodeIds: nodeIds(graph) }];
@@ -37,11 +32,11 @@ async function fixture(kind: KitKind) {
   const current = () => getDoc(sid, doc.id)!;
   const layer = (node: string) => current().board!.at[node].layer;
   const save = (mode: 'copy' | 'overwrite' = 'overwrite') => saveItem({ subjectId: id, sessionId: sid, docId: doc.id, mode, space: 'designer', by: 'user' });
-  return { sid, subject, id, doc, current, layer, save, graph, parts, kits, tokens, edge };
+  return { sid, subject, id, doc, current, layer, save, graph, kits, tokens, edge };
 }
 
 it.each(KIT_KIND_LIST)('%s deletes only known elements and restores them through Undo and Versions', async (kind) => {
-  const { sid, doc, current, id, layer, save, parts, tokens, kits, edge } = await fixture(kind);
+  const { sid, doc, current, id, layer, save, tokens, kits, edge } = await fixture(kind);
   const a = layer('na');
   expect(current().board?.at.nmissing).toBeUndefined();
 
@@ -57,11 +52,10 @@ it.each(KIT_KIND_LIST)('%s deletes only known elements and restores them through
   expect(nodeIds(entry(id).graph)).toContain('na');
   expect(copy.versions).toHaveLength(1);
   const saved = await save();
-  const remaining = ['nb', 'note', 'nmissing', ...parts.map(({ id }) => id)];
+  const remaining = ['nb', 'note', 'nmissing'];
   expect(nodeIds(saved.graph)).toEqual(remaining);
   expect(saved.graph?.edges).toEqual([]);
   expect(saved.graph?.groups?.[0].nodeIds).toEqual(remaining);
-  expect(saved.graph?.nodes.filter((n) => n.data.kind === 'part')).toEqual(parts);
   expect(saved.tokens).toEqual(tokens);
   expect(saved.kits).toEqual(kits);
   expect([...hoisted.blobs.keys()]).toEqual(expect.arrayContaining(pixelKeys));

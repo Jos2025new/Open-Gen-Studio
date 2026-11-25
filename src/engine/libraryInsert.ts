@@ -26,13 +26,10 @@ export async function insertComponent(sessionId: string, docId: string, subjectI
   const subject = useStore.getState().library.find((s) => s.id === subjectId);
   if (!subject || !isKit(subject)) throw new Error(`No Library item "${subjectId}".`);
   if (!subject.versionId) throw new Error(`Library item "${subjectId}" has no saved version.`);
-  const node = (subject.graph?.nodes ?? []).find((n) => n.id === pieceId);
-  if (node && (node.data.kind !== 'part' || node.data.partKind !== 'component' || !node.data.groupId)) throw new Error(`Node "${pieceId}" is not a component.`);
   const snap = await readKitVersion(subject.versionId);
   if (!snap?.doc) throw new Error(`Item "${subjectId}" version "${subject.versionId}" has no document.`);
-  const groupIdRef = node?.data.kind === 'part' ? node.data.groupId! : pieceId, compTitle = node?.data.kind === 'part' ? node.data.title : '';
-  const srcGroup = (snap.doc.groups ?? []).find((g) => g.id === groupIdRef), srcLayers = snap.doc.layers.filter((l) => l.groupId === groupIdRef);
-  if (!srcGroup || !srcLayers.length) throw new Error(node ? `Component group "${groupIdRef}" is missing.` : `No component piece or group "${pieceId}" in "${subjectId}".`);
+  const srcGroup = (snap.doc.groups ?? []).find((g) => g.id === pieceId), srcLayers = snap.doc.layers.filter((l) => l.groupId === pieceId);
+  if (!srcGroup || !srcLayers.length) throw new Error(`No component group "${pieceId}" in "${subjectId}".`);
   const written: string[] = [];
   try {
     const copied = await copyDocPixels({ ...snap.doc, layers: srcLayers }, null, expectedRasterIds(snap), written);
@@ -44,7 +41,7 @@ export async function insertComponent(sessionId: string, docId: string, subjectI
     }
     if (!getDoc(sessionId, docId)) throw new Error(`Target document "${docId}" was deleted while inserting.`);
     const newGroup: LayerGroup = {
-      id: groupId, name: compTitle || srcGroup.name, from: { subjectId, pieceId, versionId: subject.versionId },
+      id: groupId, name: srcGroup.name, from: { subjectId, pieceId, versionId: subject.versionId },
       ...(srcGroup.keptHidden ? { keptHidden: srcGroup.keptHidden.map((id) => idMap.get(id) ?? id) } : {}),
       ...(srcGroup.keptLocked ? { keptLocked: srcGroup.keptLocked.map((id) => idMap.get(id) ?? id) } : {}),
     };

@@ -29,8 +29,7 @@ import './KitPage.css';
 
 type Run = (fn: () => unknown) => Promise<void>;
 const assetOf = (n: GraphNode) => (n.data.kind === 'asset' ? n.data.assetId ?? undefined : undefined);
-const tokensOf = (s: Subject, sec: KitSection) => Object.entries(s.tokens ?? {}).filter(([, t]) => sec.tokens?.includes(t.type)).map(([name, t]) => ({ name, token: name as string | undefined, type: t.type, value: String(resolveToken(s.tokens!, name) ?? t.value) }));
-const colorsOf = (s: Subject, sec: KitSection) => [...tokensOf(s, sec), ...(s.graph?.nodes ?? []).flatMap((n) => (n.data.kind === 'part' && n.data.color ? [{ name: n.data.title, token: undefined, type: 'color' as const, value: n.data.color }] : []))];
+const tokensOf = (s: Subject, sec: KitSection) => Object.entries(s.tokens ?? {}).filter(([, t]) => sec.tokens?.includes(t.type)).map(([name, t]) => ({ name, token: name, type: t.type, value: String(resolveToken(s.tokens!, name) ?? t.value) }));
 const insideOf = (s: Subject, sec: KitSection, library: readonly Subject[]) => (s.kits ?? []).flatMap((id) => library.find((x) => x.id === id && x.kind === sec.kit) ?? []);
 
 /** A brand kit or design system in Library: its sections, each filled and used in place. */
@@ -77,7 +76,7 @@ function NewCategory({ onAdd }: { onAdd: (name: string) => void }) {
 
 function SectionTile({ item, section, cover, onOpen }: { item: Subject; section: KitSection; cover: (s: Subject) => string | undefined; onOpen: () => void }) {
   const library = useStore((s) => s.library), nodes = sectionNodes(item, section), images = nodes.flatMap((n) => assetOf(n) ?? []), inside = insideOf(item, section, library);
-  const colors = section.title === 'Colors' ? colorsOf(item, section) : [], tokens = section.type === 'tokens' ? tokensOf(item, section) : [];
+  const colors = section.title === 'Colors' ? tokensOf(item, section) : [], tokens = section.type === 'tokens' ? tokensOf(item, section) : [];
   const quote = nodes.find((n) => n.data.kind === 'text'), covers = inside.flatMap((s) => cover(s) ?? []), groups = section.type === 'components' ? item.groupIds?.length ?? 0 : 0;
   const count = colors.length || tokens.length || inside.length || groups || nodes.length, Icon = section.type === 'components' ? Layers : section.type === 'kits' ? KIT_META[section.kit!].icon : section.type === 'text' ? Type : section.title === 'Fonts' ? Type : section.type === 'tokens' ? Shapes : Images;
   const shown = [...images, ...covers].slice(0, 4);
@@ -105,7 +104,7 @@ function Section(p: SectionProps) {
 
 /** The colors of the kit, one click away: the picked text's or shapes' color, else the Designer's; or copied. */
 function Swatches({ item, section }: { item: Subject; section: KitSection }) {
-  const { sessionId, docId } = useDesign(), colors = section.title === 'Colors' ? colorsOf(item, section) : [];
+  const { sessionId, docId } = useDesign(), colors = section.title === 'Colors' ? tokensOf(item, section) : [];
   if (!colors.length) return null;
   const use = (c: string, token?: string) => {
     const doc = docId ? getDoc(sessionId, docId) : undefined, value = doc && token ? tokenValue(item, token, doc.tokenMode) : undefined, hex = String(value ?? colorHex(c) ?? c).toLowerCase();

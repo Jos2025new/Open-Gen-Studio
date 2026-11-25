@@ -26,7 +26,7 @@ vi.mock('../src/lib/idb', () => ({
   deleteAssetBlobs: async () => undefined,
 }));
 
-import { kitDependencies } from '../src/engine/libraryGraph';
+import { formatLibraryItemIndex, kitDependencies } from '../src/engine/libraryGraph';
 import { createItem, libraryToDesigner, readKitVersion, restoreItemVersion, saveItem } from '../src/engine/libraryVersions';
 import { newRasterLayer, newTextLayer, newVectorLayer } from '../src/engine/design/doc';
 import { groupLayers, patchGroup, setGroupFlag, ungroup } from '../src/engine/design/groups';
@@ -45,46 +45,46 @@ function resetStore() {
 
 beforeEach(() => { hoisted.blobs.clear(); });
 
-describe('Component & style part nodes, missing groups, token deps, and remapDoc survival', () => {
-  it('validates component and style part nodes, tracks missing groups, and indexes component/style -> token deps via edges and aliases', async () => {
+describe('Designer group components, tokens, written guidelines, and remapDoc survival', () => {
+  it('indexes Designer groups as components, tokens with descriptions, section texts, and missing token refs in doc', async () => {
     const s = resetStore();
     const { subject: kit, doc } = await createItem({
       name: 'AcmeDS', kind: 'design-system', space: 'studio', sessionId: s.id, by: 'agent',
       tokens: {
-        'color.primario': { type: 'color', value: '#2255ff' },
+        'color.primario': { type: 'color', value: '#2255ff', description: 'Primary CTA fill' },
+        'color.accion': { type: 'color', value: '{color.primario}' },
         'font.display': { type: 'fontFamily', value: 'Inter' },
         'space.md': { type: 'dimension', value: '16px' },
       },
     });
 
-    await expect(saveItem({ subjectId: kit.id, mode: 'overwrite', space: 'library', by: 'agent', graph: { nodes: [{ id: 'c_bad', position: { x: 0, y: 0 }, data: { kind: 'part', partKind: 'component', title: 'NoGroup' } }], edges: [] } })).rejects.toThrow(/groupId/i);
-    await expect(saveItem({ subjectId: kit.id, mode: 'overwrite', space: 'library', by: 'agent', graph: { nodes: [{ id: 's_bad', position: { x: 0, y: 0 }, data: { kind: 'part', partKind: 'style', title: 'S', values: { color: '#fff' } } }], edges: [] } })).rejects.toThrow(/styleType/i);
-    await expect(saveItem({ subjectId: kit.id, mode: 'overwrite', space: 'library', by: 'agent', graph: { nodes: [{ id: 's_bad2', position: { x: 0, y: 0 }, data: { kind: 'part', partKind: 'style', title: 'S', styleType: 'color', values: {} } }], edges: [] } })).rejects.toThrow(/values/i);
+    await expect(saveItem({ subjectId: kit.id, mode: 'overwrite', space: 'library', by: 'agent', tokens: { bad: { type: 'color', value: '{color.nope}' } } })).rejects.toThrow(/color\.nope/i);
+    await expect(saveItem({ subjectId: kit.id, mode: 'overwrite', space: 'library', by: 'agent', graph: { nodes: [{ id: 'bad_txt', position: { x: 0, y: 0 }, data: { kind: 'text', title: 'Empty', text: '   ' } }], edges: [] } })).rejects.toThrow(/text/i);
 
-    const l1 = newTextLayer('BtnText', 'Buy', { x: 10, y: 10, width: 80 });
-    const l2 = newVectorLayer('BtnBg', [{ type: 'rect', x: 0, y: 0, w: 120, h: 44, fill: '#2255ff', stroke: null, strokeWidth: 0, radius: 8 }]);
+    const l1 = newTextLayer('BtnText', 'Buy', { x: 10, y: 10, width: 80 }, { color: '#2255ff', colorToken: { kit: kit.id, token: 'color.ghost', value: '#2255ff' } });
+    const l2 = newVectorLayer('BtnBg', [{ type: 'rect', x: 0, y: 0, w: 120, h: 44, fill: '#2255ff', fillToken: { kit: kit.id, token: 'color.accion', value: '#2255ff' }, stroke: null, strokeWidth: 0, radius: 8 }]);
     setDoc(s.id, doc!.id, (d) => ({ ...d, layers: [l2, l1] }));
     const gid = groupLayers(s.id, doc!.id, [l2.id, l1.id])!;
     patchGroup(s.id, doc!.id, gid, { name: 'Primary Button' });
 
     const graph: Graph = {
       nodes: [
-        { id: 'c1', position: { x: 0, y: 0 }, data: { kind: 'part', partKind: 'component', groupId: gid, title: 'Primary Button', role: 'cta', values: { padding: '{space.md}' } } },
-        { id: 'c_missing', position: { x: 0, y: 100 }, data: { kind: 'part', partKind: 'component', groupId: 'grp_deleted', title: 'Ghost Card' } },
-        { id: 'st_h1', position: { x: 250, y: 0 }, data: { kind: 'part', partKind: 'style', title: 'Heading 1', styleType: 'text', values: { fontFamily: '{font.display}', color: '{color.primario}', fontSize: 32 } } },
-        { id: 'st_bg', position: { x: 250, y: 100 }, data: { kind: 'part', partKind: 'style', title: 'Surface', styleType: 'color', values: { color: '{color.ghost}', border: '#eee' } } },
+        { id: 'g_cta', position: { x: 0, y: 0 }, data: { kind: 'text', title: 'Buttons', text: 'One primary CTA per view', section: 'Guidelines' } },
       ],
-      edges: [{ id: 'e1', source: 'c1', target: 'st_h1', sourceHandle: 'out_ref', targetHandle: 'sys_ref', kind: 'ref', label: 'uses typography' }],
+      edges: [],
     };
     const updated = await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: doc!.id, space: 'studio', by: 'user', graph });
+    const savedDoc = (await readKitVersion(updated.versionId!))!.doc!;
 
-    const dep = kitDependencies(updated, useStore.getState().library);
-    expect(dep.missingGroupIds).toEqual(['grp_deleted']);
-    expect(dep.pieceTokens.st_h1.sort()).toEqual(['color.primario', 'font.display']);
-    expect(dep.pieceTokens.st_bg).toEqual(['color.ghost']);
-    expect(dep.pieceTokens.c1.sort()).toEqual(['color.primario', 'font.display', 'space.md']);
-    expect(dep.tokenIds.sort()).toEqual(['color.ghost', 'color.primario', 'font.display', 'space.md']);
+    const dep = kitDependencies(updated, useStore.getState().library, savedDoc);
+    expect(dep.tokenIds.sort()).toEqual(['color.accion', 'color.ghost', 'color.primario']);
     expect(dep.missingTokenIds).toEqual(['color.ghost']);
+
+    const index = formatLibraryItemIndex(updated, useStore.getState().library, {}, 2500, savedDoc).text;
+    expect(index).toContain(`component ${gid} "Primary Button"`);
+    expect(index).toContain('token color.primario (color): #2255ff — Primary CTA fill');
+    expect(index).toContain('in Guidelines: One primary CTA per view');
+    expect(index).toContain('token:color.ghost');
   });
 
   it('groupId and member layers survive save, open, copy, and restore (remapDoc)', async () => {

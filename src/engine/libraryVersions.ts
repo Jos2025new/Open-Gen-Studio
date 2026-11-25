@@ -47,12 +47,7 @@ function validateContent(kind: KitKind, subjectId: string, opts: { graph?: Graph
       if (opts.checkAssets) { if (!assets[d.assetId]) throw new Error(`Node "${id}" references missing asset "${d.assetId}".`); checked.push(d.assetId); }
     } else if (d.kind === 'text') {
       if (!d.text.trim()) throw new Error(`Text node "${id}" requires text.`);
-    } else if (d.kind === 'part') {
-      if (!(spec.parts as readonly string[]).includes(d.partKind)) throw new Error(`Kind "${kind}" does not support part "${d.partKind}".`);
-      if (d.partKind === 'color' && !d.color?.trim()) throw new Error(`Color part "${id}" requires color.`);
-      if (d.partKind === 'component' && (!d.groupId?.trim() || !d.title.trim())) throw new Error(`Component part "${id}" requires groupId and title.`);
-      if (d.partKind === 'style' && ((d.styleType !== 'text' && d.styleType !== 'color') || !d.values || !Object.keys(d.values).length)) throw new Error(`Style part "${id}" requires styleType and values.`);
-    } else throw new Error(`Unsupported Library graph node kind "${d.kind}".`);
+    } else throw new Error(`Unsupported Library graph node kind "${(d as { kind: string }).kind}".`);
   }
   for (const e of opts.graph.edges) if (!nodeIds.has(e.source) || !nodeIds.has(e.target)) throw new Error(`Edge "${e.id}" references a missing node.`);
   return checked;

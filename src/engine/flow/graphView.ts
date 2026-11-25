@@ -19,7 +19,6 @@ function statusOf(n: GraphNode, generations: Record<string, Generation>): string
   if (d.kind === 'text') return d.text.trim() ? 'text' : 'empty';
   if (d.kind === 'asset') return d.assetId ? 'done' : 'empty';
   if (d.kind === 'ref') return 'live';
-  if (d.kind === 'part') return d.partKind;
   if (runsGeneration(d)) {
     const g = nodeAttempt(n, generations);
     return g ? g.status : 'not run';

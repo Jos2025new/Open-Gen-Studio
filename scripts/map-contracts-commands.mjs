@@ -125,10 +125,9 @@ export default [
   },
   {
     id: 'library-kits-engine',
-    what: 'Entradas de Library (`KIT_KINDS`, `isKit`, `library.item.*`): grafo existente (`Graph`, nodo `part`, `GraphEdge.label`, `kits?: string[]`), índice puro acotado (`formatLibraryItemIndex`), tokens validados (`libraryTokens.ts`), versiones inmutables con `commitVersion` e índices estables para restaurar imágenes del grafo, precarga de las imágenes fuera del historial y sincronización de Designer en un paso para documentos ya abiertos, Nodes ida y vuelta (`flow/fromLibrary.ts`), inserción por copia con caja compartida (`libraryInsert.ts`, `approxLayerBox`), auto-versionado por base de turno (`libraryAutoSave.ts`), protección de assets, exclusión de envíos y ocultación de `view === studio` en Designer completo.',
+    what: 'Entradas de Library (`KIT_KINDS`, `isKit`, `library.item.*`): grafo existente (`Graph`, `GraphEdge.label`, `kits?: string[]`), índice puro acotado (`formatLibraryItemIndex`), tokens validados (`libraryTokens.ts`), versiones inmutables con `commitVersion` e índices estables para restaurar imágenes del grafo, precarga de las imágenes fuera del historial y sincronización de Designer en un paso para documentos ya abiertos, Nodes ida y vuelta (`flow/fromLibrary.ts`), inserción por copia con caja compartida (`libraryInsert.ts`, `approxLayerBox`), auto-versionado por base de turno (`libraryAutoSave.ts`), protección de assets, exclusión de envíos y ocultación de `view === studio` en Designer completo.',
     sides: [
       ['src/engine/libraryTypes.ts', 'export const KIT_KINDS'],
-      ['src/engine/nodecore/types/part.node.ts', "kind: 'part'"],
       ['src/engine/libraryTokens.ts', 'export function validateTokens'],
       ['src/engine/libraryGraph.ts', 'export function formatLibraryItemIndex'],
       ['src/engine/libraryGraph.ts', 'export function libraryAssetOwners'],
@@ -162,12 +161,11 @@ export default [
       ['src/components/gallery/SaveDesignToLibrary.tsx', 'export function SaveDesignToLibrary'],
       ['src/components/studio/EmbeddedFileMenu.tsx', 'Save to Library…'],
       ['src/components/node/Operations.tsx', 'function SaveNodesBtn'],
-      ['src/components/node/nodes.tsx', "d.kind === 'part'"],
       ['src/components/assets/AssetActions.tsx', 'Add to moodboard'],
     ],
     tests: [
       'tests/library-kits.test.ts', 'tests/library-kits-a2.test.ts', 'tests/library-kits-ui.test.tsx',
-      'tests/library-kits-b1.test.ts', 'tests/library-kits-tokens.test.ts', 'tests/library-kits-components.test.ts',
+      'tests/library-kits-b1.test.ts', 'tests/library-kits-tokens.test.ts', 'tests/library-tokens-alpha.test.tsx', 'tests/library-kits-components.test.ts',
       'tests/library-kits-insert.test.ts', 'tests/library-kits-designer-agent.test.ts', 'tests/library-kits-autosave.test.ts',
       'tests/library-kits-rules.test.ts', 'tests/library-kits-part-node.test.ts', 'tests/library-kits-c-core.test.ts',
       'tests/library-kits-c-index.test.ts', 'tests/library-kits-c-nodes.test.ts',

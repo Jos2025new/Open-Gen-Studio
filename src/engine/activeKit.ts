@@ -68,11 +68,11 @@ export function activeKitLines(st = get(), own?: string): string[] {
   ];
 }
 
-/** The colors of an entry: color tokens and color elements, as hex. */
-export const kitColors = (s: Subject): string[] => [...new Set([
-  ...Object.entries(s.tokens ?? {}).flatMap(([name, t]) => (t.type === 'color' ? [colorHex(String(resolveToken(s.tokens!, name) ?? '')) ?? ''] : [])),
-  ...(s.graph?.nodes ?? []).flatMap((n) => (n.data.kind === 'part' && n.data.color ? [n.data.color] : [])),
-].filter((c) => /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(c)).map((c) => c.toLowerCase()))];
+/** The colors of an entry: its color tokens, as 6- or 8-digit hex. */
+export const kitColors = (s: Subject): string[] => [...new Set(
+  Object.entries(s.tokens ?? {}).flatMap(([name, t]) => (t.type === 'color' ? [colorHex(String(resolveToken(s.tokens!, name) ?? '')) ?? ''] : []))
+    .filter((c) => /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(c)).map((c) => c.toLowerCase()),
+)];
 /** The colors of the picked entry and the ones it contains. */
 export const activeKitColors = (st = get()): string[] => [...new Set(activeKitItems(st).flatMap(kitColors))].slice(0, 32);
 

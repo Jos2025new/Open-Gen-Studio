@@ -66,19 +66,18 @@ describe('insertComponent with origin (copy, own pixels, single undo, no live li
 
     const v1 = await saveItem({
       subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: kitDoc!.id, space: 'studio', by: 'user',
-      graph: { nodes: [{ id: 'comp_cta', position: { x: 0, y: 0 }, data: { kind: 'part', partKind: 'component', groupId: srcGid, title: 'CTA Button', role: 'cta' } }], edges: [] },
     });
     const v1Raster = (await readKitVersion(v1.versionId!))!.doc!.layers.find((l) => l.type === 'raster') as RasterLayer;
 
     const target = createDoc('Landing', 1200, 800, '#ffffff');
     addDoc(s.id, target);
 
-    const { groupId, layerIds } = await insertComponent(s.id, target.id, kit.id, 'comp_cta', { x: 20, y: 30 });
+    const { groupId, layerIds } = await insertComponent(s.id, target.id, kit.id, srcGid, { x: 20, y: 30 });
     expect(groupId).not.toBe(srcGid);
     expect(layerIds).toHaveLength(3);
 
     const after = getDoc(s.id, target.id)!;
-    expect(after.groups?.find((g) => g.id === groupId)).toMatchObject({ id: groupId, name: 'CTA Button', from: { subjectId: kit.id, pieceId: 'comp_cta', versionId: v1.versionId } });
+    expect(after.groups?.find((g) => g.id === groupId)).toMatchObject({ id: groupId, name: 'CTA Button', from: { subjectId: kit.id, pieceId: srcGid, versionId: v1.versionId } });
     const insVec = after.layers[0] as VectorLayer, insRaster = after.layers[1] as RasterLayer, insText = after.layers[2] as TextLayer;
     expect(insRaster.id).not.toBe(v1Raster.id);
     expect(insRaster.paintBaseId).not.toBe(v1Raster.paintBaseId);
@@ -90,7 +89,7 @@ describe('insertComponent with origin (copy, own pixels, single undo, no live li
     undoDoc(s.id, target.id);
     expect(getDoc(s.id, target.id)!.layers).toEqual([]);
 
-    const direct = await insertComponent(s.id, target.id, kit.id, 'comp_cta');
+    const direct = await insertComponent(s.id, target.id, kit.id, srcGid);
     const keptRaster = getDoc(s.id, target.id)!.layers.find((l) => l.type === 'raster') as RasterLayer;
     setDoc(s.id, kitDoc!.id, (d) => ({ ...d, layers: d.layers.map((l) => (l.type === 'text' ? { ...l, text: 'CHANGED V2' } : l)) }));
     await saveItem({ subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: kitDoc!.id, space: 'studio', by: 'user' });
@@ -113,24 +112,19 @@ describe('insertComponent with origin (copy, own pixels, single undo, no live li
     await saveItem({
       subjectId: kit.id, mode: 'overwrite', sessionId: s.id, docId: kitDoc!.id, space: 'studio', by: 'user',
       graph: {
-        nodes: [
-          { id: 'c_ok', position: { x: 0, y: 0 }, data: { kind: 'part', partKind: 'component', groupId: gid, title: 'Ok' } },
-          { id: 'c_missing_grp', position: { x: 0, y: 0 }, data: { kind: 'part', partKind: 'component', groupId: 'grp_nope', title: 'Missing' } },
-          { id: 't_only', position: { x: 0, y: 0 }, data: { kind: 'text', title: 'T', text: 'Not a component' } },
-        ],
+        nodes: [{ id: 't_only', position: { x: 0, y: 0 }, data: { kind: 'text', title: 'T', text: 'Not a component' } }],
         edges: [],
       },
     });
     const target = createDoc('Target', 400, 400);
     addDoc(s.id, target);
 
-    await expect(insertComponent(s.id, target.id, kit.id, 'nope')).rejects.toThrow(/piece/i);
+    await expect(insertComponent(s.id, target.id, kit.id, 'nope')).rejects.toThrow(/group/i);
     await expect(insertComponent(s.id, target.id, kit.id, 't_only')).rejects.toThrow(/component/i);
-    await expect(insertComponent(s.id, target.id, kit.id, 'c_missing_grp')).rejects.toThrow(/group/i);
 
     const beforeKeys = new Set(hoisted.blobs.keys());
     hoisted.setFailSet(() => new Error('disk full'));
-    await expect(insertComponent(s.id, target.id, kit.id, 'c_ok')).rejects.toThrow(/disk full/i);
+    await expect(insertComponent(s.id, target.id, kit.id, gid)).rejects.toThrow(/disk full/i);
     hoisted.setFailSet(null);
     expect([...hoisted.blobs.keys()].filter((k) => !beforeKeys.has(k))).toEqual([]);
     expect(getDoc(s.id, target.id)!.layers).toEqual([]);

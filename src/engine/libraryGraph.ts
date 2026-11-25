@@ -5,7 +5,7 @@ import type { Asset, DesignDoc, Subject } from './types';
 /* Pure dependency graph, reverse usage, cycle checks, asset ownership across versions, and plain-text index. */
 export interface KitDependencies {
   kitIds: string[]; missingKitIds: string[]; assetIds: string[];
-  missingGroupIds: string[]; pieceTokens: Record<string, string[]>; tokenIds: string[]; missingTokenIds: string[];
+  tokenIds: string[]; missingTokenIds: string[];
 }
 
 const uniq = (ids: Iterable<string | undefined>): string[] => [...new Set([...ids].filter((x): x is string => Boolean(x)))];
@@ -14,29 +14,21 @@ export const shortText = (s: string, max = 120): string => (s.length <= max ? s 
 
 export function kitDependencies(subject: Subject, library: readonly Subject[] | ReadonlyMap<string, Subject>, doc?: DesignDoc): KitDependencies {
   const byId = library instanceof Map ? library : new Map((library as readonly Subject[]).map((s) => [s.id, s]));
-  const nodes = subject.graph?.nodes ?? [], byNode = new Map(nodes.map((n) => [n.id, n]));
-  const liveGroups = new Set(doc ? (doc.groups ?? []).filter((g) => doc.layers.some((l) => l.groupId === g.id)).map((g) => g.id) : (subject.groupIds ?? []));
-  const kitIds: string[] = [], missingKitIds: string[] = [], assetIds: string[] = [], missingGroupIds: string[] = [];
-  const tokenMap = new Map<string, string[]>(), addTok = (nid: string, t: string) => pushMap(tokenMap, nid, t);
+  const kitIds: string[] = [], missingKitIds: string[] = [], assetIds: string[] = [], allToks: string[] = [];
   for (const kid of subject.kits ?? []) (byId.has(kid) ? kitIds : missingKitIds).push(kid);
-  for (const { id, data: d } of nodes) {
-    if (d.kind === 'asset' && d.assetId) assetIds.push(d.assetId);
-    else if (d.kind === 'part') {
-      if (d.partKind === 'component' && d.groupId && !liveGroups.has(d.groupId)) missingGroupIds.push(d.groupId);
-      if (d.values) for (const v of Object.values(d.values)) { const t = parseTokenAlias(v); if (t) addTok(id, t); }
+  for (const { data: d } of subject.graph?.nodes ?? []) if (d.kind === 'asset' && d.assetId) assetIds.push(d.assetId);
+  for (const tok of Object.values(subject.tokens ?? {})) for (const v of [tok.value, ...Object.values(tok.modes ?? {})]) { const t = parseTokenAlias(v); if (t) allToks.push(t); }
+  const addRef = (r?: { kit: string; token: string }) => { if (r?.kit === subject.id) allToks.push(r.token); };
+  if (doc) {
+    addRef(doc.backgroundToken);
+    for (const l of doc.layers) {
+      if (l.type === 'text') [l.colorToken, l.fontFamilyToken, l.fontSizeToken].forEach(addRef);
+      else if (l.type === 'vector') { for (const s of l.shapes) { addRef(s.fillToken); addRef(s.strokeToken); for (const g of [s.fillGradient, s.strokeGradient]) g?.stops.forEach((x) => addRef(x.colorToken)); } l.strokes?.forEach((s) => addRef(s.colorToken)); }
     }
   }
-  for (const e of subject.graph?.edges ?? []) {
-    const a = byNode.get(e.source)?.data, b = byNode.get(e.target)?.data;
-    if (a?.kind !== 'part' || b?.kind !== 'part') continue;
-    if (a.partKind === 'component' && b.partKind === 'style') for (const t of tokenMap.get(e.target) ?? []) addTok(e.source, t);
-    if (b.partKind === 'component' && a.partKind === 'style') for (const t of tokenMap.get(e.source) ?? []) addTok(e.target, t);
-  }
-  const pieceTokens: Record<string, string[]> = {}, allToks: string[] = [];
-  for (const [nid, list] of tokenMap) { const u = uniq(list); pieceTokens[nid] = u; allToks.push(...u); }
   const tokenIds = uniq(allToks), tokens = subject.tokens;
   const missingTokenIds = tokenIds.filter((t) => !tokens || !Object.prototype.hasOwnProperty.call(tokens, t));
-  return { kitIds: uniq(kitIds), missingKitIds: uniq(missingKitIds), assetIds: uniq(assetIds), missingGroupIds: uniq(missingGroupIds), pieceTokens, tokenIds, missingTokenIds };
+  return { kitIds: uniq(kitIds), missingKitIds: uniq(missingKitIds), assetIds: uniq(assetIds), tokenIds, missingTokenIds };
 }
 
 export const kitUsedBy = (id: string, library: readonly Subject[]): Subject[] => library.filter((s) => s.id !== id && (s.kits ?? []).includes(id));
@@ -105,19 +97,19 @@ export function formatLibraryItemIndex(subject: Subject, library: readonly Subje
   const count = (doc?.layers.length ?? 0) + (subject.graph?.nodes.length ?? 0) + (subject.kits?.length ?? 0) + Object.keys(subject.tokens ?? {}).length;
   lines.push(`members: ${count || 'none yet'}${count ? ' (everything listed below belongs to this entry)' : ''}`);
   if (doc) lines.push(...docSummaryLines(doc, assets, new Set(dep.assetIds), isKit(subject) && subject.kind !== 'moodboard' ? 'component' : 'group'));
+  else if (subject.groupIds?.length) lines.push(`components: ${subject.groupIds.join(', ')}`);
   if (subject.fonts?.length) lines.push(`font files: ${subject.fonts.map((f) => `${f.family} ${f.variable ? 'variable' : f.weight}${f.italic ? ' italic' : ''}`).join(', ')}`);
-  for (const [k, tok] of Object.entries(subject.tokens ?? {})) lines.push(`token ${k} (${tok.type}): ${shortText(String(tok.value), 80)}${Object.entries(tok.modes ?? {}).map(([m, v]) => `; ${m}: ${shortText(String(v), 60)}`).join('')}`);
+  for (const [k, tok] of Object.entries(subject.tokens ?? {})) lines.push(`token ${k} (${tok.type}): ${shortText(String(tok.value), 80)}${Object.entries(tok.modes ?? {}).map(([m, v]) => `; ${m}: ${shortText(String(v), 60)}`).join('')}${tok.description ? ` — ${shortText(tok.description, 80)}` : ''}`);
   const nodes = subject.graph?.nodes ?? [], byNode = new Map(nodes.map((n) => [n.id, n]));
   for (const { id, data: d } of nodes) {
     if (d.kind === 'asset') lines.push(`node ${id} [asset] "${shortText(d.title, 60)}" asset:${d.assetId ?? 'none'}${assetMeta(assets, d.assetId)}${d.section ? ` in ${shortText(d.section, 40)}` : ''}`);
     else if (d.kind === 'text') lines.push(`node ${id} [text] "${shortText(d.title, 60)}"${d.section ? ` in ${shortText(d.section, 40)}` : ''}: ${shortText(d.text, d.section ? 600 : 120)}`);
-    else if (d.kind === 'part') lines.push(`node ${id} [${d.partKind}] "${shortText(d.title, 60)}"${d.color ? ` ${d.color}` : ''}${d.groupId ? ` group:${d.groupId}` : ''}${d.styleType ? ` ${d.styleType}` : ''}${dep.pieceTokens[id]?.length ? ` tokens:${dep.pieceTokens[id].join(',')}` : ''}`);
   }
   for (const gr of subject.graph?.groups ?? []) lines.push(`group ${gr.id} "${shortText(gr.title, 60)}" (${gr.nodeIds.length} nodes)`);
   for (const e of subject.graph?.edges ?? []) lines.push(`link: ${shortText(byNode.get(e.source)?.data.title ?? e.source, 40)} -> ${shortText(byNode.get(e.target)?.data.title ?? e.target, 40)}${e.label ? ` [${shortText(e.label, 40)}]` : ''}`);
   for (const kid of dep.kitIds) lines.push(`contains: ${kid} "${shortText(byId.get(kid)?.name ?? kid, 60)}" (${byId.get(kid)?.kind ?? 'item'})`);
   for (const u of usedBy) lines.push(`usedBy: ${u.id} "${shortText(u.name, 60)}" (${u.kind ?? 'item'})`);
-  const missing = [...dep.missingKitIds.map((id) => `kit:${id}`), ...dep.missingGroupIds.map((id) => `group:${id}`), ...dep.missingTokenIds.map((id) => `token:${id}`), ...dep.assetIds.filter((id) => !assets[id]).map((id) => `asset:${id}`)];
+  const missing = [...dep.missingKitIds.map((id) => `kit:${id}`), ...dep.missingTokenIds.map((id) => `token:${id}`), ...dep.assetIds.filter((id) => !assets[id]).map((id) => `asset:${id}`)];
   if (missing.length) lines.push(`missing: ${missing.join(', ')}`);
   // Last: a long layer list must not push declared relations out of the cap.
   for (const l of doc?.layers ?? []) lines.push(`layer ${l.id} [${l.type}] "${shortText(l.name, 60)}"${l.groupId ? ` in ${l.groupId}` : ''}`);

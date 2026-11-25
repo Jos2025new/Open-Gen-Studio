@@ -58,7 +58,7 @@ describe('Part 4: libraryToNodes, nodesToLibrary (overwrite|copy|new), and full 
 
       const n1: GraphNode = { id: 'orig_img', position: { x: 40, y: 50 }, data: { kind: 'asset', title: 'Hero Ref', assetId: 'a_ref' } };
       const n2: GraphNode = { id: 'orig_txt', position: { x: 340, y: 50 }, data: { kind: 'text', title: 'Mood Copy', text: 'Warm sunlit studio' } };
-      const n3: GraphNode = { id: 'orig_col', position: { x: 340, y: 240 }, data: { kind: 'part', partKind: 'color', title: 'Amber', color: '#ff9900' } };
+      const n3: GraphNode = { id: 'orig_col', position: { x: 340, y: 240 }, data: { kind: 'text', title: 'Amber', text: 'Warm amber palette', section: 'Guidelines' } };
       const e1: GraphEdge = { id: 'orig_e1', source: 'orig_img', target: 'orig_txt', sourceHandle: 'out_ref', targetHandle: 'sys_ref', kind: 'ref', label: 'lighting' };
       const e2: GraphEdge = { id: 'orig_e2', source: 'orig_col', target: 'orig_txt', sourceHandle: 'out_ref', targetHandle: 'sys_ref', kind: 'ref', label: 'palette' };
 
@@ -118,7 +118,7 @@ describe('Part 4: libraryToNodes, nodesToLibrary (overwrite|copy|new), and full 
       nodes: [
         { id: 'rt_a', position: { x: 10, y: 20 }, data: { kind: 'asset', title: 'Logo', assetId: 'a_logo' } },
         { id: 'rt_t', position: { x: 310, y: 20 }, data: { kind: 'text', title: 'Tagline', text: 'Built to last' } },
-        { id: 'rt_c', position: { x: 310, y: 210 }, data: { kind: 'part', partKind: 'color', title: 'Cobalt', color: '#1144ff' } },
+        { id: 'rt_c', position: { x: 310, y: 210 }, data: { kind: 'text', title: 'Cobalt', text: 'Primary #1144ff guideline', section: 'Guidelines' } },
       ],
       edges: [
         { id: 'rt_e1', source: 'rt_a', target: 'rt_t', sourceHandle: 'out_ref', targetHandle: 'sys_ref', kind: 'ref', label: 'brand voice' },
@@ -172,7 +172,7 @@ describe('Part 4: libraryToNodes, nodesToLibrary (overwrite|copy|new), and full 
     const byTitle = new Map(g2.nodes.map((n) => [n.data.title, n]));
     expect(byTitle.get('Logo')?.data).toMatchObject({ kind: 'asset', assetId: 'a_logo' });
     expect(byTitle.get('Tagline')?.data).toMatchObject({ kind: 'text', text: 'Built to last' });
-    expect(byTitle.get('Cobalt')?.data).toMatchObject({ kind: 'part', partKind: 'color', color: '#1144ff' });
+    expect(byTitle.get('Cobalt')?.data).toMatchObject({ kind: 'text', text: 'Primary #1144ff guideline', section: 'Guidelines' });
 
     const edgeSummary = g2.edges.map((e) => {
       const src = g2.nodes.find((n) => n.id === e.source)!.data.title;

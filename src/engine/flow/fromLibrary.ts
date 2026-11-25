@@ -3,6 +3,7 @@ import { useStore } from '../../store/store';
 import { isKit, type KitActor, type KitGroupLink, type KitKind } from '../libraryTypes';
 import { createItem, saveItem } from '../libraryVersions';
 import { editCompound, editPresentation } from '../nodecore/edit';
+import { descriptorOf } from '../nodecore/registry';
 import type { Asset, Graph, GraphEdge, GraphGroup, GraphNode, Subject } from '../types';
 import { groupSubtree } from './groupTree';
 import { NODE_WIDTH, nodeOutputAsset } from './graph';
@@ -27,9 +28,9 @@ export function libraryToNodes(sessionId: string, subjectId: string): { added: G
   if (!session) throw new Error(`No session "${sessionId}".`);
   const subject = st.library.find((s) => s.id === subjectId);
   if (!subject || !isKit(subject)) throw new Error(`No Library item "${subjectId}".`);
-  const src = subject.graph, srcNodes = src?.nodes ?? [];
+  const src = subject.graph, srcNodes = (src?.nodes ?? []).filter((n) => Boolean(descriptorOf(n.data.kind)));
   const inGraph = new Set(srcNodes.flatMap((n) => (n.data.kind === 'asset' && n.data.assetId ? [n.data.assetId] : [])));
-  const extraIds = (subject.kind === 'moodboard' && srcNodes.length ? [] : kitImageAssetIds(subject, st.assets)).filter((id) => !inGraph.has(id));
+  const extraIds = (subject.kind === 'moodboard' && (src?.nodes.length ?? 0) > 0 ? [] : kitImageAssetIds(subject, st.assets)).filter((id) => !inGraph.has(id));
   if (!srcNodes.length && !extraIds.length) return { added: [], edges: [], groupId: null };
 
   const idMap = new Map<string, string>(), elementOf = new Map<string, string>();
@@ -76,7 +77,7 @@ export async function nodesToLibrary(opts: {
   const nodes: GraphNode[] = [...new Set(rawIds)].map((nid) => {
     const n = byId.get(nid);
     if (!n) throw new Error(`No node "${nid}" in this session.`);
-    if (n.data.kind === 'text' || n.data.kind === 'part') return { id: n.id, position: { ...n.position }, data: structuredClone(n.data) };
+    if (n.data.kind === 'text') return { id: n.id, position: { ...n.position }, data: structuredClone(n.data) };
     const out = nodeOutputAsset(n, st.generations);
     if (!out) throw new Error(`Node "${n.id}" (${n.data.kind}) cannot be saved to Library without a finished asset.`);
     return { id: n.id, position: { ...n.position }, data: { kind: 'asset', title: n.data.title, assetId: out, ...(n.data.section ? { section: n.data.section } : {}) } };

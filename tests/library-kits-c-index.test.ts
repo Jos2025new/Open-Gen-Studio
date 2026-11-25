@@ -67,23 +67,38 @@ describe('Part 3: library.item.* generic verbs, pure plain-text internal index, 
 
     const cBrand = await run({
       cmd: 'library.item.create',
+      on: { session: sid },
       args: {
-        name: 'AcmeBrand', kind: 'brand-kit', space: 'library', description: 'Main brand identity',
+        name: 'AcmeBrand', kind: 'brand-kit', space: 'designer', description: 'Main brand identity',
         kits: [ds.id, mbId],
+        tokens: { 'color.accent': { type: 'color', value: '#ff5500', description: 'CTA accent' } },
         graph: {
           nodes: [
-            { id: 'n_img', position: { x: 0, y: 0 }, data: { kind: 'asset', title: 'Logo', assetId: 'a1' } },
-            { id: 'n_txt', position: { x: 200, y: 0 }, data: { kind: 'text', title: 'Voice', text: 'Warm and direct' } },
-            { id: 'n_col', position: { x: 400, y: 0 }, data: { kind: 'part', partKind: 'color', title: 'Accent', color: '#ff5500' } },
-            { id: 'n_cmp', position: { x: 600, y: 0 }, data: { kind: 'part', partKind: 'component', title: 'CTA', groupId: 'grp_gone' } },
+            { id: 'n_img', position: { x: 0, y: 0 }, data: { kind: 'asset', title: 'Logo', assetId: 'a1', section: 'Logos' } },
+            { id: 'n_txt', position: { x: 200, y: 0 }, data: { kind: 'text', title: 'Voice', text: 'Warm and direct', section: 'Voice' } },
           ],
           edges: [{ id: 'e1', source: 'n_img', target: 'n_txt', sourceHandle: 'out_ref', targetHandle: 'sys_ref', kind: 'ref', label: 'tone' }],
         },
       },
     }, { caller: 'agent' });
     expect(cBrand.ok, JSON.stringify(cBrand)).toBe(true);
-    const brand = useStore.getState().library.find((x) => x.id === (cBrand.results[0] as { id: string }).id)!;
-    expect(brand.origin?.space).toBe('library');
+    const brandCreated = cBrand.results[0] as { id: string; doc: string };
+    await run({
+      on: { session: sid, doc: brandCreated.doc },
+      seq: [
+        { cmd: 'designer.layer.add_text', args: { text: 'Buy now', x: 10, y: 10, width: 120, name: 'CTA Label' } },
+      ],
+    }, { caller: 'agent' });
+    const ctaLayerId = useStore.getState().sessions[sid].docs.find((d) => d.id === brandCreated.doc)!.layers[0].id;
+    await run({
+      on: { session: sid, doc: brandCreated.doc },
+      seq: [
+        { cmd: 'designer.group.create', args: { layers: [ctaLayerId], name: 'Primary CTA' } },
+        { cmd: 'library.item.save', args: { id: brandCreated.id, mode: 'overwrite', space: 'library', doc: brandCreated.doc } },
+      ],
+    }, { caller: 'agent' });
+    const brand = useStore.getState().library.find((x) => x.id === brandCreated.id)!;
+    expect(brand.origin?.space).toBe('designer');
     const deleteChild = await run({ cmd: 'library.item.delete', args: { id: mbId } }, { caller: 'agent' });
     expect(deleteChild.ok).toBe(true);
 
@@ -97,12 +112,13 @@ describe('Part 3: library.item.* generic verbs, pure plain-text internal index, 
     const txt = payload.index as string;
     expect(txt).toContain('AcmeBrand');
     expect(txt).toContain('brand-kit');
-    expect(txt).toContain('origin: library');
+    expect(txt).toContain('origin: designer');
     expect(txt).toContain('versions:');
     expect(txt).toContain(ds.id);
+    expect(txt).toContain('color.accent (color): #ff5500 — CTA accent');
+    expect(txt).toContain('Primary CTA');
     expect(txt).toContain('Logo -> Voice [tone]');
     expect(txt).toContain(`kit:${mbId}`);
-    expect(txt).toContain('group:grp_gone');
 
     // usedBy appears on ds read
     const readDs = await run({ cmd: 'library.item.read', args: { id: ds.id } }, { caller: 'agent' });

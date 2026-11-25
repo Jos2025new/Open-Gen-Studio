@@ -22,7 +22,7 @@ export interface NodeUi {
 }
 
 /** The card icon of every node kind: the catalog entries below take theirs from here. */
-export const KIND_ICON = { text: Type, image: ImageIcon, video: Film, audio: Music, model3d: Box, tool: Wand, asset: FileImage, ref: Layers, part: Layers } as const;
+export const KIND_ICON = { text: Type, image: ImageIcon, video: Film, audio: Music, model3d: Box, tool: Wand, asset: FileImage, ref: Layers } as const;
 
 /** Order here is the order of the add menu and the library. */
 export const NODE_UIS: readonly NodeUi[] = [

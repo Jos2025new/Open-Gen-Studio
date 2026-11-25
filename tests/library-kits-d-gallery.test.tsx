@@ -149,7 +149,7 @@ describe('Lote D Parte 1: Library kit categories, cards, menu, versions, compone
       align: 'left' as const, lineHeight: 1.2,
     };
     const compGraph: Graph = {
-      nodes: [{ id: 'p1', position: { x: 0, y: 0 }, data: { kind: 'part', partKind: 'component', title: 'Primary Button', groupId: 'g1' } }],
+      nodes: [{ id: 'p1', position: { x: 0, y: 0 }, data: { kind: 'text', title: 'Buttons', text: 'Primary CTA usage', section: 'Guidelines' } }],
       edges: [],
     };
     useStore.setState((st) => ({

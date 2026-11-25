@@ -66,7 +66,7 @@ describe('Part 2: Graph model, KIT_KINDS table, trimmed tokens, shared approxLay
     expect(typeof createItem).toBe('function');
     const graph: Graph = {
       nodes: [
-        { id: 'n1', position: { x: 10, y: 0 }, data: { kind: 'part', partKind: 'color', title: 'Accent', color: '#ff5500' } },
+        { id: 'n1', position: { x: 10, y: 0 }, data: { kind: 'text', title: 'Voice', text: 'Clear and bold', section: 'Voice' } },
         { id: 'n2', position: { x: 200, y: 0 }, data: { kind: 'text', title: 'Note', text: 'Warm glow' } },
       ],
       edges: [{ id: 'e1', source: 'n1', target: 'n2', sourceHandle: 'out_ref', targetHandle: 'sys_ref', kind: 'ref', label: 'tone' }],

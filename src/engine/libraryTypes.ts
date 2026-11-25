@@ -2,9 +2,9 @@ import type { Graph } from './graphTypes';
 
 /* Library item kinds (moodboard, design-system, brand-kit) and shared helpers. */
 export const KIT_KINDS = {
-  moodboard: { tokens: false, kits: false, parts: ['color'] },
-  'design-system': { tokens: true, kits: true, parts: ['color', 'component', 'style'] },
-  'brand-kit': { tokens: true, kits: true, parts: ['color', 'component', 'style'] },
+  moodboard: { tokens: false, kits: false },
+  'design-system': { tokens: true, kits: true },
+  'brand-kit': { tokens: true, kits: true },
 } as const;
 export type KitKind = keyof typeof KIT_KINDS;
 export const KIT_KIND_LIST = Object.keys(KIT_KINDS) as [KitKind, ...KitKind[]];

@@ -228,35 +228,26 @@ describe('Lote D Parte 2: SaveToLibrary, 3 integrations, GraphGroup.library, and
     expect(findBtn('Save a copy', fallbackForm)).toBeUndefined();
   });
 
-  it('2d: renders part node body for color, style, and component without media placeholder, and keeps part out of add menus', async () => {
+  it('2d: renders text guideline node and unknown legacy node safely without crashing, and keeps add menus clean', async () => {
     const mkProps = (node: GraphNode) => ({
       id: node.id, type: 'studio', selected: false, dragging: false, zIndex: 0,
       selectable: true, deletable: true, draggable: true, isConnectable: true,
       positionAbsoluteX: 0, positionAbsoluteY: 0, data: { node, solo: false },
     });
-    const colorNode: GraphNode = { id: 'p1', position: { x: 0, y: 0 }, data: { kind: 'part', partKind: 'color', title: 'Accent', color: '#ff3366' } };
-    const styleNode: GraphNode = { id: 'p2', position: { x: 0, y: 0 }, data: { kind: 'part', partKind: 'style', title: 'Heading', styleType: 'text', values: { font: 'Inter', size: 24 } } };
-    const compNode: GraphNode = { id: 'p3', position: { x: 0, y: 0 }, data: { kind: 'part', partKind: 'component', title: 'Hero Card', groupId: 'g1' } };
+    const noteNode: GraphNode = { id: 'p1', position: { x: 0, y: 0 }, data: { kind: 'text', title: 'Voice', text: 'Direct and clear', section: 'Voice' } };
+    const unknownNode: GraphNode = { id: 'p2', position: { x: 0, y: 0 }, data: { kind: 'legacy_widget', title: 'Old piece' } as unknown as GraphNode['data'] };
 
     await act(async () => root.render(createElement('div', null,
-      createElement(StudioNode, mkProps(colorNode)),
-      createElement(StudioNode, mkProps(styleNode)),
-      createElement(StudioNode, mkProps(compNode)),
+      createElement(StudioNode, mkProps(noteNode)),
+      createElement(StudioNode, mkProps(unknownNode)),
     )));
-    expect(host.querySelector('.nc-empty')).toBeNull();
-    const bodies = [...host.querySelectorAll('.nc .nc-text')];
-    expect(bodies).toHaveLength(3);
-    expect(bodies[0].querySelector<HTMLElement>('.group-swatch')?.style.background).toBeTruthy();
-    expect(bodies[0].textContent).toContain('#ff3366');
-    expect(bodies[1].textContent).toContain('font: Inter');
-    expect(bodies[1].textContent).toContain('size: 24');
-    expect(bodies[2].textContent).toContain('Hero Card');
+    expect(host.querySelector<HTMLTextAreaElement>('textarea.nc-text')?.value).toBe('Direct and clear');
+    expect(host.textContent).toContain('Old piece');
 
-    // part never appears in AddNodeItems or NodeLibrary
     await act(async () => root.render(createElement('div', null,
       createElement(AddNodeItems, { onPick: () => undefined }),
       createElement(NodeLibrary, { onPick: () => undefined }),
     )));
-    expect(host.textContent?.toLowerCase()).not.toContain('part');
+    expect(host.textContent?.toLowerCase()).not.toContain('legacy_widget');
   });
 });

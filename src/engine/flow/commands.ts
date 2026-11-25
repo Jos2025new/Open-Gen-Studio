@@ -50,17 +50,6 @@ const toolNode = z
   .object({ kind: z.literal('tool'), title, op, params: json, generationId: z.string().optional(), outputIndex: z.number().int().min(0), sketchAssetId: z.string().optional() })
   .strict();
 const assetNode = z.object({ kind: z.literal('asset'), title, assetId: z.string().nullable(), sketchAssetId: z.string().optional() }).strict();
-const partNode = z.object({
-  kind: z.literal('part'),
-  partKind: z.enum(['color', 'component', 'style']),
-  title,
-  role: z.string().optional(),
-  description: z.string().optional(),
-  color: z.string().optional(),
-  groupId: z.string().optional(),
-  styleType: z.enum(['text', 'color']).optional(),
-  values: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
-}).strict();
 const refNode = z
   .object({
     kind: z.literal('ref'),
@@ -79,7 +68,7 @@ const refNode = z
   })
   .strict();
 /** A node's data as the actions take it. The graph stores plain JSON; settings and params keep their own shape. */
-const nodeData = z.discriminatedUnion('kind', [textNode, genNode, toolNode, assetNode, partNode, refNode]);
+const nodeData = z.discriminatedUnion('kind', [textNode, genNode, toolNode, assetNode, refNode]);
 
 const nodePatch = z
   .object({
@@ -107,13 +96,6 @@ const nodePatch = z
     op: op.optional(),
     params: json.optional(),
     assetId: z.string().nullable().optional(),
-    partKind: z.enum(['color', 'component', 'style']).optional(),
-    role: z.string().optional(),
-    description: z.string().optional(),
-    color: z.string().optional(),
-    groupId: z.string().optional(),
-    styleType: z.enum(['text', 'color']).optional(),
-    values: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
   })
   .strict();
 

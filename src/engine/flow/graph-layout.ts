@@ -15,24 +15,9 @@ export function nodeWidth(data: GraphNodeData): number {
 }
 
 export function estimatedHeight(data: GraphNodeData): number {
-  switch (data.kind) {
-    // Media-first cards: a preview (or the text) plus the label above it; controls float outside.
-    case 'text':
-      return 170;
-    case 'ref':
-      if (data.type === 'chat') return 560;
-      if (data.type === 'space' && isOmniSpace(data.ref)) return 360;
-      return 220;
-    case 'image':
-    case 'model3d':
-    case 'video':
-    case 'audio':
-    case 'tool':
-    case 'asset':
-      return 220;
-    case 'part':
-      return 150;
-  }
+  if (data.kind === 'text') return 170;
+  if (data.kind === 'ref') return data.type === 'chat' ? 560 : data.type === 'space' && isOmniSpace(data.ref) ? 360 : 220;
+  return 220;
 }
 
 /** `panel`: the floating composer zone under the card when it has one (see `panelZone`); set by `nodeRect`, never part of the card box. */

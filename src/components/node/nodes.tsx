@@ -244,7 +244,7 @@ function Preview({ node }: { node: GraphNode }) {
   const sessionId = useSessionId();
   const { g, assetId, all, sketch } = useNodeOutput(node);
   const d = node.data;
-  const Icon = KIND_ICON[d.kind];
+  const Icon = (KIND_ICON as Record<string, typeof KIND_ICON.ref>)[d.kind] ?? KIND_ICON.ref;
   if (g && (g.status === 'running' || g.status === 'queued')) {
     // Results arrive one request at a time (×3 = three requests): show each as soon as it is saved.
     if (g.assetIds.length) {
@@ -452,7 +452,7 @@ function CreativeNode({ data, selected }: NodeProps<FlowNode>) {
   const { assetId } = useNodeOutput(node);
   const previewAsset = useStore((s) => (assetId ? s.assets[assetId] : undefined));
   const d = node.data;
-  const Icon = KIND_ICON[d.kind];
+  const Icon = (KIND_ICON as Record<string, typeof KIND_ICON.ref>)[d.kind] ?? KIND_ICON.ref;
   const kindClass = d.kind === 'tool' ? `k-tool out-${OPS[(d as ToolNodeData).op].output}` : `k-${d.kind}`;
   const hasPanel = d.kind === 'image' || d.kind === 'video' || d.kind === 'audio' || d.kind === 'model3d' || d.kind === 'tool';
   const showTools = Boolean(selected) && solo;
@@ -495,11 +495,6 @@ function CreativeNode({ data, selected }: NodeProps<FlowNode>) {
             placeholder="Prompt or copy…"
             onChange={(e) => patchNodeData(sessionId, node.id, { text: e.target.value })}
           />
-        ) : d.kind === 'part' ? (
-          <div className="nc-text">
-            {d.partKind === 'color' ? <span className="nt-row"><span className="group-swatch" style={{ background: d.color }} />{d.color}</span>
-              : d.partKind === 'style' ? (Object.entries(d.values ?? {}).map(([k, v]) => `${k}: ${v}`).join('\n') || d.title) : d.title}
-          </div>
         ) : (
           <div
             className="nc-body"
