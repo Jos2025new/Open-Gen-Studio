@@ -110,7 +110,10 @@ export function createDeltaClient() {
       for (const id of prev.keys()) if (!present.has(id)) del[coll].push(id);
       for (const id of uncUp.keys()) if (!present.has(id) && !prev.has(id)) del[coll].push(id);
       const curOrder = [...staged[coll].keys()];
-      if (!sameMapOrder(prev, staged[coll])) {
+      if ([...uncDel].some((id) => present.has(id))) {
+        // The disk may or may not have dropped what came back: its place is said outright, with the whole order.
+        (order ??= {})[coll] = computeOrderDiff([], curOrder);
+      } else if (!sameMapOrder(prev, staged[coll])) {
         const moves = computeOrderDiff([...prev.keys()], curOrder, Object.keys(up[coll]));
         if (moves) (order ??= {})[coll] = moves;
       } else if (unconfirmedOrder[coll] && !sameSequence(unconfirmedOrder[coll], curOrder)) {

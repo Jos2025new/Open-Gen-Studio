@@ -237,9 +237,9 @@ describe('library loss guard: the 409 bodies through the HTTP layer', () => {
 describe('library loss guard: the real client against the real store', () => {
   let sql: ReturnType<typeof createSqliteStore>;
   const bodies: any[] = [];
-  let drop = false;
+  let drop = false, arrives = true;
   beforeEach(async () => {
-    stores.clear(); bodies.length = 0;
+    stores.clear(); bodies.length = 0; arrives = true;
     vi.resetModules();
     sql = createSqliteStore(dir());
     opened.push(sql);
@@ -248,6 +248,7 @@ describe('library loss guard: the real client against the real store', () => {
       if (url === '/x/store/state') return new Response(sql.read() ?? '');
       const body = JSON.parse(init!.body as string);
       bodies.push(body);
+      if (drop && !arrives) { drop = false; throw new TypeError('Failed to fetch'); }
       const r = sql.commit(body);
       if (drop) { drop = false; throw new TypeError('Failed to fetch'); }
       return new Response(r.status === 204 ? null : r.status === 409 ? JSON.stringify(r) : r.reason, { status: r.status });
@@ -313,6 +314,22 @@ describe('library loss guard: the real client against the real store', () => {
     expect(await stateDb.set('ogs-app', value({ library: ['a'] }))).toBe('rejected');
     expect(await stateDb.set('ogs-app', value({ library: ['a'] }), { keep: true })).toBe('ok');
     expect(ids()).toEqual(['a']);
+  });
+
+  it('a deletion whose answer was lost and then undone comes back in its place, whether the commit arrived or not', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const { stateDb } = await import('../src/lib/idb');
+    await stateDb.get('ogs-app');
+    const all = ['a', 'b', 'c', 'd', 'e'];
+    for (const gone of ['a', 'c', 'e']) for (const arrived of [true, false]) {
+      expect(await stateDb.set('ogs-app', value({ library: all }))).toBe('ok');
+      arrives = arrived;
+      drop = true;
+      expect(await stateDb.set('ogs-app', value({ library: all.filter((x) => x !== gone) }))).toBe('fail');
+      const moved = [all[1], all[0], ...all.slice(2)];
+      expect(await stateDb.set('ogs-app', value({ library: moved }))).toBe('ok');
+      expect(ids()).toEqual(moved);
+    }
   });
 
   it('restoring the records lifts the refusal without any approval', async () => {

@@ -57,7 +57,10 @@ describe('13: the save notice', () => {
   it('a Library loss says so, alone and together with removed sessions', async () => {
     const report = (p: Parameters<typeof setProblem>[0]) => { setProblem(p); const v = markStateDirty(); beginStateSave(v); reportSave(v, 'rejected'); };
     const records = [{ coll: 'library' as const, lost: 4, diskHash: 'h' }];
-    report({ reason: 'possible-loss', losses: [], records, rejectedFile: 'rejected-x.json' });
+    report({ reason: 'possible-loss', losses: [{ sessionId: sid(), diskHash: 'h' }], records, rejectedFile: 'rejected-x.json' });
+    await render();
+    expect(host.textContent).toContain('Changes to your sessions and your Library are not being saved');
+    await act(async () => { report({ reason: 'possible-loss', losses: [], records, rejectedFile: 'rejected-x.json' }); });
     await render();
     expect(host.textContent).toContain('Changes to your Library are not being saved to disk');
     expect(labels()).toContain('Keep this version (Library items removed)');

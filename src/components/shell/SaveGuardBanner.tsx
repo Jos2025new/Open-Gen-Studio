@@ -17,7 +17,7 @@ export function SaveGuardBanner() {
   if (reason !== 'conflict' && reason !== 'possible-loss') return null;
   const loss = reason === 'possible-loss';
   const many = (rejected?.losses?.length ?? 0) > 1 || rejected?.total;
-  const sessions = rejected?.sessionId && !many ? `"${title ?? rejected.sessionId}"` : rejected?.records && !rejected.sessionId && !rejected.total ? '' : 'your sessions';
+  const sessions = rejected?.sessionId && !many ? `"${title ?? rejected.sessionId}"` : rejected?.records && !rejected.losses?.length && !rejected.sessionId && !rejected.total ? '' : 'your sessions';
   const what = [sessions, rejected?.records ? 'your Library' : ''].filter(Boolean).join(' and ');
   const removed = [rejected?.total ? 'sessions' : '', rejected?.records ? 'Library items' : ''].filter(Boolean).join(' and ');
   return (
