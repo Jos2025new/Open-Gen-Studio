@@ -21,7 +21,7 @@ export async function importDesignFiles(sessionId: string, docId: string, files:
   await placeImportedImages(sessionId, docId, ids);
 }
 
-/** Save to the gallery or download in a format; a failure becomes a toast. */
+/** Save to Library or download in a format; a failure becomes a toast. */
 export async function runDesignOutput(sessionId: string, docId: string, gallery: boolean, format: ExportFormat = 'png'): Promise<void> {
   try { await (gallery ? saveDocToGallery(sessionId, docId) : exportDocFile(sessionId, docId, format)); }
   catch (err) { toast(err instanceof Error ? err.message : 'Export failed', 'error'); }

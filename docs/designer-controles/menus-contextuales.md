@@ -27,7 +27,7 @@ El Designer NO tiene un menú de clic derecho general: una búsqueda de `onConte
 | Popover Confirm painting on this layer | Cabecera del panel (`RasterLimitControls.tsx:55`) | Aprobación de pintura ([[capas]]) | Capa raster pendiente | 320 px | Igual que hoy | se conserva | no dibujado |
 | Popover Painting on a layer with editable strokes | Junto al clic (`DrawingChoice.tsx:32`) | Elección Drawing/Design ([[propiedades]]) | Pintar con trazos editables | 340 px | Igual que hoy | se conserva | no dibujado |
 | Popover Document presets | Barra superior (`DesignerWorkspace.tsx:86`) | Nuevo documento ([[documentos]]) | Siempre | — | Igual que hoy | se conserva | no dibujado |
-| Popover Save to gallery | Barra superior (`DesignerWorkspace.tsx:103`) | Confirmación ([[documentos]]) | Hay documento | 260 px | Igual que hoy | se conserva | no dibujado |
+| Popover Save to Library | Barra superior (`DesignerWorkspace.tsx:118`) | `Image / Editable` ([[documentos]]) | Hay documento | 300 px | Igual que hoy | se conserva | no dibujado |
 | Popover Export format | Barra superior (`DesignerWorkspace.tsx:114`) | Exportación ([[documentos]]) | Hay documento | — | Igual que hoy | se conserva | no dibujado |
 | Popover Canvas size | Barra superior (`CanvasSize.tsx:85`) | Tamaño ([[tamanos]]) | Hay documento | 250 px | Igual que hoy | se conserva | no dibujado |
 | Popover Import from chat | Barra superior izquierda (`ImportFromChat.tsx:64`) | Importar imágenes ([[documentos]]) | Imágenes pendientes | 360 px | Igual que hoy | se conserva | no dibujado |

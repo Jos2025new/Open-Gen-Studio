@@ -62,7 +62,7 @@ export function SidePanel() {
 
   if (!panel) return null;
   return (
-    <aside className={`side-panel panel-${panel} ${expanded ? 'is-expanded' : ''}`} style={{ '--side-w': `${Math.max(PANEL_MIN_W, width)}px` } as CSSProperties} aria-label={panel === 'gallery' ? 'Gallery' : panel === 'spending' ? 'Spending' : 'Sessions'}>
+    <aside className={`side-panel panel-${panel} ${expanded ? 'is-expanded' : ''}`} style={{ '--side-w': `${Math.max(PANEL_MIN_W, width)}px` } as CSSProperties} aria-label={panel === 'gallery' ? 'Library' : panel === 'spending' ? 'Spending' : 'Sessions'}>
       {panel === 'gallery' ? <GalleryPanel /> : panel === 'spending' ? <SpendingPanel /> : <SessionsPanel />}
       {expanded ? null : <PanelResize width={width} onWidth={setWidth} />}
     </aside>

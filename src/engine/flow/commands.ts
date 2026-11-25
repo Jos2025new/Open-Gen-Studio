@@ -167,7 +167,7 @@ export const commands = [
   nodeCommand({
     id: 'nodes.node.add_asset',
     title: 'Add asset as node',
-    description: 'An Asset node for this gallery asset (a finished 3D model comes back as its 3D node, with the images it was made from). Returns {node}.',
+    description: 'An Asset node for this Library asset (a finished 3D model comes back as its 3D node, with the images it was made from). Returns {node}.',
     args: z.object({ asset, position: point }).strict(),
     effect: 'write',
     available: (ctx, args) => (args?.asset && !useStore.getState().assets[args.asset] ? `No asset "${args.asset}".` : hasTarget(ctx)),
@@ -272,7 +272,7 @@ export const commands = [
     description: 'A node result takes this image as its painted-over copy; null clears it. The copy it replaces is deleted.',
     args: z.object({ node: nodeRef, asset: asset.nullable() }).strict(),
     effect: 'write',
-    debt: 'The replaced copy is deleted from the gallery; undo does not bring the asset back.',
+    debt: 'The replaced copy is deleted from the Library; undo does not bring the asset back.',
     available: (ctx, args) => {
       const target = hasTarget(ctx, args);
       if (target !== true || !args?.node) return target;

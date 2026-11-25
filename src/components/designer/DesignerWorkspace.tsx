@@ -6,8 +6,8 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import { chatImagesNotInDesigner, chatToDesigner } from '../../engine/design/fromChat';
 import { ImportFromChat } from '../ui/ImportFromChat';
 import { AspectGlyph } from '../composer/MediaControls';
-import { ArrowUpFromLine, ChevronLeft, Images, Library, Maximize, Minus, PanelRight, Plus, Redo2, Undo2 } from '../ui/icons';
-import { SaveToLibrary } from '../gallery/SaveToLibrary';
+import { ArrowUpFromLine, Library, Maximize, Minus, PanelRight, Plus, Redo2, Undo2 } from '../ui/icons';
+import { SaveDesignToLibrary } from '../gallery/SaveDesignToLibrary';
 import { useStore } from '../../store/store';
 import { newBlankDoc, redoDoc, undoDoc } from '../../engine/design/actions';
 import { DOC_PRESETS } from '../../engine/design/doc';
@@ -16,7 +16,7 @@ import { canRedo, canUndo, historyDepth, subscribeHistory } from '../../engine/d
 import { designerKey } from './designerKeys';
 import { ValueNotice } from './ValueNotice';
 import { designerClipboard } from './designerClipboard';
-import { IMPORT_ACCEPT, importDesignFiles, runDesignOutput } from './designerFile';
+import { IMPORT_ACCEPT, importDesignFiles } from './designerFile';
 import { TopbarActions } from '../shell/TopBar';
 import { Button, IconButton, MenuItem } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
@@ -37,8 +37,6 @@ export function DesignerWorkspace() {
   const newKit = useNewKit(session.id, 'designer');
   const exportMenu = usePopover();
   const saveConfirm = usePopover();
-  const [saveView, setSaveView] = useState<'gallery' | 'library'>('gallery');
-  const closeSave = () => { saveConfirm.close(); setSaveView('gallery'); };
   const [zoom, setZoom] = useState(1);
   const [zoomDraft, setZoomDraft] = useState<string | null>(null);
   const [selectedCurve, setSelectedCurve] = useState<{ layerId: string; strokeId: string; handles: number[] } | null>(null);
@@ -73,12 +71,6 @@ export function DesignerWorkspace() {
     return () => window.removeEventListener('keydown', onKey);
   }, [doc, session.id]);
 
-  const saveToGallery = async () => {
-    if (!doc || busy) return;
-    setBusy(true);
-    try { await runDesignOutput(session.id, doc.id, true); } finally { setBusy(false); }
-  };
-
   const setExportOpen = exportMenu.setOpen;
   useEffect(() => {
     if (!doc || busy) return;
@@ -97,7 +89,7 @@ export function DesignerWorkspace() {
 
   return <div className="designer">
     <input ref={importRef} type="file" accept={IMPORT_ACCEPT} multiple hidden onChange={(e) => { const files = [...(e.currentTarget.files ?? [])]; e.currentTarget.value = ''; void importFiles(files); }} />
-    {/* Beside the title: new document and undo/redo, one group. Right: Save to gallery and the panel, then Export. Import (the
+    {/* Beside the title: new document and undo/redo, one group. Right: Save to Library and the panel, then Export. Import (the
         prompt box's +), Transform (Edit) and Canvas size (toolbox) live where they are used. */}
     <TopbarActions side="start">
       <span className="topbar-group" role="toolbar" aria-label="Document history">
@@ -119,22 +111,12 @@ export function DesignerWorkspace() {
       {doc && <SelectionChip docId={doc.id} />}
       {doc && <>
         <span className="topbar-group" role="toolbar" aria-label="Document">
-          <IconButton ref={saveConfirm.ref} icon={Images} label="Save to gallery" size="sm" disabled={busy} active={saveConfirm.open} onClick={saveConfirm.toggle} />
+          <IconButton ref={saveConfirm.ref} icon={Library} label="Save to Library" size="sm" disabled={busy} active={saveConfirm.open} onClick={saveConfirm.toggle} />
           <span className="topbar-sep" aria-hidden />
           <IconButton icon={PanelRight} label="Show or hide right panel" size="sm" onClick={() => window.dispatchEvent(new Event('ogs:layers-toggle'))} />
         </span>
-        <Popover open={saveConfirm.open} anchor={saveConfirm.ref} onClose={closeSave} width={saveView === 'library' ? 300 : 260} label="Save to gallery">
-          {saveView === 'library' ? <div className="menu">
-            <MenuItem icon={ChevronLeft} label="Save to Library" onClick={() => setSaveView('gallery')} />
-            <SaveToLibrary space="designer" sessionId={session.id} doc={doc} onDone={closeSave} />
-          </div> : <div className="confirm-pop">
-            <p>Save <strong>{doc.name}</strong> to the gallery as an image?</p>
-            <div className="confirm-pop-actions">
-              <Button size="sm" variant="ghost" onClick={closeSave}>Cancel</Button>
-              <Button size="sm" variant="primary" icon={Images} onClick={() => { closeSave(); void saveToGallery(); }}>Save</Button>
-            </div>
-            <MenuItem icon={Library} label="Save to Library…" onClick={() => setSaveView('library')} />
-          </div>}
+        <Popover open={saveConfirm.open} anchor={saveConfirm.ref} onClose={saveConfirm.close} width={300} label="Save to Library">
+          <SaveDesignToLibrary key={doc.id} space="designer" sessionId={session.id} doc={doc} busy={busy} setBusy={setBusy} onDone={saveConfirm.close} onCancel={saveConfirm.close} />
         </Popover>
         <Button ref={exportMenu.ref} className="topbar-export" variant="primary" icon={ArrowUpFromLine} size="sm" disabled={busy} aria-haspopup="dialog" aria-expanded={exportMenu.open} onClick={exportMenu.toggle}>Export</Button>
         <Popover open={exportMenu.open} anchor={exportMenu.ref} onClose={exportMenu.close} width={350} label="Export design">

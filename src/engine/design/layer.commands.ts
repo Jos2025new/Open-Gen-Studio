@@ -70,7 +70,7 @@ export const commands = [
   docCommand({
     id: 'designer.layer.place_asset',
     title: 'Place image',
-    description: 'An image of the gallery as pixels. target: "base" (layer 1), "new" (a layer above the active one), "replace" (the active layer) or a raster layer id. Returns {layer}.',
+    description: 'An image from the Library as pixels. target: "base" (layer 1), "new" (a layer above the active one), "replace" (the active layer) or a raster layer id. Returns {layer}.',
     args: z.object({ asset, target: z.string().min(1).max(80), name: name.optional() }).strict(),
     effect: 'write',
     debt: '"new" and "replace" depend on the document\'s active layer.',
@@ -196,7 +196,7 @@ export const commands = [
   docCommand({
     id: 'designer.layer.to_asset',
     title: 'Layer as image',
-    description: 'The pixels of a raster layer as a new image in the gallery. Returns {asset}.',
+    description: 'The pixels of a raster layer as a new image in the Library. Returns {asset}.',
     args: one,
     effect: 'write',
     undo: false,

@@ -101,6 +101,7 @@ describe('Lote D Parte 2: SaveToLibrary, 3 integrations, GraphGroup.library, and
 
     await click(host.querySelector('button[aria-label="File"]'));
     await click(findBtn('Save to Library'));
+    await click(findBtn('Editable'));
     const form = document.querySelector<HTMLFormElement>('form.subject-new')!;
     expect(form).not.toBeNull();
 
@@ -114,6 +115,7 @@ describe('Lote D Parte 2: SaveToLibrary, 3 integrations, GraphGroup.library, and
     // Save new (double click must only save once)
     await click(host.querySelector('button[aria-label="File"]'));
     await click(findBtn('Save to Library'));
+    await click(findBtn('Editable'));
     const input = document.querySelector<HTMLInputElement>('form.subject-new input')!;
     await setVal(input, 'Studio Board');
     const submit = findBtn('Save to Library', document.querySelector('form.subject-new')!)!;
@@ -136,7 +138,7 @@ describe('Lote D Parte 2: SaveToLibrary, 3 integrations, GraphGroup.library, and
     expect(useStore.getState().library.find((s) => s.id === saved[0].id)?.versions?.length).toBe(2);
   });
 
-  it('2b: DesignerWorkspace Save to gallery popover offers Save to Library as second option without extra topbar button', async () => {
+  it('2b: DesignerWorkspace Save to Library defaults to Editable on a linked document', async () => {
     const slot = document.createElement('div');
     slot.id = 'workspace-actions';
     document.body.append(slot);
@@ -144,10 +146,7 @@ describe('Lote D Parte 2: SaveToLibrary, 3 integrations, GraphGroup.library, and
     await libraryToDesigner(sid(), kit.subject.id);
     await act(async () => root.render(createElement(DesignerWorkspace)));
 
-    // Open existing Save to gallery popover (no extra Save to Library button on topbar)
-    expect(slot.querySelector('button[aria-label="Save to Library"]')).toBeNull();
-    await click(slot.querySelector('button[aria-label="Save to gallery"]'));
-    await click(findBtn('Save to Library'));
+    await click(slot.querySelector('button[aria-label="Save to Library"]'));
     const form = document.querySelector('form.subject-new')!;
     expect(form).not.toBeNull();
     await click(findBtn('Save a copy', form));

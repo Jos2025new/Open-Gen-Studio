@@ -351,10 +351,10 @@ describe('file menu', () => {
     expect(panel.querySelector('[role="alert"]')?.textContent).toContain('layer is unavailable');
     expect(item('Export')).toHaveProperty('disabled', true);
   });
-  it('Save to gallery and Import still call their existing actions', async () => {
+  it('Save to Library and Import still call their existing actions', async () => {
     render(createElement(StudioBoard));
     act(() => q('[aria-label="File"]')!.click());
-    act(() => item('Save to gallery')!.click());
+    act(() => item('Save to Library')!.click());
     expect(file.runDesignOutput).not.toHaveBeenCalled();
     await act(async () => { [...document.querySelectorAll<HTMLElement>('.popover button')].find((b) => b.textContent === 'Save')!.click(); });
     expect(file.runDesignOutput).toHaveBeenLastCalledWith(sid, doc().id, true, undefined);

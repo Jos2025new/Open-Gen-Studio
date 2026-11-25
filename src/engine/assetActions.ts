@@ -155,7 +155,7 @@ export async function attachFiles(files: File[]): Promise<void> {
   const ids = await uploadFiles(files);
   // A GLB is imported to the gallery (open it there); no model takes a 3D file as input.
   const models = ids.filter((id) => get().assets[id]?.kind === 'model3d');
-  if (models.length) toast(`${models.length} 3D model${models.length > 1 ? 's' : ''} added to the gallery.`, 'info');
+  if (models.length) toast(`${models.length} 3D model${models.length > 1 ? 's' : ''} added to Library.`, 'info');
   const inputs = ids.filter((id) => !models.includes(id));
   if (inputs.length) {
     setComposer((c) => ({ attachments: [...c.attachments, ...inputs] }));

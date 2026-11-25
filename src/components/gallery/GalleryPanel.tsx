@@ -100,7 +100,7 @@ function LibraryAssets({ source, chrome, kind, view, setView, cols, setCols }: {
   const space = omni ? 'nodes' : spaceOf(workspace);
   const { busy: creating, create } = useNewKit(sessionId, space, () => { if (space !== 'nodes') goSpace(space); });
   const emptyMsg = library.some((x) => itemKind(x) === kind) ? 'Nothing matches this search.'
-    : kitKind ? 'No saved items yet.' : 'Save a result with Send to → Save to library, or let the agent create references. Mention them as @Name in any prompt.';
+    : kitKind ? 'No saved items yet.' : 'Save a result with Send to → Save to Library, or let the agent create references. Mention them as @Name in any prompt.';
   const gridItems = list.map((x) => {
     const a = assets[coverOf(x, assets) ?? ''];
     return { id: x.id, ratio: a && a.width > 0 && a.height > 0 ? a.width / a.height : 1, node: <LibraryTile item={x} view={view} /> };

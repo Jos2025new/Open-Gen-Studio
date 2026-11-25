@@ -77,7 +77,7 @@ export function deleteNodes(sessionId: string, ids: string[]): string | null {
   if (!error && restorable.length) {
     const ids = new Set(restorable.map(n => n.id));
     const undoNodes = { nodes: restorable, edges: deleted.edges.filter(e => ids.has(e.source) || ids.has(e.target)) };
-    const results = restorable.some(n => n.data.kind !== 'ref') ? ' Results remain in the gallery.' : '';
+    const results = restorable.some(n => n.data.kind !== 'ref') ? ' Results remain in the Library.' : '';
     appendFeed(sessionId, { id: uid('fd'), createdAt: Date.now(), workspace: 'node', type: 'notice', level: 'info', text: `Deleted nodes: ${restorable.map(n => n.data.title).join(', ')}.${results}`, undoNodes, meta: { timeZone: localTimeZone(), space: placeFor(get().ui, 'node') } });
   }
   return error;

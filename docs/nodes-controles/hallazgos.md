@@ -34,6 +34,6 @@ Estados del rastreo ([rastreo de Nodes](../rastreo/nodes.md)): «respondido por 
 
 ## Qué no es hallazgo
 
-- «Results remain in the gallery» al borrar nodos es verdadero (`deleteNodes` solo toca el grafo).
+- «Results remain in the Library» al borrar nodos es verdadero (`deleteNodes` solo toca el grafo).
 - El estilo Auto del agente solo aprueba ejecuciones de coste exactamente 0; `run_nodes` siempre pide clic.
 - La revisión de gasto se revalida por firma antes de ejecutar: si el grafo cambió, no se gasta.

@@ -312,7 +312,7 @@ export function SendToMenu({ assetId, size = 'sm' }: { assetId: string; size?: '
             ) : null}
             {taken ? <p className="subject-warn">@{taken.name} already exists. Saving replaces it in every session.</p> : null}
             <Button size="sm" icon={UserPlus} type="submit" variant={taken ? 'danger' : undefined} disabled={!subjectName.trim()}>
-              {taken ? `Replace @${taken.name}` : 'Save to library'}
+              {taken ? `Replace @${taken.name}` : 'Save to Library'}
             </Button>
             <p className="faint">Kept in Assets for every session. Mention it as @Name in any prompt: its image goes as a reference.</p>
           </form>
@@ -338,7 +338,7 @@ export function SendToMenu({ assetId, size = 'sm' }: { assetId: string; size?: '
                     addAsReference(assetId);
                   }}
                 />
-                <MenuItem icon={UserPlus} label="Save to library" tip="Keep this character, object, product or style as @Name" onClick={() => setSubject(true)} />
+                <MenuItem icon={UserPlus} label="Save to Library" tip="Keep this character, object, product or style as @Name" onClick={() => setSubject(true)} />
                 <MenuItem icon={Images} label="Add to moodboard" onClick={() => setMood(true)} />
               </>
             ) : null}

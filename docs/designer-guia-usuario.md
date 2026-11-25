@@ -14,7 +14,7 @@ Guía para quien usa el Designer, sin rutas de código. Los nombres de botones y
 - [[#Selección]]
 - [[#Efectos]]
 - [[#Tamaño del lienzo]]
-- [[#Exportar y guardar en la galería]]
+- [[#Exportar y guardar en Library]]
 - [[#Atajos de teclado]]
 - [[#Consejos]]
 
@@ -48,7 +48,7 @@ De izquierda a derecha:
 - `Show or hide right panel`.
 - Un chip `Selection` aparece cuando hay una selección de píxeles y usas otra herramienta; trae `Deselect`.
 - `Canvas size`: cambia el tamaño de la página (ver [[#Tamaño del lienzo]]).
-- `Save to gallery` y `Export` (ver [[#Exportar y guardar en la galería]]).
+- `Save to Library` y `Export` (ver [[#Exportar y guardar en Library]]).
 
 Detalle técnico: [[designer-tecnico-2#Barra superior]], dentro de [[designer-tecnico-2#Superficies de la interfaz]].
 
@@ -225,9 +225,9 @@ El botón `Canvas size` de la barra superior (muestra el tamaño actual) abre un
 
 Técnico: [[designer-tecnico#Límites de recursos]]; [[designer-tecnico-2#Popovers]].
 
-## Exportar y guardar en la galería
+## Exportar y guardar en Library
 
-- `Save to gallery`: guarda el diseño como imagen PNG en la galería de la app, tras una confirmación (`Save` o `Cancel`).
+- `Save to Library`: elige `Image` para guardar un PNG con `Save`, o `Editable` para guardar el documento con sus capas. Si el documento ya está enlazado, el panel abre en `Editable`.
 - `Export` o Ctrl/Cmd+Shift+E abre el panel. Elige para qué lo quieres o ajusta formato, área, tamaño y nombre. Puedes exportar PNG, JPG, WebP, SVG o PDF. «Logo / brand», iOS y Android descargan un ZIP con varios tamaños; «Add scale» crea tu propia lista (escala, sufijo y formato por archivo). «What to export» admite Canvas, Drawing only, Selected objects, Pixel selection y Layer.
 - El panel va de arriba abajo: para qué, área (Canvas · Drawing · Selection · Layer), vista previa, tamaño (ancho, alto y DPI enlazados), fondo con «Transparent», nombre y formato. El engranaje junto a Format abre las opciones de ese formato: calidad (JPG/WebP), decimales/minificar/título (SVG), texto «Embed fonts / Convert to paths», papel, resolución de ráster y, en «Print shop», sangrado y marcas de corte (apagadas por defecto). En Chromium puedes elegir una carpeta de destino. Puedes guardar presets propios y borrarlos. El documento recuerda la última exportación y avisa si falta la capa o selección elegida.
 - Si el archivo vectorial pierde algún efecto o supera un límite, revisa el aviso del panel. La selección de píxeles se conserva como imagen incrustada en SVG y PDF.

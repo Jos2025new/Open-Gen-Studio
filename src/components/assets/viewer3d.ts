@@ -55,7 +55,7 @@ export async function snapshot3d(): Promise<void> {
   try {
     const blob: Blob = await el.toBlob({ mimeType: 'image/png' });
     const ids = await uploadFiles([new File([blob], '3d-snapshot.png', { type: 'image/png' })]);
-    if (ids.length) toast('Snapshot saved to Gallery', 'success');
+    if (ids.length) toast('Snapshot saved to Library', 'success');
   } catch {
     toast('Could not take the snapshot', 'error');
   }

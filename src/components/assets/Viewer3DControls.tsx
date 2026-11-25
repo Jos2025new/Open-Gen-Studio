@@ -23,7 +23,7 @@ export function Viewer3DDock() {
       <IconButton icon={Hand} label="Pan (drag to move)" active={pan} disabled={!ready} onClick={() => setView3d({ pan: !pan })} />
       <IconButton icon={ZoomOut} label="Zoom out" disabled={!ready} onClick={() => zoomBy(-1)} />
       <IconButton icon={ZoomIn} label="Zoom in" disabled={!ready} onClick={() => zoomBy(1)} />
-      <IconButton icon={Camera} label="Snapshot to Gallery" disabled={!ready} onClick={() => void snapshot3d()} />
+      <IconButton icon={Camera} label="Snapshot to Library" disabled={!ready} onClick={() => void snapshot3d()} />
     </div>
   );
 }

@@ -62,5 +62,5 @@ export async function editGraphTool(sessionId: string, name: string, input: unkn
   const v = nodeIdsSchema.safeParse(input);
   if (!v.success) return { text: `Invalid delete_nodes: ${v.error.message}` };
   const result = deleteNodesWithUndo(sessionId, v.data.node_ids);
-  return { text: result.error ?? `Deleted ${v.data.node_ids.length} existing node(s). Results remain in the gallery. Undo is available in the chat.`, deleted: result.deleted };
+  return { text: result.error ?? `Deleted ${v.data.node_ids.length} existing node(s). Results remain in the Library. Undo is available in the chat.`, deleted: result.deleted };
 }

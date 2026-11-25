@@ -165,8 +165,8 @@ export const commands = [
   }),
   docCommand({
     id: 'designer.doc.save_to_gallery',
-    title: 'Save to gallery',
-    description: 'The page as a new image in the gallery. Returns {asset}.',
+    title: 'Save to Library',
+    description: 'The page as a new image in the Library. Returns {asset}.',
     args: none,
     effect: 'write',
     undo: false,

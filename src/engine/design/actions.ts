@@ -474,7 +474,7 @@ export async function saveDocToGallery(sessionId: string, docId: string): Promis
   await ensureBuffers(doc.layers);
   const blob = await exportDoc(doc);
   const asset = await storeDesignAsset(sessionId, blob, doc.width, doc.height, 'design');
-  toast('Design saved to the gallery', 'success');
+  toast('Design saved to Library', 'success');
   return asset;
 }
 

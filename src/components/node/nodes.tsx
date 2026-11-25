@@ -66,7 +66,7 @@ function DeleteButton({ node }: { node: GraphNode }) {
       </button>
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={250} label="Delete node">
         <div className="confirm">
-          <p>Delete “{node.data.title}”? Its results stay in the gallery.</p>
+          <p>Delete “{node.data.title}”? Its results stay in the Library.</p>
           <div className="spend-actions">
             <Button variant="ghost" onClick={pop.close}>
               Cancel
@@ -269,7 +269,7 @@ function Preview({ node }: { node: GraphNode }) {
   // Transcribe: the text is the output (it can feed a Prompt port).
   if (g?.status === 'done' && g.kind === 'text') return <div className="nc-text">{g.text || <span className="faint">No speech was found.</span>}</div>;
   if (!assetId) {
-    const hint = d.kind === 'image' || d.kind === 'video' || d.kind === 'audio' || d.kind === 'model3d' ? d.prompt : d.kind === 'asset' ? 'Drop an asset from the gallery' : d.kind === 'tool' ? OPS[d.op].description : '';
+    const hint = d.kind === 'image' || d.kind === 'video' || d.kind === 'audio' || d.kind === 'model3d' ? d.prompt : d.kind === 'asset' ? 'Drop an asset from the Library' : d.kind === 'tool' ? OPS[d.op].description : '';
     return (
       <div className="nc-empty">
         <Icon size={18} />
