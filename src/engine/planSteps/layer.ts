@@ -1,3 +1,4 @@
+import { parseTokenAlias } from '../libraryTokens';
 import { parsePath } from '../design/path';
 import type { LayerStep, LayerType, ShapeSpec, StrokeSpec, TextStyle } from '../types';
 import { num } from './shared';
@@ -7,7 +8,7 @@ const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 
 function color(v: unknown, fallback: string | null): string | null {
   if (v === null || v === 'none' || v === 'transparent') return null;
-  return typeof v === 'string' && HEX.test(v.trim()) ? v.trim() : fallback;
+  return typeof v === 'string' && (HEX.test(v.trim()) || parseTokenAlias(v) !== null) ? v.trim() : fallback;
 }
 
 function normalizeTextStyle(s: Record<string, unknown> | undefined): Partial<TextStyle> {

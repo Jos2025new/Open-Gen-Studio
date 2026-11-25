@@ -3,7 +3,7 @@ import { uid } from '../../lib/id';
 import { scaleStroke, translateStroke } from './strokes';
 import { scaleLook } from './shapeLook';
 import { composeShape, pageBox } from './shapeTransform';
-import type { DesignDoc, Layer, RasterLayer, TextLayer, TextStyle, VectorLayer, VectorShape, ShapeSpec } from '../types';
+import type { DesignDoc, Layer, Subject, RasterLayer, TextLayer, TextStyle, VectorLayer, VectorShape, ShapeSpec } from '../types';
 import { DEFAULT_TEXT_STYLE } from '../storeBindings';
 export { DEFAULT_TEXT_STYLE } from '../storeBindings';
 
@@ -20,8 +20,12 @@ export const FONT_STACKS: Record<string, string> = {
 
 export const FONT_NAMES = Object.keys(FONT_STACKS);
 
+/** The fonts the entries of the Library name in their tokens or bring as files. */
+export const fontNames = (library: readonly Subject[]): string[] => [...new Set(library.flatMap((s) => [...(s.fonts ?? []).map((f) => f.family), ...Object.values(s.tokens ?? {}).flatMap((t) => (t.type === 'fontFamily' && !String(t.value).includes('{') ? [String(t.value).split(',')[0].trim().replace(/^(['"])(.*)\1$/, '$2')] : []))]))].filter((f) => f && !FONT_STACKS[f]);
+
+/** A font the app does not bring is asked for by its name, and Inter shows while it is missing. */
 export function fontStack(name: string): string {
-  return FONT_STACKS[name] ?? FONT_STACKS.Inter;
+  return FONT_STACKS[name] ?? (name ? `'${name.replace(/['"\\<>;{}]/g, '')}', ${FONT_STACKS.Inter}` : FONT_STACKS.Inter);
 }
 
 export const DOC_PRESETS: Array<{ id: string; label: string; width: number; height: number }> = [
@@ -67,7 +71,7 @@ export function newVectorLayer(name: string, shapes: ShapeSpec[] = []): VectorLa
 }
 
 export function newTextLayer(name: string, text: string, pos: { x: number; y: number; width: number }, style: Partial<TextStyle> = {}): TextLayer {
-  return { ...base(name), type: 'text', ...DEFAULT_TEXT_STYLE, ...style, fontFamily: style.fontFamily && FONT_STACKS[style.fontFamily] ? style.fontFamily : DEFAULT_TEXT_STYLE.fontFamily, text, x: pos.x, y: pos.y, width: pos.width };
+  return { ...base(name), type: 'text', ...DEFAULT_TEXT_STYLE, ...style, fontFamily: style.fontFamily || DEFAULT_TEXT_STYLE.fontFamily, text, x: pos.x, y: pos.y, width: pos.width };
 }
 
 export function touch(doc: DesignDoc): DesignDoc {

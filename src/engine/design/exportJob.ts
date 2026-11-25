@@ -8,7 +8,7 @@ import { unionBox, type Box } from './doc';
 import { docToSvg, svgToPdf, xmlEscape, type SvgDeps } from './export';
 import { ExportError, exportError } from './exportErrors';
 import { checkRasterExport, drawExport, exportDoc, PREVIEW_MAX_SIDE, type RasterExport } from './exportRaster';
-import { collectFonts, fontFaceCss, woffToSfnt } from './exportText';
+import { canEmbedInPdf, collectFonts, fontFaceCss, woffToSfnt } from './exportText';
 import { printPixelRatio, printPreflight } from './exportPrint';
 import { autoSuffix, DEFAULT_JPEG_QUALITY, pageLayout, pdfPage, type ExportSettings } from './exportSettings';
 import type { ObjectPick } from './objectSelection';
@@ -236,6 +236,7 @@ async function renderOutput(doc: DesignDoc, settings: ExportSettings, target: Ex
     const texts = renderDoc.layers.filter((l): l is Extract<typeof l, { type: 'text' }> => l.type === 'text' && l.visible);
     const live = (settings.text ?? 'fonts') === 'fonts' && texts.length > 0;
     const { found, missing } = live ? await collectFonts(texts, deps.fontFile) : { found: new Map(), missing: [] as string[] };
+    if (format === 'pdf') for (const [k, f] of found) if (!canEmbedInPdf(f.woff)) { found.delete(k); missing.push(f.family); }
     missing.forEach((family) => deps.notice?.(`“${family}” is a system font the app cannot read, so its text keeps the font name.`));
     const svg = selection || options.mask ? await maskedSvg(renderDoc, options, ratio, settings.svg?.metadata !== false) : await docToSvg(renderDoc, pdfDeps, options, {
       ...settings.svg, text: settings.text ?? 'fonts', ...(format === 'pdf' ? { hidden: false, filters: false } : {}), fontFaces: format === 'svg' && live ? fontFaceCss(found.values()) : undefined,

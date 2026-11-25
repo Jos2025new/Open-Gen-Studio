@@ -6,6 +6,9 @@ import { FORMAT_PRESETS, PAGE_UNITS, DEFAULT_DPI, orientationOf, presetPx, pxToU
 import { mutateDoc } from '../../engine/design/actions';
 import { setUi, toast, useStore } from '../../store/store';
 import { Button, IconButton, Segmented } from '../ui/primitives';
+import { TokenModeField } from './TokenFields';
+import { tokenOf, tokenPatch } from '../../engine/design/tokenBind';
+import type { TokenRef } from '../../engine/libraryTypes';
 import { InlineColor, InlineSelect } from './InlineControls';
 import { TransparentSwatch } from './DocBackgroundChoice';
 import { Popover, usePopover } from '../ui/Popover';
@@ -19,8 +22,8 @@ export function CanvasSize({ sessionId, doc, inline = false }: { sessionId: stri
   const [anchor, setAnchor] = useState<Anchor>('middle-center');
   const unit = useStore((s) => s.ui.pageUnit ?? 'px'), dpi = useStore((s) => s.ui.pageDpi ?? DEFAULT_DPI);
   const setUnit = (v: PageUnit) => setUi({ pageUnit: v });
-  const [bgEdit, setBgEdit] = useState<string | null>(null);
-  const bg = bgEdit ?? doc.background ?? '#ffffff';
+  const [bgEdit, setBgEdit] = useState<{ background: string; backgroundToken?: TokenRef } | null>(null);
+  const bg = bgEdit?.background ?? doc.background ?? '#ffffff';
   const [ratio, setRatio] = useState(doc.height ? doc.width / doc.height : 1);
   const dp = Math.max(1, dpi || DEFAULT_DPI);
   /** The preset whose size (either orientation) is the current one at this DPI; otherwise Custom. */
@@ -56,7 +59,7 @@ export function CanvasSize({ sessionId, doc, inline = false }: { sessionId: stri
   const orient = (o: Orientation) => { if (o !== orientationOf(w, h)) { setW(h); setH(w); setRatio(h / w); } };
   const apply = () => {
     const err = resizeCanvas(sessionId, doc.id, w, h, anchor);
-    if (!err && bgEdit !== null && bgEdit !== doc.background) mutateDoc(sessionId, doc.id, (d) => ({ ...d, background: bgEdit }));
+    if (!err && bgEdit && (bgEdit.background !== doc.background || bgEdit.backgroundToken !== doc.backgroundToken)) mutateDoc(sessionId, doc.id, (d) => ({ ...d, ...bgEdit }));
     done(err);
   };
   const form = <div className="canvas-size">
@@ -67,7 +70,8 @@ export function CanvasSize({ sessionId, doc, inline = false }: { sessionId: stri
         <label>H<input type="number" min={step} step={step} value={pxToUnit(h, unit, dp)} onChange={(e) => setHeight(Math.min(MAX_SIDE, unitToPx(+e.target.value, unit, dp)))} /></label>
         <Segmented size="sm" value={unit} options={PAGE_UNITS.map((u) => ({ value: u, label: u }))} onChange={setUnit} />
         {unit !== 'px' && <label>DPI<input type="number" min={1} max={1200} value={dpi} onChange={(e) => setDpi(+e.target.value)} /></label>}
-        <InlineColor label="Page color" value={bg} onChange={setBgEdit} />
+        <InlineColor label="Page color" value={bg} token={bgEdit ? bgEdit.backgroundToken : tokenOf(doc, 'background')} onChange={(c, t) => setBgEdit(tokenPatch('background', c, t))} />
+        <TokenModeField sessionId={sessionId} doc={doc} />
         <TransparentSwatch on={!doc.background && bgEdit === null} onClick={() => { setBgEdit(null); mutateDoc(sessionId, doc.id, (d) => ({ ...d, background: null })); }} />
         <label className="check-row"><input type="checkbox" checked={lock} onChange={(e) => { setLock(e.target.checked); if (e.target.checked && h) setRatio(w / h); }} />Keep ratio</label>
       </div>

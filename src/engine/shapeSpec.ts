@@ -1,9 +1,10 @@
 import type { PrimSpec } from './design/primitives';
 import type { MarkerKind } from './design/markers';
 import type { ObjectMeta } from './objectMeta';
+import type { TokenRef } from './libraryTypes';
 
 /** One colour stop of an editable gradient: colour as #rrggbb and alpha 0–1 (SVG stop-color and stop-opacity). */
-export interface GradientStop { offset: number; color: string; alpha: number }
+export interface GradientStop { offset: number; color: string; alpha: number; colorToken?: TokenRef }
 
 /**
  * An editable gradient in PAGE coordinates. Linear: start (x1,y1) to end (x2,y2). Radial: centre (x1,y1) and a point
@@ -31,6 +32,8 @@ export interface ShapeSpec extends ObjectMeta {
   fill: string | null;
   stroke: string | null;
   strokeWidth: number;
+  fillToken?: TokenRef;
+  strokeToken?: TokenRef;
   /** fill-opacity / stroke-opacity (0–1) as in SVG; absent = 1, so older documents are unchanged. */
   fillOpacity?: number;
   strokeOpacity?: number;
@@ -75,4 +78,7 @@ export interface TextExtras {
   underline?: boolean;
   strike?: boolean;
   textCase?: 'upper' | 'lower' | 'title';
+  colorToken?: TokenRef;
+  fontFamilyToken?: TokenRef;
+  fontSizeToken?: TokenRef;
 }

@@ -110,7 +110,7 @@ export interface UiState extends PageUiPrefs {
   drawingChoice?: 'ask' | 'flatten' | 'design' | 'newLayer';
   /** Clicks act on the topmost layer under the pointer (Photoshop Auto-select); off by default. */
   autoSelect?: boolean;
-  shape: { fill: string | null; stroke: string | null; strokeWidth: number; radius: number; sides?: number; bend?: number; primParams?: { inner?: number; round?: number; a0?: number; a1?: number } } & Pick<ShapeSpec, 'rx' | 'ry' | 'join' | 'cap' | 'miter' | 'dash' | 'dashOffset' | 'paintOrder'>;
+  shape: { fill: string | null; stroke: string | null; strokeWidth: number; radius: number; sides?: number; bend?: number; primParams?: { inner?: number; round?: number; a0?: number; a1?: number } } & Pick<ShapeSpec, 'fillToken' | 'strokeToken' | 'rx' | 'ry' | 'join' | 'cap' | 'miter' | 'dash' | 'dashOffset' | 'paintOrder'>;
   text: TextStyle;
   threadOpen: boolean;
   settingsOpen: boolean;

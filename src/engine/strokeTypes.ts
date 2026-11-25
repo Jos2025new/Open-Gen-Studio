@@ -1,8 +1,11 @@
 /* Pressure strokes: the style of a stroke and the stroke itself. Kept apart from types.ts (its size limit); types.ts re-exports them. */
 
+import type { TokenRef } from './libraryTypes';
+
 /** How a pressure stroke is shaped (perfect-freehand options, kept so the stroke can be re-shaped later). */
 export interface StrokeStyle {
   color: string;
+  colorToken?: TokenRef;
   /** Base diameter in document px. */
   size: number;
   /** How much pressure thins the line (-1…1; 0 = constant width). */

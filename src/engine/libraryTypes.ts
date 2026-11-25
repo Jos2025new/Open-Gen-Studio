@@ -13,8 +13,12 @@ export type KitActor = 'user' | 'agent';
 
 export const TOKEN_TYPES = ['color', 'dimension', 'fontFamily', 'number', 'string'] as const;
 export type KitTokenType = (typeof TOKEN_TYPES)[number];
-export interface KitToken { type: KitTokenType; value: string | number; description?: string; }
+/** `modes`: its value in the modes where it changes (Dark). */
+export interface KitToken { type: KitTokenType; value: string | number; description?: string; modes?: Record<string, string | number>; }
 export type KitTokens = Record<string, KitToken>;
+/** A value taken from a token of an entry. It holds while the value is the one it gave (design/tokenBind.ts). */
+export interface TokenRef { kit: string; token: string; value: string | number; }
+export interface KitFont { id: string; family: string; weight: number; italic?: boolean; variable?: boolean; name: string; }
 export interface KitOrigin { space: LibrarySpace; sessionId?: string; sessionTitle?: string; by: KitActor; from?: string[]; at: number; }
 export interface KitVersionRef { id: string; at: number; by: KitActor; space: LibrarySpace; label?: string; assetIds: string[]; docRev?: string; groupIds?: string[]; }
 
@@ -22,6 +26,8 @@ export interface LibraryKitFields {
   graph?: Graph; kits?: string[]; tokens?: KitTokens;
   /** The categories the user made in its page; elements name theirs in `section`. */
   sections?: string[];
+  /** Font files of the entry (engine/ownFonts.ts); their bytes are kept apart. */
+  fonts?: KitFont[];
   /** Immutable after creation. */
   origin?: KitOrigin; copiedFrom?: string; draft?: boolean;
   versionId?: string; docRev?: string; groupIds?: string[]; versions?: KitVersionRef[];

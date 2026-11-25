@@ -1,4 +1,4 @@
-import type { KitBoard } from '../libraryTypes';
+import type { KitBoard, TokenRef } from '../libraryTypes';
 import type { Layer, LayerGroup } from '../types';
 import type { RememberedExport } from './exportSettings';
 
@@ -8,6 +8,9 @@ export interface DesignDoc {
   width: number;
   height: number;
   background: string | null;
+  backgroundToken?: TokenRef;
+  /** The mode its token values are taken in (Dark); absent = the tokens' own values. */
+  tokenMode?: string;
   layers: Layer[];
   /** Layer folders: a name for a run of layers that hide, lock, select and move together. */
   groups?: LayerGroup[];

@@ -3,6 +3,7 @@ import type { Stroke } from '../../engine/strokeTypes';
 import { patchLayer } from '../../engine/design/actions';
 import { bakeStroke } from '../../engine/design/strokes';
 import { editStrokes } from '../../engine/design/strokeEdit';
+import { tokenPatch, tokenOf } from '../../engine/design/tokenBind';
 import { InlineColor, InlineSlider } from './InlineControls';
 
 /* The selection strip of picked Lineart strokes (colour, size, Edit nodes); their edit row is NodeModeButtons + NodeDoneButton (ContextStrip). */
@@ -22,7 +23,7 @@ function restyle(sessionId: string, doc: DesignDoc, layerId: string, ids: string
 export function StrokeStripFields({ sessionId, doc, layerId, strokes }: { sessionId: string; doc: DesignDoc; layerId: string; strokes: Stroke[] }) {
   const ids = strokes.map((s) => s.id), first = strokes[0];
   return <>
-    <InlineColor label="Color" value={first.color} alpha={{ value: first.opacity, onChange: (opacity) => restyle(sessionId, doc, layerId, ids, { opacity }) }} onChange={(color) => restyle(sessionId, doc, layerId, ids, { color })} />
+    <InlineColor label="Color" value={first.color} alpha={{ value: first.opacity, onChange: (opacity) => restyle(sessionId, doc, layerId, ids, { opacity }) }} token={tokenOf(first, 'color')} onChange={(c, t) => restyle(sessionId, doc, layerId, ids, tokenPatch('color', c, t))} />
     <InlineSlider label="Size" unit="px" min={0.5} max={200} step={0.5} allowManualOverflow value={Math.round(first.size * pageScale(first) * 10) / 10} onChange={(size) => restyle(sessionId, doc, layerId, ids, { size })} />
     <button type="button" className="opt" data-tip="Move, bend, cut or erase part of the stroke" onClick={() => editStrokes(doc.id, layerId, ids)}>Edit nodes</button>
   </>;

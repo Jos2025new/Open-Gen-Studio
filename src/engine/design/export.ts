@@ -10,7 +10,7 @@ import { shapeMatrix } from './shapeTransform';
 import { multiply } from './matrix';
 import { inkscapePrimAttrs } from './inkscapeShape';
 import { decorationRects } from './textLayout';
-import { base64, textPathData } from './exportText';
+import { base64, canOutline, textPathData } from './exportText';
 import { blurFilterSvg, blurRegion, cornerRadii, roundRectPath, strokeAlignOf, strokeLookSvg } from './shapeLook';
 import type { DesignDoc, Layer, TextLayer, VectorShape } from '../types';
 import { fontStack, shapeBox, type Box } from './doc';
@@ -275,7 +275,7 @@ async function buildSvg(doc: DesignDoc, deps: SvgDeps, viewport: SvgViewport | u
       let paths: string[] | undefined;
       if (build.text === 'paths') {
         const woff = await deps.fontFile?.(l.fontFamily, l.fontWeight);
-        if (woff) paths = await textPathData(woff, l, t, deps.ascent(l));
+        if (woff && canOutline(woff)) paths = await textPathData(woff, l, t, deps.ascent(l));
         else deps.notice?.(`“${l.fontFamily}” is a system font the app cannot read, so its text stays live text instead of paths.`);
       }
       inner = textSvg(l, t, deps.ascent(l), paths);

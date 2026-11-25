@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { validateTokens } from '../src/engine/libraryTokens';
+import { tokensIn, validateTokens } from '../src/engine/libraryTokens';
 import { colorHex, colorObject, colorText } from '../src/engine/libraryTokensColor';
-import { tokensFromFile, tokensToFile } from '../src/engine/libraryTokensFile';
+import { tokensFromFile, tokensToFile, withMode } from '../src/engine/libraryTokensFile';
 import type { KitTokens } from '../src/engine/libraryTypes';
 
 const file = (v: unknown) => tokensFromFile(JSON.stringify(v));
@@ -101,8 +101,9 @@ describe('other tools', () => {
   it('follows the active theme, or the first one of each group', () => {
     const theme = (name: string, set: string) => ({ id: name, name, group: 'Mode', selectedTokenSets: { Global: 'source', [set]: 'enabled' } });
     const $themes = [theme('Light', 'Light'), theme('Dark', 'Dark')], $metadata = { tokenSetOrder: ['Global', 'Light', 'Dark'] };
-    expect(file({ ...sets, $themes, $metadata }).tokens.accent.value).toBe('{brand.deep-sea}');
-    expect(file({ ...sets, $themes, $metadata: { ...$metadata, activeThemes: ['Mode/Dark'] } }).tokens.accent.value).toBe('#000000');
+    expect(file({ ...sets, $themes, $metadata }).tokens.accent).toEqual({ type: 'color', value: '{brand.deep-sea}', modes: { Dark: '#000000' } });
+    expect(file({ ...sets, $themes, $metadata }).off).toEqual([]);
+    expect(file({ ...sets, $themes, $metadata: { ...$metadata, activeThemes: ['Mode/Dark'] } }).tokens.accent).toEqual({ type: 'color', value: '#000000', modes: { Light: '{brand.deep-sea}' } });
   });
 
   it('writes one Penpot set with its name, in use', () => {
@@ -110,6 +111,17 @@ describe('other tools', () => {
     expect(json.$metadata).toEqual({ tokenSetOrder: ['Marea - 2-0'], activeThemes: [], activeSets: ['Marea - 2-0'] });
     const set = json['Marea - 2-0'];
     expect([set.color.veil, set.space.m, set.font.body, set.weight]).toEqual([{ $type: 'color', $value: '#0a4d6880' }, { $type: 'dimension', $value: '16px' }, { $type: 'fontFamilies', $value: 'Inter, Arial' }, { $type: 'number', $value: '700' }]);
+  });
+
+  it('modes go out to Penpot as themes and come back', () => {
+    const t: KitTokens = { bg: { type: 'color', value: '#ffffff', modes: { Dark: '#101010' } }, ink: { type: 'color', value: '#101010', modes: { Dark: '#ffffff' } }, pad: { type: 'dimension', value: '8px' }, main: { type: 'color', value: '{ink}', modes: { Dark: '{bg}' } } };
+    validateTokens(t);
+    const { json } = out(t, 'penpot', 'Marea');
+    expect(json.$metadata).toEqual({ tokenSetOrder: ['Marea/Default', 'Marea/Dark'], activeThemes: ['Marea/Default'], activeSets: ['Marea/Default'] });
+    expect(Object.keys(json['Marea/Dark'])).toEqual(['bg', 'ink', 'main']);
+    expect(tokensFromFile(tokensToFile(t, 'penpot', 'Marea').text)).toEqual({ tokens: t, skipped: [], off: [] });
+    expect(() => validateTokens({ a: { type: 'color', value: '#ffffff', modes: { Dark: '{none}' } } })).toThrow('missing alias');
+    expect(withMode(tokensFromFile(tokensToFile(tokensIn(t)).text).tokens, 'Dark', tokensFromFile(tokensToFile(tokensIn(t, 'Dark')).text).tokens)).toEqual(t);
   });
 
   it('says when it is not a token file', () => {

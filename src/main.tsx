@@ -44,6 +44,8 @@ import './styles/node-side.css';
 import './styles/node-notices.css';
 import { App } from './App';
 import { installDoneNotice } from './lib/doneNotice';
+import { installOwnFonts } from './engine/fontFiles';
+import { installTokenSync } from './engine/design/tokenBind';
 import { installDoneSignal } from './lib/doneSignal';
 import { installBoardAutoOpen } from './lib/studioBoard';
 import { watchAccessibility } from './lib/theme';
@@ -55,6 +57,8 @@ installHomeAutoClose();
 installBoardAutoOpen();
 installDoneNotice();
 installDoneSignal();
+installTokenSync();
+installOwnFonts();
 
 startKeySync();
 createRoot(document.getElementById('root')!).render(

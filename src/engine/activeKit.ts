@@ -15,7 +15,7 @@ const docs = new Map<string, DesignDoc | undefined>();
 export const activeKit = (st = get()): Subject | undefined => (st.composer.kitId ? st.library.find((s) => s.id === st.composer.kitId && isKit(s)) : undefined);
 
 /** The picked entry and the ones it contains. */
-function activeKitItems(st = get()): Subject[] {
+export function activeKitItems(st = get()): Subject[] {
   const kit = activeKit(st);
   if (!kit) return [];
   const out = [kit];
@@ -46,6 +46,7 @@ export function activeKitLines(st = get()): string[] {
   const images = activeKitImages(st);
   return [
     `active ${kit.kind!.replace('-', ' ')} (picked by the user; every piece follows it):\n${index(kit, 2500)}`,
+    ...(Object.keys(kit.tokens ?? {}).length || inside.some((s) => s.tokens) ? ['in Designer text and shapes write a token as "{its.name}" for color, fill, stroke or fontFamily: the design then follows the token.'] : []),
     ...inside.map((s) => `inside it:\n${index(s, 1200)}`),
     ...(images.length ? [`its images (usable as refs): ${images.map((id) => `asset:${id}`).join(', ')}`] : []),
   ];

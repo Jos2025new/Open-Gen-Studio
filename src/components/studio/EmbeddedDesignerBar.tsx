@@ -4,6 +4,8 @@ import type { DesignTool } from '../../engine/design/rules';
 import { IconButton } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { ToolDock } from '../designer/ToolDock';
+import type { TokenRef } from '../../engine/libraryTypes';
+import { tokenPatch } from '../../engine/design/tokenBind';
 import { InlineColor, InlineSlider } from '../designer/InlineControls';
 import { setUi, useStore } from '../../store/store';
 import { EmbeddedLayers } from './EmbeddedLayers';
@@ -19,16 +21,16 @@ const DOCK_TOOLS: ReadonlySet<DesignTool> = new Set([...EMBEDDED_TOOLS].filter((
 function useToolPaint(tool: DesignTool) {
   const ui = useStore((s) => s.ui);
   if (tool === 'text') return {
-    color: ui.text.color, onColor: (color: string) => setUi({ text: { ...ui.text, color } }),
+    color: ui.text.color, onColor: (c: string, t?: TokenRef) => setUi({ text: { ...ui.text, ...tokenPatch('color', c, t) } }),
     size: { label: 'Size', unit: 'px', min: 1, max: 500, value: ui.text.fontSize, set: (fontSize: number) => setUi({ text: { ...ui.text, fontSize } }) },
   };
   if (SHAPE_TOOLS.includes(tool)) return {
-    color: ui.shape.fill ?? '#d4f25a', onColor: (fill: string) => setUi({ shape: { ...ui.shape, fill } }),
+    color: ui.shape.fill ?? '#d4f25a', onColor: (c: string, t?: TokenRef) => setUi({ shape: { ...ui.shape, ...tokenPatch('fill', c, t) } }),
     size: { label: 'Width', unit: 'px', min: 1, max: 40, value: ui.shape.strokeWidth, set: (strokeWidth: number) => setUi({ shape: { ...ui.shape, strokeWidth } }) },
   };
   if (tool === 'eraser') return { color: null, onColor: () => undefined, size: { label: 'Size', unit: 'px', min: 1, max: 240, value: ui.brush.size, set: (size: number) => setUi({ brush: { ...ui.brush, size } }) } };
   return {
-    color: ui.lineart.color, onColor: (color: string) => setUi({ lineart: { ...ui.lineart, color } }),
+    color: ui.lineart.color, onColor: (c: string, t?: TokenRef) => setUi({ lineart: { ...ui.lineart, ...tokenPatch('color', c, t) } }),
     size: { label: 'Size', unit: 'px', min: 1, max: 120, value: ui.lineart.size, set: (size: number) => setUi({ lineart: { ...ui.lineart, size } }) },
   };
 }

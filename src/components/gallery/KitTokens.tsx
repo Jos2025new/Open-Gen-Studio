@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
 import { useStore } from '../../store/store';
 import { downloadBlob } from '../../lib/media';
-import { resolveToken } from '../../engine/libraryTokens';
-import { tokensFromFile, tokensToFile, type TokenFormat } from '../../engine/libraryTokensFile';
+import { resolveToken, tokenModes, tokensIn } from '../../engine/libraryTokens';
+import { tokensFromFile, tokensToFile, withMode, type TokenFormat } from '../../engine/libraryTokensFile';
 import { TOKEN_TYPES, type KitToken, type KitTokens as Tokens, type KitTokenType } from '../../engine/libraryTypes';
 import type { Subject } from '../../engine/types';
 import { Download, Plus, Upload, X } from '../ui/icons';
@@ -11,10 +11,10 @@ import { toast } from '../../store/store';
 import { saveItem } from '../../engine/libraryVersions';
 import './KitTokens.css';
 
-interface Row { name: string; type: KitTokenType; value: string; description?: string; }
+interface Row { name: string; type: KitTokenType; value: string; description?: string; modes?: Record<string, string>; }
 const LABELS: Record<KitTokenType, string> = { color: 'Color', dimension: 'Size', fontFamily: 'Font', number: 'Number', string: 'Text' };
 const START: Record<KitTokenType, string> = { color: '#000000', dimension: '16px', fontFamily: 'Inter', number: '1', string: '' };
-const rowsOf = (tokens?: Tokens): Row[] => Object.entries(tokens ?? {}).map(([name, t]) => ({ name, type: t.type, value: String(t.value), ...(t.description ? { description: t.description } : {}) }));
+const rowsOf = (tokens?: Tokens): Row[] => Object.entries(tokens ?? {}).map(([name, t]) => ({ name, type: t.type, value: String(t.value), ...(t.description ? { description: t.description } : {}), ...(t.modes ? { modes: Object.fromEntries(Object.entries(t.modes).map(([m, v]) => [m, String(v)])) } : {}) }));
 
 const names = (list: readonly string[]) => (list.length > 4 ? `${list.slice(0, 4).join(', ')} and ${list.length - 4} more` : list.join(', '));
 
@@ -25,15 +25,16 @@ function tokensOf(rows: readonly Row[]): Tokens {
     const name = r.name.trim(), text = r.value.trim();
     if (!name) throw new Error('Every token needs a name.');
     if (out[name]) throw new Error(`Two tokens are named "${name}".`);
-    const value: KitToken['value'] = r.type === 'number' && text && Number.isFinite(Number(text)) ? Number(text) : text;
-    out[name] = { type: r.type, value, ...(r.description ? { description: r.description } : {}) };
+    const val = (t: string): KitToken['value'] => (r.type === 'number' && t && Number.isFinite(Number(t)) ? Number(t) : t);
+    const modes = Object.entries(r.modes ?? {}).flatMap(([m, v]) => (v.trim() && v.trim() !== text ? [[m, val(v.trim())]] : []));
+    out[name] = { type: r.type, value: val(text), ...(r.description ? { description: r.description } : {}), ...(modes.length ? { modes: Object.fromEntries(modes) as KitToken['modes'] } : {}) };
   }
   return out;
 }
 
 /** The design tokens of a design system or brand kit: seen, edited, imported and exported. Save makes a version. */
 export function KitTokens({ item, onDone, types = TOKEN_TYPES }: { item: Subject; onDone: () => void; /** Only these types show; the rest stay as they are. */ types?: readonly KitTokenType[] }) {
-  const [rows, setRows] = useState(() => rowsOf(item.tokens)), [busy, setBusy] = useState(false), [exporting, setExporting] = useState(false), file = useRef<HTMLInputElement>(null);
+  const [rows, setRows] = useState(() => rowsOf(item.tokens)), [modes, setModes] = useState(() => tokenModes(item.tokens)), [busy, setBusy] = useState(false), [exporting, setExporting] = useState(false), file = useRef<HTMLInputElement>(null);
   const patch = (i: number, p: Partial<Row>) => setRows((rs) => rs.map((r, k) => (k === i ? { ...r, ...p } : r)));
   const add = (type: KitTokenType) => setRows((rs) => {
     let n = 1;
@@ -41,18 +42,33 @@ export function KitTokens({ item, onDone, types = TOKEN_TYPES }: { item: Subject
     while (rs.some((r) => r.name === `${stem}.${n}`)) n++;
     return [...rs, { name: `${stem}.${n}`, type, value: START[type] }];
   });
-  const importFile = async (f?: File) => {
-    if (!f) return;
+  const importFiles = async (files: File[]) => {
+    if (!files.length) return;
     try {
-      const { tokens, skipped, off } = tokensFromFile(await f.text());
+      // Several files are the modes of one set of tokens (Figma writes one per mode): the light or shortest one is the base.
+      const stem = (f: File) => f.name.replace(/(\.tokens)?\.json$/i, '');
+      const [main, ...more] = [...files].sort((a, b) => Number(/light|default|base/i.test(stem(b))) - Number(/light|default|base/i.test(stem(a))) || stem(a).length - stem(b).length);
+      const read = tokensFromFile(await main.text()), skipped = [...read.skipped], off = read.off;
+      let tokens = read.tokens;
+      for (const f of more) {
+        const r = tokensFromFile(await f.text());
+        skipped.push(...r.skipped.filter((n) => !skipped.includes(n)));
+        tokens = withMode(tokens, (stem(f).startsWith(`${stem(main)}.`) ? stem(f).slice(stem(main).length + 1) : stem(f)) || 'Mode', r.tokens);
+      }
+      setModes((ms) => [...new Set([...ms, ...tokenModes(tokens)])]);
       setRows((rs) => [...rs.filter((r) => !tokens[r.name]), ...rowsOf(tokens)]);
       toast(`${Object.keys(tokens).length} tokens imported${skipped.length ? `. Not supported: ${names(skipped)}` : ''}${off.length ? `. Sets not in use: ${names(off)}` : ''}.`, skipped.length || off.length ? 'info' : 'success');
     } catch (e) { toast((e as Error).message, 'error'); }
   };
   const exportFile = (format: TokenFormat) => {
     try {
-      const { text, left } = tokensToFile(tokensOf(rows), format, item.name);
-      downloadBlob(new Blob([text], { type: 'application/json' }), `${item.name}${format === 'penpot' ? '.penpot' : ''}.tokens.json`);
+      const tokens = tokensOf(rows), files = format === 'penpot' ? [{ name: '.penpot', tokens }] : [undefined, ...tokenModes(tokens)].map((m) => ({ name: m ? `.${m}` : '', tokens: tokensIn(tokens, m) }));
+      let left: string[] = [];
+      for (const f of files) {
+        const r = tokensToFile(f.tokens, format, item.name);
+        left = r.left;
+        downloadBlob(new Blob([r.text], { type: 'application/json' }), `${item.name}${f.name}.tokens.json`);
+      }
       setExporting(false);
       if (left.length) toast(`Left out, not in this format: ${names(left)}.`, 'info');
     } catch (e) { toast((e as Error).message, 'error'); }
@@ -66,23 +82,28 @@ export function KitTokens({ item, onDone, types = TOKEN_TYPES }: { item: Subject
       onDone();
     } catch (e) { toast((e as Error).message, 'error'); } finally { setBusy(false); }
   };
-  const color = (r: Row) => { const t = Object.fromEntries(rows.map((x) => [x.name, { type: x.type, value: x.value }])) as Tokens; return String(resolveToken(t, r.name) ?? r.value); };
+  const color = (r: Row, mode?: string) => { const t = Object.fromEntries(rows.map((x) => [x.name, { type: x.type, value: x.value, modes: Object.fromEntries(Object.entries(x.modes ?? {}).filter(([, v]) => v.trim())) }])) as Tokens; return String(resolveToken(t, r.name, mode) ?? r.value); };
+  const swatch = (name: string, shown: string, value: string, set: (v: string) => void) => <input type="color" aria-label={`${name} color`} value={/^#[0-9a-f]{6}/i.exec(shown)?.[0].toLowerCase() ?? '#000000'} onChange={(e) => set(e.target.value + (/^#[0-9a-f]{6}([0-9a-f]{2})$/i.exec(value)?.[1] ?? ''))} />;
   return (
     <form className="kit-tokens" onSubmit={(e) => { e.preventDefault(); void save(); }}>
       <div className="kit-tokens-rows">
         {rows.map((r, i) => types.includes(r.type) && (
           <div key={i} className="kit-token">
             {r.type === 'color'
-              ? <input type="color" aria-label={`${r.name} color`} value={/^#[0-9a-f]{6}/i.exec(color(r))?.[0].toLowerCase() ?? '#000000'} onChange={(e) => patch(i, { value: e.target.value + (/^#[0-9a-f]{6}([0-9a-f]{2})$/i.exec(r.value)?.[1] ?? '') })} />
+              ? swatch(r.name, color(r), r.value, (value) => patch(i, { value }))
               : <span className="kit-token-type faint">{LABELS[r.type]}</span>}
             <input aria-label="Token name" value={r.name} disabled={busy} onChange={(e) => patch(i, { name: e.target.value })} />
             <input aria-label={`${r.name} value`} value={r.value} disabled={busy} onChange={(e) => patch(i, { value: e.target.value })} />
             <IconButton icon={X} size="sm" label={`Remove ${r.name}`} onClick={() => setRows((rs) => rs.filter((_, k) => k !== i))} />
+            {modes.filter((m) => r.type === 'color' || r.modes?.[m] !== undefined).map((m) => { const set = (v: string) => patch(i, { modes: { ...r.modes, [m]: v } }); return <div key={m} className="kit-token-mode">
+              {r.type === 'color' ? swatch(`${r.name} ${m}`, color(r, m), r.modes?.[m] ?? '', set) : <span />}
+              <span className="faint">{m}</span>
+              <input aria-label={`${r.name} ${m} value`} placeholder={r.value} value={r.modes?.[m] ?? ''} disabled={busy} onChange={(e) => set(e.target.value)} /></div>; })}
           </div>
         ))}
       </div>
-      <div className="kit-tokens-add">{types.map((t) => <Button key={t} size="sm" variant="ghost" icon={Plus} disabled={busy} onClick={() => add(t)}>{LABELS[t]}</Button>)}</div>
-      <input ref={file} type="file" accept=".json,application/json" hidden onChange={(e) => { void importFile(e.target.files?.[0]); e.target.value = ''; }} />
+      <div className="kit-tokens-add">{types.map((t) => <Button key={t} size="sm" variant="ghost" icon={Plus} disabled={busy} onClick={() => add(t)}>{LABELS[t]}</Button>)}{!modes.length && rows.length > 0 && types.includes('color') && <Button size="sm" variant="ghost" icon={Plus} disabled={busy} onClick={() => setModes(['Dark'])}>Dark mode</Button>}</div>
+      <input ref={file} type="file" accept=".json,application/json" multiple hidden onChange={(e) => { void importFiles([...(e.target.files ?? [])]); e.target.value = ''; }} />
       <div className="confirm-pop-actions">
         <IconButton icon={Upload} size="sm" label="Import tokens" onClick={() => file.current?.click()} />
         <IconButton icon={Download} size="sm" label="Export tokens" active={exporting} disabled={!rows.length} onClick={() => setExporting((v) => !v)} />

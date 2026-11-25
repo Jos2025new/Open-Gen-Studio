@@ -19,11 +19,16 @@ function validLiteral({ type, value: v }: KitToken): boolean {
   return type === 'string' && typeof v === 'string';
 }
 
+/** The modes the tokens have besides their own value. */
+export const tokenModes = (tokens: KitTokens = {}): string[] => [...new Set(Object.values(tokens).flatMap((t) => Object.keys(t.modes ?? {})))];
+/** The tokens with the values of one mode. */
+export const tokensIn = (tokens: KitTokens, mode?: string): KitTokens => Object.fromEntries(Object.entries(tokens).map(([name, { modes, ...t }]) => [name, { ...t, value: (mode !== undefined ? modes?.[mode] : undefined) ?? t.value }]));
+
 /** The value a token ends in, following its aliases. */
-export function resolveToken(tokens: KitTokens, name: string): string | number | undefined {
+export function resolveToken(tokens: KitTokens, name: string, mode?: string): string | number | undefined {
   let cur: string | null = name;
   for (let i = 0; cur !== null && i < 20; i++) {
-    const value: string | number | undefined = tokens[cur]?.value, next = parseTokenAlias(value);
+    const value: string | number | undefined = (mode !== undefined ? tokens[cur]?.modes?.[mode] : undefined) ?? tokens[cur]?.value, next = parseTokenAlias(value);
     if (next === null) return value;
     cur = next;
   }
@@ -31,6 +36,7 @@ export function resolveToken(tokens: KitTokens, name: string): string | number |
 }
 
 export function validateTokens(tokens: KitTokens): void {
+  for (const mode of tokenModes(tokens)) validateTokens(tokensIn(tokens, mode));
   for (const [name, tok] of Object.entries(tokens)) {
     if (!NAME_RE.test(name)) throw new Error(`Invalid token name "${name}".`);
     if (!(TOKEN_TYPES as readonly string[]).includes(tok.type)) throw new Error(`Invalid token type "${String(tok.type)}" for "${name}".`);

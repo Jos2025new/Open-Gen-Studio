@@ -1,10 +1,12 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { ChevronDown } from '../ui/icons';
 import { MenuItem, Range } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store/store';
 import { activeKit, activeKitColors } from '../../engine/activeKit';
+import { tokenChoices, type TokenChoice } from '../../engine/design/tokenBind';
+import type { TokenRef } from '../../engine/libraryTypes';
 import { rememberColor, removeSwatch, saveSwatch } from '../../engine/design/swatches';
 import { alphaFromOpacity, colorHsl, hexShown, opacityFromAlpha, parseHexAlpha } from '../../lib/color';
 import { ColorPlane } from './ColorPlane';
@@ -57,26 +59,34 @@ export function InlineChoice<T extends string | number>({ label, value, options,
   </div>;
 }
 
+/** The mode of the document on screen. */
+export const useTokenMode = () => useStore((s) => { const x = s.sessions[s.activeSessionId]; return x?.docs.find((d) => d.id === x.activeDocId)?.tokenMode; });
+
 /**
  * A color in the bar: click for the picker, a hex field, the recent colors and the saved ones (shared by every tool).
  * The color is remembered as recent when the panel closes, so dragging in the picker does not fill the list.
  */
-export function InlineColor({ label, value, onChange, showValue = false, iconOnly = false, alpha, children, preview }: { label: string; value: string; /** CSS background of the swatch when it is not just the value (a gradient). */ preview?: string; showValue?: boolean; /** The tool's opacity (0–1) as alpha: A and #RRGGBBAA read and write it. */ alpha?: { value: number; onChange: (opacity: number) => void }; /** Just the swatch, as a round button (the brush row). */ iconOnly?: boolean; children?: ReactNode; onChange: (v: string) => void }) {
+export function InlineColor({ label, value, onChange, showValue = false, iconOnly = false, alpha, children, preview, token }: { label: string; value: string; /** The brand token the value comes from. */ token?: TokenRef; /** CSS background of the swatch when it is not just the value (a gradient). */ preview?: string; showValue?: boolean; /** The tool's opacity (0–1) as alpha: A and #RRGGBBAA read and write it. */ alpha?: { value: number; onChange: (opacity: number) => void }; /** Just the swatch, as a round button (the brush row). */ iconOnly?: boolean; children?: ReactNode; onChange: (v: string, token?: TokenRef) => void }) {
   const pop = usePopover();
   const sw = useStore((s) => s.ui.swatches) ?? { recent: [], saved: [] };
   const [hex, setHex] = useState(() => hexShown(value, alpha?.value));
   const [hue, setHue] = useState(() => colorHsl(value)[0]);
   useEffect(() => { const [h, s] = colorHsl(value); if (s > 0) setHue(h); }, [value]);
-  const kit = useStore(activeKit), kitColors = useStore(useShallow(activeKitColors));
+  const kit = useStore(activeKit), library = useStore((s) => s.library), kitColors = useStore(useShallow(activeKitColors)), mode = useTokenMode();
+  const tokens = useMemo(() => (pop.open ? tokenChoices('color', mode) : []), [pop.open, kit, library, mode]);
+  const plain = kitColors.filter((c) => !tokens.some((t) => t.ref.value === c));
   const close = () => { rememberColor(value); pop.close(); };
   const pick = (c: string) => { onChange(c); setHex(hexShown(c, alpha?.value)); };
+  const tokenChip = ({ ref, label: name }: TokenChoice) => (
+    <button key={`${ref.kit}${ref.token}`} type="button" className={`swatch${token?.kit === ref.kit && token.token === ref.token ? ' is-on' : ''}`} style={{ background: String(ref.value) }} aria-label={name} data-tip={name} onClick={() => { onChange(String(ref.value), ref); setHex(hexShown(String(ref.value), alpha?.value)); }} />
+  );
   const chip = (c: string, saved: boolean) => (
     <button key={`${saved}${c}`} type="button" className={`swatch${c === value.toLowerCase() ? ' is-on' : ''}`} style={{ background: c }} aria-label={c} data-tip={saved ? `${c} · right-click to remove` : c}
       onClick={() => pick(c)} onContextMenu={saved ? (e) => { e.preventDefault(); removeSwatch(c); } : undefined} />
   );
   return <>
-    <button type="button" ref={pop.ref} className={`opt opt-color${iconOnly ? ' is-icon' : ''}`} aria-label={`${label} · ${value}`} data-tip={label} aria-haspopup="dialog" aria-expanded={pop.open} onClick={() => { setHex(hexShown(value, alpha?.value)); pop.toggle(); }}>
-      {!iconOnly && <span className="opt-label">{label}</span>}<span className="opt-swatch" style={{ background: preview ?? value }} />{!iconOnly && (showValue || label === 'Text color') && <span className="opt-value">{value.toUpperCase()}</span>}
+    <button type="button" ref={pop.ref} className={`opt opt-color${iconOnly ? ' is-icon' : ''}`} aria-label={`${label} · ${token?.token ?? value}`} data-tip={token ? `${label} · ${token.token}` : label} aria-haspopup="dialog" aria-expanded={pop.open} onClick={() => { setHex(hexShown(value, alpha?.value)); pop.toggle(); }}>
+      {!iconOnly && <span className="opt-label">{label}</span>}<span className="opt-swatch" style={{ background: preview ?? value }} />{!iconOnly && (showValue || label === 'Text color') && <span className="opt-value">{token?.token ?? value.toUpperCase()}</span>}
     </button>
     <Popover open={pop.open} anchor={pop.ref} onClose={close} placement="bottom-start" width={260} label={label}>
       <div className="swatch-panel">
@@ -88,7 +98,7 @@ export function InlineColor({ label, value, onChange, showValue = false, iconOnl
           <input className="swatch-hex" value={hex} aria-label="Hex" spellCheck={false} onChange={(e) => { setHex(e.target.value); const p = parseHexAlpha(e.target.value); if (p) { onChange(p.color); if (alpha && e.target.value.trim().length === 9) alpha.onChange(opacityFromAlpha(p.alpha)); } }} />
           <button type="button" className="sb-link" onClick={() => saveSwatch(value)} disabled={sw.saved.includes(value.toLowerCase())}>Save</button>
         </div>
-        {kitColors.length > 0 && <><span className="field-label">{kit!.name}</span><div className="swatch-grid">{kitColors.map((c) => chip(c, false))}</div></>}
+        {kit && tokens.length + plain.length > 0 && <><span className="field-label">{kit.name}</span><div className="swatch-grid">{tokens.map(tokenChip)}{plain.map((c) => chip(c, false))}</div></>}
         {sw.recent.length > 0 && <><span className="field-label">Recent</span><div className="swatch-grid">{sw.recent.map((c) => chip(c, false))}</div></>}
         {sw.saved.length > 0 && <><span className="field-label">Saved</span><div className="swatch-grid">{sw.saved.map((c) => chip(c, true))}</div></>}
       </div>

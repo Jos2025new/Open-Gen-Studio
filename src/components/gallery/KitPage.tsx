@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { addAsReference, sendToNodes, uploadFiles } from '../../engine/actions';
-import { addTextLayer, placeAsset } from '../../engine/design/actions';
-import { FONT_STACKS } from '../../engine/design/doc';
+import { addTextLayer, getDoc, patchLayer, placeAsset } from '../../engine/design/actions';
+import { fontStack } from '../../engine/design/doc';
+import { patchPickedShapes } from '../../engine/design/multiObjectOps';
+import { objectPicks } from '../../engine/design/objectSelection';
+import { tokenPatch, tokenValue } from '../../engine/design/tokenBind';
 import { rememberColor } from '../../engine/design/swatches';
+import { addFonts, removeFont } from '../../engine/ownFonts';
 import { insertComponent } from '../../engine/libraryInsert';
 import { addCategory, addToSection, kitSections, moveToSection, removeCategory, removeFromSection, sectionNodes, setSectionText, type KitSection } from '../../engine/librarySections';
 import { resolveToken } from '../../engine/libraryTokens';
@@ -20,8 +24,8 @@ import './KitPage.css';
 
 type Run = (fn: () => unknown) => Promise<void>;
 const assetOf = (n: GraphNode) => (n.data.kind === 'asset' ? n.data.assetId ?? undefined : undefined);
-const tokensOf = (s: Subject, sec: KitSection) => Object.entries(s.tokens ?? {}).filter(([, t]) => sec.tokens?.includes(t.type)).map(([name, t]) => ({ name, type: t.type, value: String(resolveToken(s.tokens!, name) ?? t.value) }));
-const colorsOf = (s: Subject, sec: KitSection) => [...tokensOf(s, sec), ...(s.graph?.nodes ?? []).flatMap((n) => (n.data.kind === 'part' && n.data.color ? [{ name: n.data.title, type: 'color' as const, value: n.data.color }] : []))];
+const tokensOf = (s: Subject, sec: KitSection) => Object.entries(s.tokens ?? {}).filter(([, t]) => sec.tokens?.includes(t.type)).map(([name, t]) => ({ name, token: name as string | undefined, type: t.type, value: String(resolveToken(s.tokens!, name) ?? t.value) }));
+const colorsOf = (s: Subject, sec: KitSection) => [...tokensOf(s, sec), ...(s.graph?.nodes ?? []).flatMap((n) => (n.data.kind === 'part' && n.data.color ? [{ name: n.data.title, token: undefined, type: 'color' as const, value: n.data.color }] : []))];
 const insideOf = (s: Subject, sec: KitSection, library: readonly Subject[]) => (s.kits ?? []).flatMap((id) => library.find((x) => x.id === id && x.kind === sec.kit) ?? []);
 
 /** The Designer document the user is on, if any. */
@@ -87,7 +91,7 @@ function SectionTile({ item, section, cover, onOpen }: { item: Subject; section:
     <span className={`kit-tile-art${shown.length ? ` is-images n${shown.length}` : ''}`}>
       {shown.length ? shown.map((id) => <AssetMedia key={id} assetId={id} />)
         : colors.length ? colors.slice(0, 8).map((c) => <i key={c.name} className="kit-tile-color" style={{ background: c.value }} />)
-          : section.title === 'Fonts' && tokens.length ? <span className="kit-tile-font" style={{ fontFamily: FONT_STACKS[tokens[0].value] ?? tokens[0].value }}>Aa</span>
+          : section.title === 'Fonts' && tokens.length ? <span className="kit-tile-font" style={{ fontFamily: fontStack(tokens[0].value.split(',')[0].trim()) }}>Aa</span>
             : quote?.data.kind === 'text' ? <span className="kit-tile-quote">{quote.data.text}</span>
               : <Icon size={20} />}
     </span>
@@ -98,22 +102,51 @@ function SectionTile({ item, section, cover, onOpen }: { item: Subject; section:
 interface SectionProps { item: Subject; section: KitSection; sections: KitSection[]; busy: boolean; run: Run; cover: (s: Subject) => string | undefined; onOpen: (s: Subject) => void; onDesign: () => void; onGone: () => void; }
 function Section(p: SectionProps) {
   const { item, section, run } = p;
-  if (section.type === 'tokens') return <div className="kit-section"><Swatches item={item} section={section} /><KitTokens key={item.versionId} item={item} types={section.tokens} onDone={() => undefined} /></div>;
+  if (section.type === 'tokens') return <div className="kit-section"><Swatches item={item} section={section} />{section.title === 'Fonts' && <Fonts {...p} />}<KitTokens key={item.versionId} item={item} types={section.tokens} onDone={() => undefined} /></div>;
   if (section.type === 'components') return <Components {...p} />;
   if (section.type === 'kits') return <Inside {...p} />;
   if (section.type === 'text') return <div className="kit-section"><Texts {...p} nodes={sectionNodes(item, section)} /><NewText onAdd={(text) => run(() => addToSection(item.id, section.title, { texts: [text] }))} /></div>;
   return <Items {...p} />;
 }
 
-/** The colors of the kit, one click away: the Designer's color, or copied. */
+/** The colors of the kit, one click away: the picked text's or shapes' color, else the Designer's; or copied. */
 function Swatches({ item, section }: { item: Subject; section: KitSection }) {
-  const { docId } = useDesign(), colors = section.title === 'Colors' ? colorsOf(item, section) : [];
+  const { sessionId, docId } = useDesign(), colors = section.title === 'Colors' ? colorsOf(item, section) : [];
   if (!colors.length) return null;
-  const use = (c: string) => {
-    if (docId && /^#[0-9a-f]{6}$/i.test(c)) { setUi((u) => ({ brush: { ...u.brush, color: c.toLowerCase() } })); rememberColor(c); }
-    else void navigator.clipboard?.writeText(c).then(() => toast(`${c} copied.`, 'success'), () => toast('Could not copy.', 'error'));
+  const use = (c: string, token?: string) => {
+    const doc = docId ? getDoc(sessionId, docId) : undefined, value = doc && token ? tokenValue(item, token, doc.tokenMode) : undefined, hex = String(value ?? c).toLowerCase();
+    if (doc && /^#[0-9a-f]{6}$/.test(hex)) {
+      const ref = token && value !== undefined ? { kit: item.id, token, value } : undefined, layer = doc.layers.find((l) => l.id === doc.activeLayerId), picks = objectPicks(doc.id);
+      if (picks.length) patchPickedShapes(sessionId, doc.id, doc, picks, tokenPatch('fill', hex, ref));
+      else if (layer?.type === 'text' && !layer.locked) patchLayer(sessionId, doc.id, layer.id, tokenPatch('color', hex, ref));
+      else setUi((u) => ({ brush: { ...u.brush, color: hex }, text: { ...u.text, ...tokenPatch('color', hex, ref) }, shape: { ...u.shape, ...tokenPatch('fill', hex, ref) }, lineart: { ...u.lineart, ...tokenPatch('color', hex, ref) } }));
+      rememberColor(hex);
+    } else void navigator.clipboard?.writeText(c).then(() => toast(`${c} copied.`, 'success'), () => toast('Could not copy.', 'error'));
   };
-  return <div className="kit-swatches">{colors.map((c) => <button key={c.name} type="button" className="kit-swatch" aria-label={`${c.name} ${c.value}`} data-tip={c.value} style={{ background: c.value }} onClick={() => use(c.value)} />)}</div>;
+  return <div className="kit-swatches">{colors.map((c) => <button key={c.name} type="button" className="kit-swatch" aria-label={`${c.name} ${c.value}`} data-tip={c.value} style={{ background: c.value }} onClick={() => use(c.value, c.token)} />)}</div>;
+}
+
+/** The entry's own font files: added, used in the picked text (or the next one) with a click, and removed. */
+function Fonts({ item, busy, run }: SectionProps) {
+  const { sessionId, docId } = useDesign(), file = useRef<HTMLInputElement>(null);
+  const families = [...new Set((item.fonts ?? []).map((f) => f.family))];
+  const use = (family: string) => {
+    const token = Object.keys(item.tokens ?? {}).find((n) => tokenValue(item, n) === family && item.tokens![n].type === 'fontFamily');
+    const patch = tokenPatch('fontFamily', family, token ? { kit: item.id, token, value: family } : undefined);
+    const doc = docId ? getDoc(sessionId, docId) : undefined, layer = doc?.layers.find((l) => l.id === doc.activeLayerId);
+    if (doc && layer?.type === 'text' && !layer.locked) patchLayer(sessionId, doc.id, layer.id, patch);
+    else setUi((u) => ({ text: { ...u.text, ...patch } }));
+  };
+  return <>
+    <div className="kit-add">
+      <input ref={file} type="file" accept=".ttf,.otf,.woff,font/ttf,font/otf,font/woff" multiple hidden onChange={(e) => { const list = [...(e.target.files ?? [])]; e.target.value = ''; void run(async () => { const names = await addFonts(item.id, list); if (names.length) toast(`${names.join(', ')} added.`, 'success'); }); }} />
+      <Button size="sm" icon={Upload} disabled={busy} onClick={() => file.current?.click()}>Upload font</Button>
+    </div>
+    {families.map((f) => <div key={f} className="kit-font">
+      <button type="button" className="kit-font-use" aria-label={`Use ${f}`} style={{ fontFamily: fontStack(f) }} onClick={() => use(f)}>{f}</button>
+      <IconButton icon={Trash} label={`Remove ${f}`} size="sm" disabled={busy} onClick={() => removeFont(item.id, f)} />
+    </div>)}
+  </>;
 }
 
 function Items({ item, section, sections, busy, run, onGone }: SectionProps) {

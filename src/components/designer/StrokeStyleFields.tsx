@@ -5,6 +5,7 @@ import { Field } from '../ui/primitives';
 import { SizePresets } from './SizePresets';
 import { BrushTipShape } from './BrushTipShape';
 import { NIB_DEFAULT_ANGLE, NIB_DEFAULT_MIN } from '../../engine/design/nibOutline';
+import { tokenPatch, tokenOf } from '../../engine/design/tokenBind';
 import { InlineColor, InlineSelect, InlineSlider } from './InlineControls';
 
 const SIZE_MAX = 120;
@@ -16,7 +17,7 @@ export function StrokeStyleFields({ value, onChange }: { value: StrokeStyle; onC
   return <div className="stroke-controls">
     <InlineSlider label="Size" unit="px" min={1} max={SIZE_MAX} value={value.size} onChange={(size) => onChange({ size })} />
     <SizePresets value={value.size} min={1} max={SIZE_MAX} onChange={(size) => onChange({ size })} />
-    <InlineColor label="Color" showValue value={value.color} onChange={(color) => onChange({ color })} />
+    <InlineColor label="Color" showValue value={value.color} token={tokenOf(value, 'color')} onChange={(c, t) => onChange(tokenPatch('color', c, t))} />
     <InlineSlider label="Opacity" unit="%" scale={100} min={0.05} max={1} step={0.01} value={value.opacity} onChange={(opacity) => onChange({ opacity })} />
     {range('thinning', 'Pressure thinning', -1)}
     {range('smoothing', 'Smoothing')}

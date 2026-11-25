@@ -8,12 +8,13 @@ import { useObjectSelection } from '../../engine/design/objectSelection';
 import { layerObjects } from '../../engine/design/objectOps';
 import { alignPicks, distributePicks, pickGroups, turnPicks } from '../../engine/design/multiObjectOps';
 import { setUi, useStore, toast } from '../../store/store';
-import { FONT_NAMES } from '../../engine/design/doc';
 import { Popover, usePopover } from '../ui/Popover';
 import type { DesignDoc, StrokeStyle, TextStyle } from '../../engine/types';
 import { getDoc, mutateDoc } from '../../engine/design/actions';
 import { getSelection, invertSelection, selectAll, selectionToLayer, setSelection, useSelectionVersion, type SelectCombine } from '../../engine/design/pixelSelection';
 import { SelectionActions } from './SelectionActions';
+import { tokenPatch, tokenOf } from '../../engine/design/tokenBind';
+import { FontField, SizeTokenField } from './TokenFields';
 import { InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
 import { AlignControls } from './AlignControls';
 import type { ToolSettingsProps } from './tools/types';
@@ -178,10 +179,11 @@ export function SelectOps({ sessionId, doc, compact = false }: { sessionId: stri
  */
 export function TextStyleFields({ value, onChange, compact = false }: { value: TextStyle; onChange: (patch: Partial<TextStyle>) => void; compact?: boolean }) {
   return <>
-    <InlineSelect label="Font" value={value.fontFamily} options={FONT_NAMES} onChange={(v) => onChange({ fontFamily: v })} />
+    <FontField value={value} onChange={onChange} />
     <InlineSlider label="Size" unit="px" min={1} max={500} value={value.fontSize} onChange={(v) => onChange({ fontSize: v })} />
+    <SizeTokenField value={value} onChange={onChange} />
     <InlineSelect label="Weight" value={value.fontWeight} options={[100, 200, 300, 400, 500, 600, 700, 800, 900]} onChange={(v) => onChange({ fontWeight: v })} />
-    <InlineColor label="Color" value={value.color} onChange={(v) => onChange({ color: v })} />
+    <InlineColor label="Color" value={value.color} token={tokenOf(value, 'color')} onChange={(c, t) => onChange(tokenPatch('color', c, t))} />
     <InlineSelect label="Align" value={value.align} options={['left', 'center', 'right'] as const as unknown as Array<TextStyle['align']>} onChange={(v) => onChange({ align: v })} />
     {!compact && <>
       <InlineSlider label="Line" min={0.5} max={3} step={0.1} value={value.lineHeight} onChange={(v) => onChange({ lineHeight: v })} />

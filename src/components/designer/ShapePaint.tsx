@@ -6,6 +6,8 @@ import { defaultGradient } from '../../engine/design/gradientPaint';
 import { MARKER_KINDS, type MarkerKind } from '../../engine/design/markers';
 import { Popover } from '../ui/Popover';
 import { usePopover } from '../ui/Popover';
+import type { TokenRef } from '../../engine/libraryTypes';
+import { tokenPatch, tokenOf } from '../../engine/design/tokenBind';
 import { InlineChoice, InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
 import { PrimFields } from './PrimFields';
 import { isClosedShape, strokeAlignOf } from '../../engine/design/shapeLook';
@@ -66,9 +68,9 @@ export function PaintSwatch({ sessionId, docId, layerId, shape, side }: { sessio
   const value = st ? st.color : solid;
   const alpha = st ? st.alpha : (shape[f.opacity] ?? 1);
   const set = (patch: Partial<VectorShape>) => patchShape(sessionId, docId, layerId, shape.id, patch);
-  const onColor = (c: string) => set(st ? stopPatch(shape, side, end, { color: c }) ?? {} : { [f.paint]: c });
+  const onColor = (c: string, t?: TokenRef) => set(st ? stopPatch(shape, side, end, tokenPatch('color', c, t)) ?? {} : tokenPatch(stroke ? 'stroke' : 'fill', c, t));
   const onAlpha = (a: number) => set(st ? stopPatch(shape, side, end, { alpha: a }) ?? {} : { [f.opacity]: a });
-  return <InlineColor label={label} value={value} preview={g ? gradientCss(g) : undefined} alpha={{ value: alpha, onChange: onAlpha }} onChange={onColor}>
+  return <InlineColor label={label} value={value} token={st ? tokenOf(st, 'color') : tokenOf(shape, stroke ? 'stroke' : 'fill')} preview={g ? gradientCss(g) : undefined} alpha={{ value: alpha, onChange: onAlpha }} onChange={onColor}>
     <div className="swatch-row" role="radiogroup" aria-label={`${label} type`}>
       {KINDS.map((k) => { const Icon = k.icon; return <button key={k.kind} type="button" role="radio" aria-checked={kind === k.kind} aria-label={k.label} data-tip={k.label} className={`opt${kind === k.kind ? ' is-on' : ''}`} onClick={() => set(paintKindPatch(shape, side, k.kind))}><Icon size={14} aria-hidden="true" /></button>; })}
     </div>

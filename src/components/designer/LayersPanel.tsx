@@ -4,7 +4,7 @@ import { LayerObjects, LayerObjectsToggle } from './LayerObjects';
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Grid2x2, Merge, Layers as LayersIcon, SlidersHorizontal, RotateCcw, Wrench, MoreHorizontal, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from '../ui/icons';
 import type { DesignDoc, Layer, OpId, VectorShape } from '../../engine/types';
 import type { RelativeTo } from '../../engine/design/transform';
-import { activeLayer, dropIndex, FONT_NAMES } from '../../engine/design/doc';
+import { activeLayer, dropIndex } from '../../engine/design/doc';
 import { paintOpacity, paintOpacityPatch } from '../../engine/design/shapeLook';
 import { StrokeStyleFields } from './StrokeStyleFields';
 import { addEmptyLayer, deleteLayers, duplicateLayer, mergeDown, moveLayer, rasterizeLayer, patchLayer, reorderLayer, setActiveLayer } from '../../engine/design/actions';
@@ -23,6 +23,8 @@ import { LayerGeometry } from './LayerGeometry';
 import { LayerUnreadable } from './LayerUnreadable';
 import { EditOps, ToolSettings } from './ToolSettings';
 import { ShapeLookFields } from './ShapeLookFields';
+import { tokenPatch, tokenOf } from '../../engine/design/tokenBind';
+import { FontField, TokenModeField } from './TokenFields';
 import { InlineColor, InlineSlider, InlineToggle } from './InlineControls';
 import { pickedIn, useObjectSelection } from '../../engine/design/objectSelection';
 import { groupLayers, groupMembers, liveGroups, patchGroup, selectGroup, setGroupFlag, ungroup } from '../../engine/design/groups';
@@ -265,7 +267,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
       </section>}
       {tool === 'hand' ? <p className="field-hint">Pan has no additional settings.</p> : <ToolSettings sessionId={sessionId} doc={doc} selectedCurve={selectedCurve} />}
     </section>}
-    {tab === 'props' && !layer && <p className="empty-block">Select a layer to see its properties.</p>}
+    {tab === 'props' && !layer && <><p className="empty-block">Select a layer to see its properties.</p><TokenModeField sessionId={sessionId} doc={doc} /></>}
     {layer && <>
       {tab === 'props' && <details className="layer-details" open={propertiesOpen} onToggle={(e) => setPropertiesOpen(e.currentTarget.open)}>
       <summary>Layer properties</summary>
@@ -274,9 +276,9 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
         {layer.type === 'raster' && layer.sourceAssetId && <InlineToggle label="Allow painting on this image" checked={!!layer.allowPaint} onChange={(v) => patch({ allowPaint: v })} />}
         {layer.type === 'text' && <>
           <Field label="Text"><textarea rows={3} value={layer.text} onChange={(e) => patch({ text: e.target.value })} /></Field>
-          <Field label="Font"><select value={layer.fontFamily} onChange={(e) => patch({ fontFamily: e.target.value })}>{FONT_NAMES.map((f) => <option key={f}>{f}</option>)}</select></Field>
+          <FontField value={layer} onChange={patch} />
           <div className="property-grid"><Field label="Size"><input type="number" min={4} max={1000} value={layer.fontSize} onChange={(e) => patch({ fontSize: Math.min(1000, Math.max(4, +e.target.value)) })} /></Field><Field label="Weight"><select value={layer.fontWeight} onChange={(e) => patch({ fontWeight: +e.target.value })}>{[300, 400, 500, 600, 700, 800, 900].map((w) => <option key={w}>{w}</option>)}</select></Field></div>
-          <Field label="Text color"><InlineColor label="Text color" value={layer.color} onChange={(color) => patch({ color })} /></Field>
+          <Field label="Text color"><InlineColor label="Text color" value={layer.color} token={tokenOf(layer, 'color')} onChange={(c, t) => patch(tokenPatch('color', c, t))} /></Field>
           <Field label="Alignment"><select value={layer.align} onChange={(e) => patch({ align: e.target.value as 'left' | 'center' | 'right' })}>{['left', 'center', 'right'].map((a) => <option key={a}>{a}</option>)}</select></Field>
         </>}
         {layer.type === 'vector' && layer.strokes?.length ? (() => {
@@ -296,8 +298,8 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
           const pickedShapes = layer.shapes.filter((s) => pickedIn(objPick, layer.id).includes(s.id));
           const set = (id: string, p: Partial<VectorShape>) => patch({ shapes: layer.shapes.map((x) => (x.id === id ? { ...x, ...p } : x)) });
           return <><p className="muted">{pickedShapes.length ? `Picked shape ${pickedShapes.length === 1 ? '' : `(${pickedShapes.length}) `}of ${layer.shapes.length}.` : `${layer.shapes.length} shapes · draw on the canvas to add more.`}</p>{(pickedShapes.length ? pickedShapes : layer.shapes).map((s) => <div className="shape-properties" key={s.id}><strong>{s.type} {layer.shapes.indexOf(s) + 1}</strong>
-            <InlineColor label="Fill" value={s.fill ?? '#d4f25a'} showValue onChange={(fill) => set(s.id, { fill })} alpha={{ value: paintOpacity(s, 'fill'), onChange: (o) => set(s.id, paintOpacityPatch('fill', o)) }} />
-            <InlineColor label="Stroke" value={s.stroke ?? '#ffffff'} showValue onChange={(stroke) => set(s.id, { stroke })} alpha={{ value: paintOpacity(s, 'stroke'), onChange: (o) => set(s.id, paintOpacityPatch('stroke', o)) }} />
+            <InlineColor label="Fill" value={s.fill ?? '#d4f25a'} token={tokenOf(s, 'fill')} showValue onChange={(c, t) => set(s.id, tokenPatch('fill', c, t))} alpha={{ value: paintOpacity(s, 'fill'), onChange: (o) => set(s.id, paintOpacityPatch('fill', o)) }} />
+            <InlineColor label="Stroke" value={s.stroke ?? '#ffffff'} token={tokenOf(s, 'stroke')} showValue onChange={(c, t) => set(s.id, tokenPatch('stroke', c, t))} alpha={{ value: paintOpacity(s, 'stroke'), onChange: (o) => set(s.id, paintOpacityPatch('stroke', o)) }} />
             <InlineSlider label="Stroke width" unit="px" min={0} max={40} allowManualOverflow value={s.strokeWidth} onChange={(strokeWidth) => set(s.id, { strokeWidth })} />
             <ShapeLookFields value={s} corners={s.type === 'rect'} smoothing blur onChange={(p) => set(s.id, p)} /></div>)}</>;
         })()}

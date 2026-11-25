@@ -10,6 +10,7 @@ import { snapAngle } from '../../../engine/design/selectGeometry';
 import type { View } from '../../../engine/design/viewCoordinates';
 import { uid } from '../../../lib/id';
 import { ShapeLookFields } from '../ShapeLookFields';
+import { tokenPatch, tokenOf } from '../../../engine/design/tokenBind';
 import { InlineColor, InlineSlider } from '../InlineControls';
 import type { ComponentType } from 'react';
 import type { GestureMap, ToolDescriptor } from './types';
@@ -52,8 +53,8 @@ function shapeTool(tool: ShapeTool, { strokeOnly = false, customPath, trace, fie
 export function ShapeSettings({ compact, fill = true, corners = false, fields: Fields }: { compact?: boolean; fill?: boolean; corners?: boolean; fields?: ComponentType }) {
   const shape = useStore((s) => s.ui.shape);
   return <>
-    {fill && <InlineColor label={shape.fill === null ? "Fill · none" : "Fill"} value={shape.fill ?? '#d4f25a'} showValue onChange={(fill) => setUi({ shape: { ...shape, fill } })}><label className="check-row"><input type="checkbox" checked={shape.fill === null} onChange={(e) => setUi({ shape: { ...shape, fill: e.target.checked ? null : '#d4f25a' } })} />No fill</label></InlineColor>}
-    <InlineColor label={shape.stroke === null ? "Stroke · none" : "Stroke"} value={shape.stroke ?? '#ffffff'} showValue onChange={(stroke) => setUi({ shape: { ...shape, stroke } })}><label className="check-row"><input type="checkbox" checked={shape.stroke === null} onChange={(e) => setUi({ shape: { ...shape, stroke: e.target.checked ? null : '#ffffff' } })} />No stroke</label></InlineColor>
+    {fill && <InlineColor label={shape.fill === null ? "Fill · none" : "Fill"} value={shape.fill ?? '#d4f25a'} showValue token={tokenOf(shape, 'fill')} onChange={(c, t) => setUi({ shape: { ...shape, ...tokenPatch('fill', c, t) } })}><label className="check-row"><input type="checkbox" checked={shape.fill === null} onChange={(e) => setUi({ shape: { ...shape, fill: e.target.checked ? null : '#d4f25a' } })} />No fill</label></InlineColor>}
+    <InlineColor label={shape.stroke === null ? "Stroke · none" : "Stroke"} value={shape.stroke ?? '#ffffff'} showValue token={tokenOf(shape, 'stroke')} onChange={(c, t) => setUi({ shape: { ...shape, ...tokenPatch('stroke', c, t) } })}><label className="check-row"><input type="checkbox" checked={shape.stroke === null} onChange={(e) => setUi({ shape: { ...shape, stroke: e.target.checked ? null : '#ffffff' } })} />No stroke</label></InlineColor>
     <InlineSlider label="Width" unit="px" min={1} max={40} value={shape.strokeWidth} onChange={(v) => setUi({ shape: { ...shape, strokeWidth: v } })} />
     {Fields && <Fields />}
     <ShapeLookFields value={shape} corners={corners} compact={compact} onChange={(p) => setUi({ shape: { ...shape, ...p } })} />
@@ -91,7 +92,7 @@ export const shapeGestures = {
       const pbox = d0 ? pathBox(d0) : null;
       if (d0 && !pbox) return;
       // Stroke style of the next shape (ShapeLookFields); corners only for rectangles.
-      const { join, cap, miter, dash, dashOffset, paintOrder } = shapeStyle, look = { join, cap, miter, dash, dashOffset, paintOrder };
+      const { join, cap, miter, dash, dashOffset, paintOrder } = shapeStyle, look = { join, cap, miter, dash, dashOffset, paintOrder, fillToken: lineLike ? undefined : shapeStyle.fillToken, strokeToken: lineLike && !shapeStyle.stroke ? shapeStyle.fillToken : shapeStyle.strokeToken };
       const shape = pfit || pbox ? {
         id: uid('shp'),
         ...(pfit ?? { type: 'path' as const, d: d0!, box0: pbox!, ...pbox! }),
