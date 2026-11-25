@@ -1,3 +1,4 @@
+import { hexShown } from '../../../lib/color';
 import { cornerRadii, paintOpacity, paintOpacityPatch, traceRoundRect } from '../../../engine/design/shapeLook';
 import { CornerToolFields, EllipseToolFields, LineToolFields } from '../ShapeKindFields';
 import { drawShape } from '../../../engine/design/drawShape';
@@ -51,10 +52,10 @@ function shapeTool(tool: ShapeTool, { strokeOnly = false, customPath, trace, fie
 }
 
 export function ShapeSettings({ compact, fill = true, corners = false, fields: Fields }: { compact?: boolean; fill?: boolean; corners?: boolean; fields?: ComponentType }) {
-  const shape = useStore((s) => s.ui.shape), sOp = shape as typeof shape & { fillOpacity?: number; strokeOpacity?: number };
+  const shape = useStore((s) => s.ui.shape);
   return <>
-    {fill && <InlineColor label={shape.fill === null ? "Fill · none" : "Fill"} value={shape.fill ?? '#d4f25a'} showValue alpha={{ value: paintOpacity(sOp as never, 'fill'), onChange: (o) => setUi({ shape: { ...shape, ...paintOpacityPatch('fill', o) } }) }} token={tokenOf(shape, 'fill')} onChange={(c, t, p) => setUi({ shape: { ...shape, ...tokenPatch('fill', c, t, p) } })}><label className="check-row"><input type="checkbox" checked={shape.fill === null} onChange={(e) => setUi({ shape: { ...shape, fill: e.target.checked ? null : '#d4f25a' } })} />No fill</label></InlineColor>}
-    <InlineColor label={shape.stroke === null ? "Stroke · none" : "Stroke"} value={shape.stroke ?? '#ffffff'} showValue alpha={{ value: paintOpacity(sOp as never, 'stroke'), onChange: (o) => setUi({ shape: { ...shape, ...paintOpacityPatch('stroke', o) } }) }} token={tokenOf(shape, 'stroke')} onChange={(c, t, p) => setUi({ shape: { ...shape, ...tokenPatch('stroke', c, t, p) } })}><label className="check-row"><input type="checkbox" checked={shape.stroke === null} onChange={(e) => setUi({ shape: { ...shape, stroke: e.target.checked ? null : '#ffffff' } })} />No stroke</label></InlineColor>
+    {fill && <InlineColor label={shape.fill === null ? "Fill · none" : "Fill"} value={shape.fill ?? '#d4f25a'} showValue alpha={{ value: paintOpacity(shape, 'fill'), onChange: (o) => setUi({ shape: { ...shape, ...paintOpacityPatch('fill', o) } }) }} token={tokenOf(shape, 'fill')} onChange={(c, t, p) => setUi({ shape: { ...shape, ...tokenPatch('fill', c, t, p) } })}><label className="check-row"><input type="checkbox" checked={shape.fill === null} onChange={(e) => setUi({ shape: { ...shape, fill: e.target.checked ? null : '#d4f25a' } })} />No fill</label></InlineColor>}
+    <InlineColor label={shape.stroke === null ? "Stroke · none" : "Stroke"} value={shape.stroke ?? '#ffffff'} showValue alpha={{ value: paintOpacity(shape, 'stroke'), onChange: (o) => setUi({ shape: { ...shape, ...paintOpacityPatch('stroke', o) } }) }} token={tokenOf(shape, 'stroke')} onChange={(c, t, p) => setUi({ shape: { ...shape, ...tokenPatch('stroke', c, t, p) } })}><label className="check-row"><input type="checkbox" checked={shape.stroke === null} onChange={(e) => setUi({ shape: { ...shape, stroke: e.target.checked ? null : '#ffffff' } })} />No stroke</label></InlineColor>
     <InlineSlider label="Width" unit="px" min={1} max={40} value={shape.strokeWidth} onChange={(v) => setUi({ shape: { ...shape, strokeWidth: v } })} />
     {Fields && <Fields />}
     <ShapeLookFields value={shape} corners={corners} compact={compact} onChange={(p) => setUi({ shape: { ...shape, ...p } })} />
@@ -92,8 +93,8 @@ export const shapeGestures = {
       const pbox = d0 ? pathBox(d0) : null;
       if (d0 && !pbox) return;
       // Stroke style of the next shape (ShapeLookFields); corners only for rectangles.
-      const { join, cap, miter, dash, dashOffset, paintOrder } = shapeStyle, sOp = shapeStyle as { fillOpacity?: number; strokeOpacity?: number };
-      const look = { join, cap, miter, dash, dashOffset, paintOrder, fillToken: lineLike ? undefined : shapeStyle.fillToken, fillOpacity: lineLike ? undefined : sOp.fillOpacity, strokeToken: lineLike && !shapeStyle.stroke ? shapeStyle.fillToken : shapeStyle.strokeToken, strokeOpacity: lineLike && !shapeStyle.stroke ? sOp.fillOpacity : sOp.strokeOpacity };
+      const { join, cap, miter, dash, dashOffset, paintOrder } = shapeStyle;
+      const look = { join, cap, miter, dash, dashOffset, paintOrder, fillToken: lineLike ? undefined : shapeStyle.fillToken, fillOpacity: lineLike ? undefined : shapeStyle.fillOpacity, strokeToken: lineLike && !shapeStyle.stroke ? shapeStyle.fillToken : shapeStyle.strokeToken, strokeOpacity: lineLike && !shapeStyle.stroke ? shapeStyle.fillOpacity : shapeStyle.strokeOpacity };
       const shape = pfit || pbox ? {
         id: uid('shp'),
         ...(pfit ?? { type: 'path' as const, d: d0!, box0: pbox!, ...pbox! }),
@@ -126,10 +127,10 @@ export function drawShapePreview(ctx: CanvasRenderingContext2D, view: View, prev
     : new Path2D();
   trace?.(path, preview, shapeStyle, { x, y, w, h });
   if (!lineLike && shapeStyle.fill) {
-    ctx.fillStyle = shapeStyle.fill;
+    ctx.fillStyle = hexShown(shapeStyle.fill, shapeStyle.fillOpacity);
     ctx.fill(path);
   }
-  ctx.strokeStyle = lineLike ? shapeStyle.stroke ?? shapeStyle.fill ?? '#ffffff' : shapeStyle.stroke ?? 'rgba(212,242,90,0.6)';
+  ctx.strokeStyle = shapeStyle.stroke ? hexShown(shapeStyle.stroke, shapeStyle.strokeOpacity) : lineLike ? hexShown(shapeStyle.fill ?? '#ffffff', shapeStyle.fillOpacity) : 'rgba(212,242,90,0.6)';
   ctx.lineWidth = (lineLike || shapeStyle.stroke ? shapeStyle.strokeWidth : 1) || 1;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';

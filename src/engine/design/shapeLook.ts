@@ -225,7 +225,7 @@ export function blurFilterSvg(id: string, s: ShapeSpec): string {
 }
 
 /** The picker's A for a shape's fill or stroke is that paint's opacity (one value, absent = 1). */
-export function paintOpacity(s: ShapeSpec, which: 'fill' | 'stroke'): number {
+export function paintOpacity(s: Pick<ShapeSpec, 'fillOpacity' | 'strokeOpacity'>, which: 'fill' | 'stroke'): number {
   return (which === 'fill' ? s.fillOpacity : s.strokeOpacity) ?? 1;
 }
 export function paintOpacityPatch(which: 'fill' | 'stroke', opacity: number): Partial<ShapeSpec> {

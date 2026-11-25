@@ -75,8 +75,9 @@ describe('Library graph guidelines, GraphEdge.label, and unknown legacy node res
 
     const doc = await libraryToDesigner(sid, item.id);
     expect(doc.layers.some((l) => l.type === 'text' && l.text === 'Warm tone')).toBe(true);
-    const resaved = await saveItem({ subjectId: item.id, mode: 'overwrite', space: 'designer', by: 'user', sessionId: sid, docId: doc.id });
-    expect(resaved.graph?.nodes.map((n) => n.id)).toEqual(['n_keep']);
+    // Saving refuses what it does not know instead of dropping it.
+    await expect(saveItem({ subjectId: item.id, mode: 'overwrite', space: 'designer', by: 'user', sessionId: sid, docId: doc.id })).rejects.toThrow('legacy_widget');
+    expect(useStore.getState().library.find((x) => x.id === item.id)!.graph!.nodes.map((n) => n.id)).toEqual(['n_keep', 'n_unknown']);
   });
 
   it('supports guideline text nodes with section and GraphEdge.label across migrate, edit, layout, graphToSteps, freshness, ordinaryGraph, graphView, fromNodes, undo/redo, and serialization', () => {

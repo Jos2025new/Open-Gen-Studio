@@ -53,7 +53,7 @@ export function graphFromDoc(graph: Graph | undefined, doc: DesignDoc, joins: bo
   if (!board) return { graph };
   const spot = (p: { x: number; y: number }) => placedAt((p.x - board.x) / board.k, (p.y - board.y) / board.k), at = { ...board.at };
   for (const id of gone) delete at[id];
-  const nodes = (graph?.nodes ?? []).filter((n) => !gone.has(n.id) && (n.data.kind === 'asset' || n.data.kind === 'text')).map((n): GraphNode => {
+  const nodes = (graph?.nodes ?? []).filter((n) => !gone.has(n.id)).map((n): GraphNode => {
     const e = linked(doc, n.id);
     if (!e) return n;
     const text = e.layer.type === 'text' && e.layer.text !== e.at.text && e.layer.text.trim() ? e.layer.text : undefined;
@@ -68,10 +68,9 @@ export function graphFromDoc(graph: Graph | undefined, doc: DesignDoc, joins: bo
     nodes.push({ id, position, data: l.type === 'text' ? { kind: 'text', title: l.name, text: l.text } : { kind: 'asset', title: l.name, assetId: (l as { sourceAssetId: string }).sourceAssetId } });
     at[id] = { layer: l.id, ...position, ...(l.type === 'text' ? { text: l.text } : {}) };
   }
-  const kept = new Set(nodes.map((n) => n.id));
-  const edges = (graph?.edges ?? []).filter((e) => kept.has(e.source) && kept.has(e.target));
-  const groups = graph?.groups?.map((g) => ({ ...g, nodeIds: g.nodeIds.filter((id) => kept.has(id)) }));
-  for (const id of Object.keys(at)) if (!kept.has(id)) delete at[id];
+  const edges = (graph?.edges ?? []).filter((e) => !gone.has(e.source) && !gone.has(e.target));
+  const groups = graph?.groups?.map((g) => ({ ...g, nodeIds: g.nodeIds.filter((id) => !gone.has(id)) }));
+  for (const id of Object.keys(at)) if (!nodes.some((n) => n.id === id)) delete at[id];
   return { graph: { ...graph, nodes, edges, ...(groups ? { groups } : {}) }, board: { ...board, at } };
 }
 
