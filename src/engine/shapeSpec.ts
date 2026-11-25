@@ -79,6 +79,7 @@ export interface TextExtras {
   underline?: boolean;
   strike?: boolean;
   textCase?: 'upper' | 'lower' | 'title';
+  colorOpacity?: number;
   colorToken?: TokenRef;
   fontFamilyToken?: TokenRef;
   fontSizeToken?: TokenRef;

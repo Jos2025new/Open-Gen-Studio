@@ -5,7 +5,7 @@ import { addTextLayer, getDoc, patchLayer, placeAsset } from '../../engine/desig
 import { fontStack } from '../../engine/design/doc';
 import { patchPickedShapes } from '../../engine/design/multiObjectOps';
 import { objectPicks } from '../../engine/design/objectSelection';
-import { familyPatch, tokenPatch, tokenValue } from '../../engine/design/tokenBind';
+import { brushColorPatch, familyPatch, tokenOf, tokenPatch, tokenValue } from '../../engine/design/tokenBind';
 import { rememberColor } from '../../engine/design/swatches';
 import { FONT_ACCEPT } from '../../engine/fontFiles';
 import { applyFont } from './FontTile';
@@ -14,6 +14,7 @@ import { addFonts, removeFont } from '../../engine/ownFonts';
 import { insertComponent } from '../../engine/libraryInsert';
 import { addCategory, addToSection, kitSections, moveToSection, removeCategory, removeFromSection, sectionNodes, setSectionText, type KitSection } from '../../engine/librarySections';
 import { resolveToken } from '../../engine/libraryTokens';
+import { colorHex } from '../../engine/libraryTokensColor';
 import { createItem, readKitVersion, saveItem } from '../../engine/libraryVersions';
 import type { GraphNode, Subject } from '../../engine/types';
 import { PICTURE_ACCEPT, isSvg } from '../../lib/imports';
@@ -107,13 +108,14 @@ function Swatches({ item, section }: { item: Subject; section: KitSection }) {
   const { sessionId, docId } = useDesign(), colors = section.title === 'Colors' ? colorsOf(item, section) : [];
   if (!colors.length) return null;
   const use = (c: string, token?: string) => {
-    const doc = docId ? getDoc(sessionId, docId) : undefined, value = doc && token ? tokenValue(item, token, doc.tokenMode) : undefined, hex = String(value ?? c).toLowerCase();
-    if (doc && /^#[0-9a-f]{6}$/.test(hex)) {
+    const doc = docId ? getDoc(sessionId, docId) : undefined, value = doc && token ? tokenValue(item, token, doc.tokenMode) : undefined, hex = String(value ?? colorHex(c) ?? c).toLowerCase();
+    if (doc && /^#[0-9a-f]{6}([0-9a-f]{2})?$/.test(hex)) {
       const ref = token && value !== undefined ? { kit: item.id, token, value } : undefined, layer = doc.layers.find((l) => l.id === doc.activeLayerId), picks = objectPicks(doc.id);
-      if (picks.length) patchPickedShapes(sessionId, doc.id, doc, picks, tokenPatch('fill', hex, ref));
-      else if (layer?.type === 'text' && !layer.locked) patchLayer(sessionId, doc.id, layer.id, tokenPatch('color', hex, ref));
-      else setUi((u) => ({ brush: { ...u.brush, color: hex }, text: { ...u.text, ...tokenPatch('color', hex, ref) }, shape: { ...u.shape, ...tokenPatch('fill', hex, ref) }, lineart: { ...u.lineart, ...tokenPatch('color', hex, ref) } }));
-      rememberColor(hex);
+      const firstShape = picks.length ? doc.layers.flatMap((l) => (l.type === 'vector' ? l.shapes : [])).find((s) => picks.some((p) => p.ids.includes(s.id))) : undefined;
+      if (picks.length) patchPickedShapes(sessionId, doc.id, doc, picks, tokenPatch('fill', hex, ref, firstShape && tokenOf(firstShape, 'fill')));
+      else if (layer?.type === 'text' && !layer.locked) patchLayer(sessionId, doc.id, layer.id, tokenPatch('color', hex, ref, tokenOf(layer, 'color')));
+      else setUi((u) => ({ brush: { ...u.brush, ...brushColorPatch(hex) }, text: { ...u.text, ...tokenPatch('color', hex, ref, tokenOf(u.text, 'color')) }, shape: { ...u.shape, ...tokenPatch('fill', hex, ref, tokenOf(u.shape, 'fill')) }, lineart: { ...u.lineart, ...tokenPatch('color', hex, ref, tokenOf(u.lineart, 'color'), 'opacity') } }));
+      rememberColor(hex.slice(0, 7));
     } else void navigator.clipboard?.writeText(c).then(() => toast(`${c} copied.`, 'success'), () => toast('Could not copy.', 'error'));
   };
   return <div className="kit-swatches">{colors.map((c) => <button key={c.name} type="button" className="kit-swatch" aria-label={`${c.name} ${c.value}`} data-tip={c.value} style={{ background: c.value }} onClick={() => use(c.value, c.token)} />)}</div>;

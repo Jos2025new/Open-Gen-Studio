@@ -70,7 +70,7 @@ export function CanvasSize({ sessionId, doc, inline = false }: { sessionId: stri
         <label>H<input type="number" min={step} step={step} value={pxToUnit(h, unit, dp)} onChange={(e) => setHeight(Math.min(MAX_SIDE, unitToPx(+e.target.value, unit, dp)))} /></label>
         <Segmented size="sm" value={unit} options={PAGE_UNITS.map((u) => ({ value: u, label: u }))} onChange={setUnit} />
         {unit !== 'px' && <label>DPI<input type="number" min={1} max={1200} value={dpi} onChange={(e) => setDpi(+e.target.value)} /></label>}
-        <InlineColor label="Page color" value={bg} token={bgEdit ? bgEdit.backgroundToken : tokenOf(doc, 'background')} onChange={(c, t) => setBgEdit(tokenPatch('background', c, t))} />
+        <InlineColor label="Page color" opaque value={bg} token={bgEdit ? bgEdit.backgroundToken : tokenOf(doc, 'background')} onChange={(c, t, p) => setBgEdit(tokenPatch('background', c, t, p))} />
         <TokenModeField sessionId={sessionId} doc={doc} />
         <TransparentSwatch on={!doc.background && bgEdit === null} onClick={() => { setBgEdit(null); mutateDoc(sessionId, doc.id, (d) => ({ ...d, background: null })); }} />
         <label className="check-row"><input type="checkbox" checked={lock} onChange={(e) => { setLock(e.target.checked); if (e.target.checked && h) setRatio(w / h); }} />Keep ratio</label>

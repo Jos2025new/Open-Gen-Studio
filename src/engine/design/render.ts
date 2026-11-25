@@ -168,10 +168,11 @@ function drawBlurredShape(ctx: CanvasRenderingContext2D, s: VectorShape): void {
 }
 
 function drawText(ctx: CanvasRenderingContext2D, l: TextLayer): void {
-  const t = layoutText(l);
+  const t = layoutText(l), a0 = ctx.globalAlpha;
   ctx.font = fontFor(l);
   applyLetterSpacing(ctx, l.letterSpacing);
   ctx.fillStyle = l.color;
+  ctx.globalAlpha *= l.colorOpacity ?? 1;
   ctx.textBaseline = 'top';
   ctx.textAlign = l.align;
   const ax = l.align === 'center' ? l.x + t.width / 2 : l.align === 'right' ? l.x + t.width : l.x;
@@ -179,6 +180,7 @@ function drawText(ctx: CanvasRenderingContext2D, l: TextLayer): void {
   const pad = (t.lineHeightPx - l.fontSize) / 2;
   t.lines.forEach((line, i) => ctx.fillText(line, ax, l.y + i * t.lineHeightPx + pad));
   drawTextDecoration(ctx, l, t);
+  ctx.globalAlpha = a0;
   applyLetterSpacing(ctx, 0);
 }
 

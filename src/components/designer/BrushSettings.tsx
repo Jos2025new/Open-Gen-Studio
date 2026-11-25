@@ -97,7 +97,7 @@ type BrushTab = 'tip' | 'stroke' | 'pressure' | 'blend';
 /** `card`: the toolbox card of the mockup. The brush on the left, the rest in tabs on the right; every tab shares one cell so switching never changes the height. */
 export function BrushSettings({ erase, compact = false, card = false, head }: { erase: boolean; compact?: boolean; card?: boolean; head?: ReactNode }) {
   const brush = useStore((s) => s.ui.brush);
-  const set = (patch: Partial<Brush>) => setUi({ brush: { ...brush, ...patch } });
+  const set = (patch: Partial<Brush>) => setUi({ brush: { ...useStore.getState().ui.brush, ...patch } });
   const hardness = brush.hardness ?? BRUSH_DEFAULTS.hardness;
   const tipIndex = TIP_PRESETS.findIndex((h) => Math.abs(h - hardness) < 0.005);
   // Pressure curves and Keep Opacity: hidden until asked for.

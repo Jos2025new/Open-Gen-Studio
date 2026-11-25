@@ -5,7 +5,7 @@ import { IconButton } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { ToolDock } from '../designer/ToolDock';
 import type { TokenRef } from '../../engine/libraryTypes';
-import { tokenPatch } from '../../engine/design/tokenBind';
+import { tokenOf, tokenPatch } from '../../engine/design/tokenBind';
 import { InlineColor, InlineSlider } from '../designer/InlineControls';
 import { setUi, useStore } from '../../store/store';
 import { EmbeddedLayers } from './EmbeddedLayers';
@@ -21,16 +21,16 @@ const DOCK_TOOLS: ReadonlySet<DesignTool> = new Set([...EMBEDDED_TOOLS].filter((
 function useToolPaint(tool: DesignTool) {
   const ui = useStore((s) => s.ui);
   if (tool === 'text') return {
-    color: ui.text.color, onColor: (c: string, t?: TokenRef) => setUi({ text: { ...ui.text, ...tokenPatch('color', c, t) } }),
+    color: ui.text.color, token: tokenOf(ui.text, 'color'), onColor: (c: string, t?: TokenRef, p?: TokenRef) => setUi({ text: { ...ui.text, ...tokenPatch('color', c, t, p) } }),
     size: { label: 'Size', unit: 'px', min: 1, max: 500, value: ui.text.fontSize, set: (fontSize: number) => setUi({ text: { ...ui.text, fontSize } }) },
   };
   if (SHAPE_TOOLS.includes(tool)) return {
-    color: ui.shape.fill ?? '#d4f25a', onColor: (c: string, t?: TokenRef) => setUi({ shape: { ...ui.shape, ...tokenPatch('fill', c, t) } }),
+    color: ui.shape.fill ?? '#d4f25a', token: tokenOf(ui.shape, 'fill'), onColor: (c: string, t?: TokenRef, p?: TokenRef) => setUi({ shape: { ...ui.shape, ...tokenPatch('fill', c, t, p) } }),
     size: { label: 'Width', unit: 'px', min: 1, max: 40, value: ui.shape.strokeWidth, set: (strokeWidth: number) => setUi({ shape: { ...ui.shape, strokeWidth } }) },
   };
-  if (tool === 'eraser') return { color: null, onColor: () => undefined, size: { label: 'Size', unit: 'px', min: 1, max: 240, value: ui.brush.size, set: (size: number) => setUi({ brush: { ...ui.brush, size } }) } };
+  if (tool === 'eraser') return { color: null, token: undefined, onColor: () => undefined, size: { label: 'Size', unit: 'px', min: 1, max: 240, value: ui.brush.size, set: (size: number) => setUi({ brush: { ...ui.brush, size } }) } };
   return {
-    color: ui.lineart.color, onColor: (c: string, t?: TokenRef) => setUi({ lineart: { ...ui.lineart, ...tokenPatch('color', c, t) } }),
+    color: ui.lineart.color, token: tokenOf(ui.lineart, 'color'), onColor: (c: string, t?: TokenRef, p?: TokenRef) => setUi({ lineart: { ...ui.lineart, ...tokenPatch('color', c, t, p, 'opacity') } }),
     size: { label: 'Size', unit: 'px', min: 1, max: 120, value: ui.lineart.size, set: (size: number) => setUi({ lineart: { ...ui.lineart, size } }) },
   };
 }
@@ -45,7 +45,7 @@ export function EmbeddedDesignerBar({ sessionId, doc }: { sessionId: string; doc
       <ToolDock sessionId={sessionId} doc={doc} tools={DOCK_TOOLS} />
       {paint.color === null
         ? <IconButton icon={BrushIcon} label="Color" size="md" disabled data-tip="The eraser has no color" />
-        : <InlineColor label="Color" iconOnly value={paint.color} onChange={paint.onColor} />}
+        : <InlineColor label="Color" iconOnly value={paint.color} token={paint.token} onChange={paint.onColor} />}
       <IconButton ref={sizePop.ref} icon={Circle} label="Size" size="md" active={sizePop.open} aria-haspopup="dialog" aria-expanded={sizePop.open} onClick={sizePop.toggle} />
       <Popover open={sizePop.open} anchor={sizePop.ref} onClose={sizePop.close} width={240} label="Size">
         <div className="studio-size-pop"><InlineSlider label={paint.size.label} unit={paint.size.unit} min={paint.size.min} max={paint.size.max} value={paint.size.value} onChange={paint.size.set} /></div>

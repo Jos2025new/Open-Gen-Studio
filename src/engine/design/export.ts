@@ -141,8 +141,9 @@ export function textSvg(l: TextLayer, t: { lines: string[]; width: number; lineH
   const pad = (t.lineHeightPx - l.fontSize) / 2;
   const spans = t.lines.map((line, i) => `<tspan x="${n(ax)}" y="${n(l.y + i * t.lineHeightPx + pad + ascent)}">${xmlEscape(line)}</tspan>`).join('');
   const spacing = l.letterSpacing ? ` letter-spacing="${n(l.letterSpacing)}"` : '';
-  const bars = decorationRects(l, t, ascent).map((r) => `<rect x="${n(r.x)}" y="${n(r.y)}" width="${n(r.w)}" height="${n(r.h)}" fill="${xmlEscape(l.color)}"/>`).join('');
-  const el = paths ? `<g fill="${xmlEscape(l.color)}">${paths.map((d) => `<path d="${d}"/>`).join('')}</g>` : `<text xml:space="preserve" font-family="${xmlEscape(fontStack(l.fontFamily))}" font-size="${n(l.fontSize)}" font-weight="${l.fontWeight}"${l.italic ? ' font-style="italic"' : ''} fill="${xmlEscape(l.color)}" text-anchor="${anchor}"${spacing}>${spans}</text>`;
+  const fo = l.colorOpacity != null && l.colorOpacity < 1 ? ` fill-opacity="${n(Math.max(0, l.colorOpacity))}"` : '';
+  const bars = decorationRects(l, t, ascent).map((r) => `<rect x="${n(r.x)}" y="${n(r.y)}" width="${n(r.w)}" height="${n(r.h)}" fill="${xmlEscape(l.color)}"${fo}/>`).join('');
+  const el = paths ? `<g fill="${xmlEscape(l.color)}"${fo}>${paths.map((d) => `<path d="${d}"/>`).join('')}</g>` : `<text xml:space="preserve" font-family="${xmlEscape(fontStack(l.fontFamily))}" font-size="${n(l.fontSize)}" font-weight="${l.fontWeight}"${l.italic ? ' font-style="italic"' : ''} fill="${xmlEscape(l.color)}"${fo} text-anchor="${anchor}"${spacing}>${spans}</text>`;
   return bars ? `<g>${el}${bars}</g>` : el;
 }
 

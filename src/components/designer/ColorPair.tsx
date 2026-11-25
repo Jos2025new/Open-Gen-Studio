@@ -12,7 +12,7 @@ export function ColorPair({ compact = false, dimSecondary = false }: { compact?:
   const brush = useStore((s) => s.ui.brush), gradient = useStore((s) => s.ui.gradient);
   const secondary = secondaryOf(brush, gradient);
   const parts = <>
-    <InlineColor label="Color" value={brush.color} iconOnly={compact} onChange={(v) => setUi({ brush: { ...useStore.getState().ui.brush, color: v } })} />
+    <InlineColor label="Color" value={brush.color} iconOnly={compact} alpha={{ value: brush.opacity, onChange: (o) => setUi({ brush: { ...useStore.getState().ui.brush, opacity: Math.max(0.01, o) } }) }} onChange={(v) => setUi({ brush: { ...useStore.getState().ui.brush, color: v } })} />
     <button type="button" className="opt" aria-label="Swap colors" data-tip="Swap the two colors (X)" onClick={swapColors}><ArrowLeftRight size={13} /></button>
     <span style={dimSecondary ? { opacity: 0.45 } : undefined} data-tip={dimSecondary ? 'Not used while the gradient fades to transparent' : undefined}>
       <InlineColor label="Second color" value={secondary} iconOnly={compact} onChange={setSecondary} />

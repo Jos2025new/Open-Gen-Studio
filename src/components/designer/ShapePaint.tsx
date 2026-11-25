@@ -68,7 +68,7 @@ export function PaintSwatch({ sessionId, docId, layerId, shape, side }: { sessio
   const value = st ? st.color : solid;
   const alpha = st ? st.alpha : (shape[f.opacity] ?? 1);
   const set = (patch: Partial<VectorShape>) => patchShape(sessionId, docId, layerId, shape.id, patch);
-  const onColor = (c: string, t?: TokenRef) => set(st ? stopPatch(shape, side, end, tokenPatch('color', c, t)) ?? {} : tokenPatch(stroke ? 'stroke' : 'fill', c, t));
+  const onColor = (c: string, t?: TokenRef, p?: TokenRef) => set(st ? stopPatch(shape, side, end, tokenPatch('color', c, t, p, 'alpha')) ?? {} : tokenPatch(stroke ? 'stroke' : 'fill', c, t, p));
   const onAlpha = (a: number) => set(st ? stopPatch(shape, side, end, { alpha: a }) ?? {} : { [f.opacity]: a });
   return <InlineColor label={label} value={value} token={st ? tokenOf(st, 'color') : tokenOf(shape, stroke ? 'stroke' : 'fill')} preview={g ? gradientCss(g) : undefined} alpha={{ value: alpha, onChange: onAlpha }} onChange={onColor}>
     <div className="swatch-row" role="radiogroup" aria-label={`${label} type`}>

@@ -60,7 +60,7 @@ function Control({ kind, sessionId, doc }: { kind: QuickKind; sessionId: string;
     case 'size': return <BrushSizeField />;
     case 'opacity': return <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(v) => setBrush({ opacity: v })} />;
     case 'threshold': return <InlineSlider label="Threshold" min={0} max={255} value={brush.fillThreshold ?? 24} onChange={(v) => setBrush({ fillThreshold: v })} />;
-    case 'color': return <InlineColor label="Color" value={brush.color} iconOnly onChange={(v) => setBrush({ color: v })} />;
+    case 'color': return <InlineColor label="Color" value={brush.color} iconOnly alpha={{ value: brush.opacity, onChange: (o) => setBrush({ opacity: Math.max(0.01, o) }) }} onChange={(v) => setBrush({ color: v })} />;
     case 'gradientOpacity': return <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={gradient.opacity} onChange={(v) => setUi({ gradient: { ...gradient, opacity: v } })} />;
     case 'gradientShape': return <InlineSelect label="Shape" value={gradient.shape} options={[{ value: 'linear' as const, label: 'Linear' }, { value: 'radial' as const, label: 'Radial' }]} onChange={(v) => setUi({ gradient: { ...gradient, shape: v } })} />;
     case 'gradientColors': return <>
@@ -77,12 +77,12 @@ function Control({ kind, sessionId, doc }: { kind: QuickKind; sessionId: string;
     case 'sampleSource': return <SampleSourceField />;
     case 'lineartSize': return <InlineSlider label="Size" unit="px" min={1} max={120} value={lineart.size} onChange={(v) => setLine({ size: v })} />;
     case 'lineartOpacity': return <InlineSlider label="Opacity" unit="%" scale={100} min={0.05} max={1} step={0.01} value={lineart.opacity} onChange={(v) => setLine({ opacity: v })} />;
-    case 'lineartColor': return <InlineColor label="Color" value={lineart.color} iconOnly token={tokenOf(lineart, 'color')} onChange={(c, t) => setLine(tokenPatch('color', c, t))} />;
+    case 'lineartColor': return <InlineColor label="Color" value={lineart.color} iconOnly alpha={{ value: lineart.opacity, onChange: (opacity) => setLine({ opacity }) }} token={tokenOf(lineart, 'color')} onChange={(c, t, p) => setLine(tokenPatch('color', c, t, p, 'opacity'))} />;
     case 'strokeWidth': return <InlineSlider label="Width" unit="px" min={1} max={40} value={shape.strokeWidth} onChange={(v) => setShape({ strokeWidth: v })} />;
-    case 'stroke': return <InlineColor label="Stroke" value={shape.stroke ?? '#ffffff'} iconOnly token={tokenOf(shape, 'stroke')} onChange={(c, t) => setShape(tokenPatch('stroke', c, t))} />;
-    case 'fill': return <InlineColor label="Fill" value={shape.fill ?? '#d4f25a'} iconOnly token={tokenOf(shape, 'fill')} onChange={(c, t) => setShape(tokenPatch('fill', c, t))} />;
+    case 'stroke': return <InlineColor label="Stroke" value={shape.stroke ?? '#ffffff'} iconOnly token={tokenOf(shape, 'stroke')} onChange={(c, t, p) => setShape(tokenPatch('stroke', c, t, p))} />;
+    case 'fill': return <InlineColor label="Fill" value={shape.fill ?? '#d4f25a'} iconOnly token={tokenOf(shape, 'fill')} onChange={(c, t, p) => setShape(tokenPatch('fill', c, t, p))} />;
     case 'fontSize': return <InlineSlider label="Size" unit="px" min={1} max={500} value={text.fontSize} onChange={(v) => setUi({ text: { ...useStore.getState().ui.text, fontSize: v } })} />;
-    case 'textColor': return <InlineColor label="Color" value={text.color} iconOnly token={tokenOf(text, 'color')} onChange={(c, t) => setUi({ text: { ...useStore.getState().ui.text, ...tokenPatch('color', c, t) } })} />;
+    case 'textColor': return <InlineColor label="Color" value={text.color} iconOnly alpha={{ value: text.colorOpacity ?? 1, onChange: (o) => setUi({ text: { ...useStore.getState().ui.text, colorOpacity: o < 1 ? o : undefined } }) }} token={tokenOf(text, 'color')} onChange={(c, t, p) => setUi({ text: { ...useStore.getState().ui.text, ...tokenPatch('color', c, t, p) } })} />;
     case 'rulerSnap': return <InlineToggle label="Snap" tip="Brush strokes follow the ruler guide" checked={!!r?.on} onChange={(on) => r && setRuler({ ...r, on })} />;
     case 'rulerClear': return <button type="button" className="opt" disabled={!r} onClick={() => setRuler(null)} data-tip="Removes the guide from the page">Clear</button>;
   }

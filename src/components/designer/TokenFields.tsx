@@ -60,7 +60,7 @@ export function TextLayerFields({ layer, onChange }: { layer: TextLayer; onChang
     <div className="property-grid"><Field label="Size"><input type="number" min={4} max={1000} value={layer.fontSize} onChange={(e) => onChange({ fontSize: Math.min(1000, Math.max(4, +e.target.value)) })} /></Field><Field label="Weight"><select value={layer.fontWeight} onChange={(e) => onChange({ fontWeight: +e.target.value })}>{[100, 200, 300, 400, 500, 600, 700, 800, 900].map((w) => <option key={w}>{w}</option>)}</select></Field></div>
     <SizeTokenField value={layer} onChange={onChange} />
     <InlineToggle label="Italic" checked={!!layer.italic} onChange={(on) => onChange({ italic: on || undefined })} />
-    <Field label="Text color"><InlineColor label="Text color" value={layer.color} token={tokenOf(layer, 'color')} onChange={(c, t) => onChange(tokenPatch('color', c, t))} /></Field>
+    <Field label="Text color"><InlineColor label="Text color" value={layer.color} alpha={{ value: layer.colorOpacity ?? 1, onChange: (o) => onChange({ colorOpacity: o < 1 ? o : undefined }) }} token={tokenOf(layer, 'color')} onChange={(c, t, p) => onChange(tokenPatch('color', c, t, p))} /></Field>
     <Field label="Alignment"><select value={layer.align} onChange={(e) => onChange({ align: e.target.value as TextLayer['align'] })}>{['left', 'center', 'right'].map((a) => <option key={a}>{a}</option>)}</select></Field>
   </>;
 }

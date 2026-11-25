@@ -3,6 +3,7 @@ import type { TextLayer } from '../../engine/types';
 import type { View } from '../../engine/design/viewCoordinates';
 import { layoutText } from '../../engine/design/render';
 import { fontFor } from '../../engine/design/textLayout';
+import { hexShown } from '../../lib/color';
 
 /* The in-place text editor over the canvas: a textarea placed and transformed like the text it edits (Stage.tsx). */
 export function TextEditor({ layer, view, onDone }: { layer: TextLayer; view: View; onDone: (text: string) => void }) {
@@ -65,7 +66,7 @@ export function TextEditor({ layer, view, onDone }: { layer: TextLayer; view: Vi
         letterSpacing: `${layer.letterSpacing * z}px`,
         textTransform: layer.textCase === 'upper' ? 'uppercase' : layer.textCase === 'lower' ? 'lowercase' : layer.textCase === 'title' ? 'capitalize' : undefined,
         textDecoration: [layer.underline && 'underline', layer.strike && 'line-through'].filter(Boolean).join(' ') || undefined,
-        color: layer.color,
+        color: hexShown(layer.color, layer.colorOpacity),
         textAlign: layer.align,
         paddingTop: ((layer.fontSize * layer.lineHeight - layer.fontSize) / 2) * z,
       }}

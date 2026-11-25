@@ -293,8 +293,8 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
           const pickedShapes = layer.shapes.filter((s) => pickedIn(objPick, layer.id).includes(s.id));
           const set = (id: string, p: Partial<VectorShape>) => patch({ shapes: layer.shapes.map((x) => (x.id === id ? { ...x, ...p } : x)) });
           return <><p className="muted">{pickedShapes.length ? `Picked shape ${pickedShapes.length === 1 ? '' : `(${pickedShapes.length}) `}of ${layer.shapes.length}.` : `${layer.shapes.length} shapes · draw on the canvas to add more.`}</p>{(pickedShapes.length ? pickedShapes : layer.shapes).map((s) => <div className="shape-properties" key={s.id}><strong>{s.type} {layer.shapes.indexOf(s) + 1}</strong>
-            <InlineColor label="Fill" value={s.fill ?? '#d4f25a'} token={tokenOf(s, 'fill')} showValue onChange={(c, t) => set(s.id, tokenPatch('fill', c, t))} alpha={{ value: paintOpacity(s, 'fill'), onChange: (o) => set(s.id, paintOpacityPatch('fill', o)) }} />
-            <InlineColor label="Stroke" value={s.stroke ?? '#ffffff'} token={tokenOf(s, 'stroke')} showValue onChange={(c, t) => set(s.id, tokenPatch('stroke', c, t))} alpha={{ value: paintOpacity(s, 'stroke'), onChange: (o) => set(s.id, paintOpacityPatch('stroke', o)) }} />
+            <InlineColor label="Fill" value={s.fill ?? '#d4f25a'} token={tokenOf(s, 'fill')} showValue onChange={(c, t, p) => set(s.id, tokenPatch('fill', c, t, p))} alpha={{ value: paintOpacity(s, 'fill'), onChange: (o) => set(s.id, paintOpacityPatch('fill', o)) }} />
+            <InlineColor label="Stroke" value={s.stroke ?? '#ffffff'} token={tokenOf(s, 'stroke')} showValue onChange={(c, t, p) => set(s.id, tokenPatch('stroke', c, t, p))} alpha={{ value: paintOpacity(s, 'stroke'), onChange: (o) => set(s.id, paintOpacityPatch('stroke', o)) }} />
             <InlineSlider label="Stroke width" unit="px" min={0} max={40} allowManualOverflow value={s.strokeWidth} onChange={(strokeWidth) => set(s.id, { strokeWidth })} />
             <ShapeLookFields value={s} corners={s.type === 'rect'} smoothing blur onChange={(p) => set(s.id, p)} /></div>)}</>;
         })()}

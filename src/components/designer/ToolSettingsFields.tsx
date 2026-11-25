@@ -183,7 +183,7 @@ export function TextStyleFields({ value, onChange, compact = false }: { value: T
     <InlineSlider label="Size" unit="px" min={1} max={500} value={value.fontSize} onChange={(v) => onChange({ fontSize: v })} />
     <SizeTokenField value={value} onChange={onChange} />
     <InlineSelect label="Weight" value={value.fontWeight} options={[100, 200, 300, 400, 500, 600, 700, 800, 900]} onChange={(v) => onChange({ fontWeight: v })} />
-    <InlineColor label="Color" value={value.color} token={tokenOf(value, 'color')} onChange={(c, t) => onChange(tokenPatch('color', c, t))} />
+    <InlineColor label="Color" value={value.color} alpha={{ value: value.colorOpacity ?? 1, onChange: (o) => onChange({ colorOpacity: o < 1 ? o : undefined }) }} token={tokenOf(value, 'color')} onChange={(c, t, p) => onChange(tokenPatch('color', c, t, p))} />
     <InlineSelect label="Align" value={value.align} options={['left', 'center', 'right'] as const as unknown as Array<TextStyle['align']>} onChange={(v) => onChange({ align: v })} />
     {!compact && <>
       <InlineSlider label="Line" min={0.5} max={3} step={0.1} value={value.lineHeight} onChange={(v) => onChange({ lineHeight: v })} />
