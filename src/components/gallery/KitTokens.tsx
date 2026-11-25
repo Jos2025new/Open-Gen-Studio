@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useStore } from '../../store/store';
 import { downloadBlob } from '../../lib/media';
 import { resolveToken } from '../../engine/libraryTokens';
-import { tokensFromFile, tokensToFile } from '../../engine/libraryTokensFile';
+import { tokensFromFile, tokensToFile, type TokenFormat } from '../../engine/libraryTokensFile';
 import { TOKEN_TYPES, type KitToken, type KitTokens as Tokens, type KitTokenType } from '../../engine/libraryTypes';
 import type { Subject } from '../../engine/types';
 import { Download, Plus, Upload, X } from '../ui/icons';
@@ -15,6 +15,8 @@ interface Row { name: string; type: KitTokenType; value: string; description?: s
 const LABELS: Record<KitTokenType, string> = { color: 'Color', dimension: 'Size', fontFamily: 'Font', number: 'Number', string: 'Text' };
 const START: Record<KitTokenType, string> = { color: '#000000', dimension: '16px', fontFamily: 'Inter', number: '1', string: '' };
 const rowsOf = (tokens?: Tokens): Row[] => Object.entries(tokens ?? {}).map(([name, t]) => ({ name, type: t.type, value: String(t.value), ...(t.description ? { description: t.description } : {}) }));
+
+const names = (list: readonly string[]) => (list.length > 4 ? `${list.slice(0, 4).join(', ')} and ${list.length - 4} more` : list.join(', '));
 
 /** Row texts as tokens; a number typed as text is a number again. */
 function tokensOf(rows: readonly Row[]): Tokens {
@@ -31,7 +33,7 @@ function tokensOf(rows: readonly Row[]): Tokens {
 
 /** The design tokens of a design system or brand kit: seen, edited, imported and exported. Save makes a version. */
 export function KitTokens({ item, onDone, types = TOKEN_TYPES }: { item: Subject; onDone: () => void; /** Only these types show; the rest stay as they are. */ types?: readonly KitTokenType[] }) {
-  const [rows, setRows] = useState(() => rowsOf(item.tokens)), [busy, setBusy] = useState(false), file = useRef<HTMLInputElement>(null);
+  const [rows, setRows] = useState(() => rowsOf(item.tokens)), [busy, setBusy] = useState(false), [exporting, setExporting] = useState(false), file = useRef<HTMLInputElement>(null);
   const patch = (i: number, p: Partial<Row>) => setRows((rs) => rs.map((r, k) => (k === i ? { ...r, ...p } : r)));
   const add = (type: KitTokenType) => setRows((rs) => {
     let n = 1;
@@ -42,9 +44,17 @@ export function KitTokens({ item, onDone, types = TOKEN_TYPES }: { item: Subject
   const importFile = async (f?: File) => {
     if (!f) return;
     try {
-      const { tokens, skipped } = tokensFromFile(await f.text());
+      const { tokens, skipped, off } = tokensFromFile(await f.text());
       setRows((rs) => [...rs.filter((r) => !tokens[r.name]), ...rowsOf(tokens)]);
-      toast(`${Object.keys(tokens).length} tokens imported${skipped.length ? `, ${skipped.length} not supported` : ''}.`, skipped.length ? 'info' : 'success');
+      toast(`${Object.keys(tokens).length} tokens imported${skipped.length ? `. Not supported: ${names(skipped)}` : ''}${off.length ? `. Sets not in use: ${names(off)}` : ''}.`, skipped.length || off.length ? 'info' : 'success');
+    } catch (e) { toast((e as Error).message, 'error'); }
+  };
+  const exportFile = (format: TokenFormat) => {
+    try {
+      const { text, left } = tokensToFile(tokensOf(rows), format, item.name);
+      downloadBlob(new Blob([text], { type: 'application/json' }), `${item.name}${format === 'penpot' ? '.penpot' : ''}.tokens.json`);
+      setExporting(false);
+      if (left.length) toast(`Left out, not in this format: ${names(left)}.`, 'info');
     } catch (e) { toast((e as Error).message, 'error'); }
   };
   const save = async () => {
@@ -75,7 +85,11 @@ export function KitTokens({ item, onDone, types = TOKEN_TYPES }: { item: Subject
       <input ref={file} type="file" accept=".json,application/json" hidden onChange={(e) => { void importFile(e.target.files?.[0]); e.target.value = ''; }} />
       <div className="confirm-pop-actions">
         <IconButton icon={Upload} size="sm" label="Import tokens" onClick={() => file.current?.click()} />
-        <IconButton icon={Download} size="sm" label="Export tokens" disabled={!rows.length} onClick={() => { try { downloadBlob(new Blob([tokensToFile(tokensOf(rows))], { type: 'application/json' }), `${item.name}.tokens.json`); } catch (e) { toast((e as Error).message, 'error'); } }} />
+        <IconButton icon={Download} size="sm" label="Export tokens" active={exporting} disabled={!rows.length} onClick={() => setExporting((v) => !v)} />
+        {exporting && <>
+          <Button size="sm" variant="ghost" onClick={() => exportFile('w3c')}>W3C / Figma</Button>
+          <Button size="sm" variant="ghost" onClick={() => exportFile('penpot')}>Penpot</Button>
+        </>}
         <Button size="sm" variant="primary" type="submit" loading={busy}>Save</Button>
       </div>
     </form>

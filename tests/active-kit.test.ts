@@ -4,7 +4,6 @@ import { createItem, libraryToDesigner, saveItem } from '../src/engine/libraryVe
 import { activeKitColors, activeKitImages, activeKitLines, loadActiveKit } from '../src/engine/activeKit';
 import { buildContext } from '../src/engine/agent/context';
 import { addTextLayer } from '../src/engine/design/actions';
-import { tokensFromFile, tokensToFile } from '../src/engine/libraryTokensFile';
 import { setComposer, useStore } from '../src/store/store';
 
 const ctx = (workspace: 'chat' | 'designer' = 'chat') => buildContext(useStore.getState().sessions[useStore.getState().activeSessionId], { workspace, style: 'auto', round: 0, maxRounds: 2, attachments: [] });
@@ -39,22 +38,5 @@ describe('the brand the agent works with', () => {
   it('a removed entry is simply no longer active', () => {
     setComposer({ kitId: 'gone' });
     expect(activeKitLines()).toEqual([]);
-  });
-});
-
-describe('token files', () => {
-  it('go out and come back the same', () => {
-    const tokens = { 'color.sea': { type: 'color' as const, value: '#0a4d68', description: 'Deep' }, 'color.main': { type: 'color' as const, value: '{color.sea}' }, 'space.m': { type: 'dimension' as const, value: '16px' }, 'font.title': { type: 'fontFamily' as const, value: 'Inter' }, weight: { type: 'number' as const, value: 700 } };
-    expect(tokensFromFile(tokensToFile(tokens))).toEqual({ tokens, skipped: [] });
-  });
-
-  it('reads token sets, inherited types and other tools’ types, and says what it could not read', () => {
-    const file = { $themes: [], $metadata: { tokenSetOrder: ['Global', 'Light mode'] },
-      Global: { brand: { $type: 'color', 'deep sea': { $value: '#0A4D68' } }, radius: { $type: 'borderRadius', $value: '8' }, body: { $type: 'fontFamilies', $value: ['Inter', 'Arial'] }, pad: { $type: 'spacing', $value: '{radius}*2' }, title: { $type: 'typography', $value: { fontSize: '12' } } },
-      'Light mode': { accent: { $type: 'color', $value: '{brand.deep sea}' } } };
-    const { tokens, skipped } = tokensFromFile(JSON.stringify(file));
-    expect(tokens).toEqual({ 'brand.deep-sea': { type: 'color', value: '#0A4D68' }, radius: { type: 'dimension', value: '8' }, body: { type: 'fontFamily', value: 'Inter, Arial' }, accent: { type: 'color', value: '{brand.deep-sea}' } });
-    expect(skipped.sort()).toEqual(['pad', 'title']);
-    expect(() => tokensFromFile('nope')).toThrow('not valid JSON');
   });
 });

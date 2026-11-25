@@ -1,54 +1,108 @@
 import { parseTokenAlias, validateTokens } from './libraryTokens';
+import { colorHex, colorObject, colorText } from './libraryTokensColor';
 import type { KitToken, KitTokens, KitTokenType } from './libraryTypes';
 
-/* Design tokens as a file: the W3C Design Tokens format, also as Penpot and Tokens Studio write it (token sets at the top). */
+/* Design tokens as a file: the W3C Design Tokens format (2025.10, the one Figma reads) and the token sets of Penpot and Tokens Studio. */
 const TYPES: Record<string, KitTokenType> = {
-  color: 'color', dimension: 'dimension', borderRadius: 'dimension', spacing: 'dimension', sizing: 'dimension', borderWidth: 'dimension', strokeWidth: 'dimension', fontSize: 'dimension', fontSizes: 'dimension', letterSpacing: 'dimension',
-  number: 'number', opacity: 'number', rotation: 'number', fontWeight: 'number', fontWeights: 'number', lineHeight: 'number',
+  color: 'color', dimension: 'dimension', borderRadius: 'dimension', spacing: 'dimension', sizing: 'dimension', borderWidth: 'dimension', strokeWidth: 'dimension', fontSize: 'dimension', fontSizes: 'dimension', letterSpacing: 'dimension', paragraphSpacing: 'dimension',
+  number: 'number', opacity: 'number', rotation: 'number', fontWeight: 'number', fontWeights: 'number', lineHeight: 'number', lineHeights: 'number',
   fontFamily: 'fontFamily', fontFamilies: 'fontFamily', string: 'string', text: 'string',
 };
+/** Tokens made of several values: each one becomes a token of its own ("title.fontSize"). */
+const COMPOSITES = ['typography', 'border', 'shadow', 'boxShadow'];
+const PARTS: Record<string, string> = { fontFamily: 'fontFamily', fontSize: 'dimension', fontWeight: 'fontWeight', letterSpacing: 'dimension', lineHeight: 'lineHeight', color: 'color', width: 'dimension', offsetX: 'dimension', offsetY: 'dimension', x: 'dimension', y: 'dimension', blur: 'dimension', spread: 'dimension' };
+const WEIGHTS: Record<string, number> = { thin: 100, hairline: 100, extralight: 200, ultralight: 200, light: 300, normal: 400, regular: 400, book: 400, medium: 500, semibold: 600, demibold: 600, bold: 700, extrabold: 800, ultrabold: 800, black: 900, heavy: 900, extrablack: 950, ultrablack: 950 };
 type Json = Record<string, unknown>;
 const isObj = (v: unknown): v is Json => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
 const clean = (part: string) => part.trim().replace(/[^\p{L}\p{N}_-]+/gu, '-').replace(/^-+|-+$/g, '') || 'token';
-const nameOf = (path: readonly string[]) => path.map(clean).join('.');
-
-function literal(type: KitTokenType, raw: unknown): string | number | undefined {
-  const v = Array.isArray(raw) && type === 'fontFamily' ? raw.join(', ') : isObj(raw) && 'value' in raw && type === 'dimension' ? `${String(raw.value)}${String(raw.unit ?? 'px')}` : isObj(raw) && typeof raw.hex === 'string' && type === 'color' ? raw.hex : raw;
-  if (typeof v !== 'string' && typeof v !== 'number') return undefined;
-  const alias = parseTokenAlias(v);
-  if (alias !== null) return `{${nameOf(alias.split('.'))}}`;
-  if (type === 'number' && typeof v === 'string' && v.trim() && Number.isFinite(Number(v))) return Number(v);
-  return type === 'dimension' || type === 'number' ? v : String(v);
+const nameOf = (path: readonly string[]) => path.filter((p) => p !== '$root').map(clean).join('.');
+const isToken = (node: Json) => '$value' in node || ('value' in node && typeof node.type === 'string');
+/** The path a "{group.token}" or a "#/group/token" points to. */
+function refPath(v: unknown): string[] | null {
+  const alias = parseTokenAlias(v), pointer = typeof v === 'string' && v.startsWith('#/') ? v : isObj(v) && typeof v.$ref === 'string' && v.$ref.startsWith('#/') ? v.$ref : null;
+  if (alias !== null) return alias.split('.');
+  return pointer === null ? null : pointer.slice(2).split('/').map((p) => p.replace(/~1/g, '/').replace(/~0/g, '~')).filter((p) => p !== '$value');
 }
 
-/** The tokens of a file, and the names of the ones this app has no type or value for. */
-export function tokensFromFile(text: string): { tokens: KitTokens; skipped: string[] } {
+/** A value of a file as this app keeps it; undefined when it has no place here. An alias takes its type from its target. */
+function read(type: string, raw: unknown): KitToken | undefined {
+  const ref = refPath(raw), kind = Object.hasOwn(TYPES, type) ? TYPES[type] : undefined;
+  if (ref) return { type: kind as KitTokenType, value: `{${nameOf(ref)}}` };
+  if (!kind) return undefined;
+  if (kind === 'fontFamily' && Array.isArray(raw)) raw = raw.join(', ');
+  if (isObj(raw)) raw = kind === 'color' ? colorText(raw) : kind === 'dimension' && typeof raw.value === 'number' ? `${raw.value}${String(raw.unit ?? 'px')}` : undefined;
+  if ((typeof raw !== 'string' && typeof raw !== 'number') || (typeof raw === 'string' && kind !== 'string' && /[{}]/.test(raw))) return undefined;
+  if (kind === 'number' && typeof raw === 'string') {
+    const t = raw.trim(), weight = /weight/i.test(type) ? WEIGHTS[t.toLowerCase().replace(/[\s_-]/g, '')] : undefined;
+    if (weight) return { type: kind, value: weight };
+    if (t && Number.isFinite(Number(t))) return { type: kind, value: Number(t) };
+    if (type === 'opacity' && /^[\d.]+%$/.test(t)) return { type: kind, value: parseFloat(t) / 100 };
+    return type.startsWith('lineHeight') ? { type: 'dimension', value: t } : undefined;
+  }
+  return { type: kind, value: kind === 'color' || kind === 'fontFamily' || kind === 'string' ? String(raw) : raw };
+}
+
+/** The token sets that apply: the active ones, or those of the first theme of each group, or all; and the ones left out. */
+function activeSets(root: Json): { sets: Json[]; off: string[] } {
+  const meta = isObj(root.$metadata) ? root.$metadata : null, themes = Array.isArray(root.$themes) ? root.$themes.filter(isObj) : [];
+  if (!meta && !themes.length) return { sets: [root], off: [] };
+  const list = (v: unknown) => (Array.isArray(v) ? v.map(String) : []);
+  const all = [...new Set([...list(meta?.tokenSetOrder), ...Object.keys(root)])].filter((k) => !k.startsWith('$') && isObj(root[k]));
+  const inThemes = (which: Json[]) => new Set(which.flatMap((t) => (isObj(t.selectedTokenSets) ? Object.entries(t.selectedTokenSets).filter(([, v]) => v !== 'disabled').map(([k]) => k) : [])));
+  const names = list(meta?.activeThemes), seen = new Set<string>();
+  const on = [new Set(list(meta?.activeSets)), inThemes(themes.filter((t) => names.includes(t.group ? `${String(t.group)}/${String(t.name)}` : String(t.name)) || names.includes(String(t.id)))),
+    inThemes(themes.filter((t) => { const g = String(t.group ?? ''); return !seen.has(g) && seen.add(g); }))].find((s) => all.some((k) => s.has(k)));
+  return { sets: all.filter((k) => !on || on.has(k)).map((k) => root[k] as Json), off: on ? all.filter((k) => !on.has(k)) : [] };
+}
+
+/** The tokens of a file, the names of the ones this app has no type or value for, and the token sets not in use in it. */
+export function tokensFromFile(text: string): { tokens: KitTokens; skipped: string[]; off: string[] } {
   let root: unknown;
   try { root = JSON.parse(text); } catch { throw new Error('The file is not valid JSON.'); }
   if (!isObj(root)) throw new Error('The file has no design tokens.');
-  const order = isObj(root.$metadata) && Array.isArray(root.$metadata.tokenSetOrder) ? root.$metadata.tokenSetOrder.map(String) : null;
-  const sets: Json[] = order ? order.flatMap((k) => (isObj(root[k]) ? [root[k] as Json] : [])) : [root];
+  const { sets, off } = activeSets(root);
   const tokens: KitTokens = {}, skipped: string[] = [];
-  const walk = (node: Json, path: string[], inherited?: unknown) => {
-    const type = node.$type ?? inherited;
-    if ('$value' in node || ('value' in node && 'type' in node)) {
-      const kind = TYPES[String(node.$type ?? node.type ?? type)], value = kind && literal(kind, node.$value ?? node.value), name = nameOf(path);
-      const description = typeof node.$description === 'string' && node.$description ? node.$description : undefined;
-      if (kind && value !== undefined && name) tokens[name] = { type: kind, value, ...(description ? { description } : {}) };
-      else skipped.push(path.join('.'));
-      return;
-    }
-    for (const [k, v] of Object.entries(node)) if (!k.startsWith('$') && isObj(v)) walk(v, [...path, k], type);
-  };
-  for (const set of sets) walk(set, []);
-  // One token the app cannot read (a formula, an alias to a skipped one) does not stop the rest.
-  for (;;) {
-    const bad = Object.keys(tokens).find((name) => { try { validateTokens(chain(tokens, name)); return false; } catch { return true; } });
-    if (!bad) break;
-    delete tokens[bad]; skipped.push(bad);
+  for (const set of sets) {
+    const here = new Set<string>();
+    const put = (path: string[], type: string, raw: unknown, description?: string) => {
+      const name = nameOf(path), token = read(type, raw);
+      if (!token || !name || here.has(name)) { skipped.push(path.join('.')); return; }
+      here.add(name);
+      tokens[name] = { ...token, ...(description ? { description } : {}) };
+    };
+    const at = (path: string[]) => path.reduce<unknown>((n, p) => (isObj(n) && Object.hasOwn(n, p) ? n[p] : undefined), set);
+    const merge = (base: Json, over: Json): Json => {
+      const out: Json = { ...base };
+      for (const [k, v] of Object.entries(over)) out[k] = isObj(v) && isObj(out[k]) && !isToken(v) ? merge(out[k] as Json, v) : v;
+      return out;
+    };
+    const walk = (node: Json, path: string[], inherited: unknown, extended: string[]) => {
+      const type = node.$type ?? inherited;
+      if (isToken(node)) {
+        const raw = '$value' in node ? node.$value : node.value, kind = String(node.$type ?? node.type ?? type), d = node.$description ?? node.description, description = typeof d === 'string' ? d : undefined;
+        if (!COMPOSITES.includes(kind) || refPath(raw)) { put(path, kind, raw, description); return; }
+        (Array.isArray(raw) ? raw : [raw]).forEach((part, i, every) => {
+          const inside = every.length > 1 ? [...path, String(i + 1)] : path;
+          if (!isObj(part)) skipped.push(inside.join('.'));
+          else for (const [k, v] of Object.entries(part)) put([...inside, k], Object.hasOwn(PARTS, k) ? PARTS[k] : '', v);
+        });
+        return;
+      }
+      const from = refPath(node.$extends ?? node.$ref), key = from?.join('.'), base = from && key && !extended.includes(key) ? at(from) : undefined;
+      if (isObj(base) && !isToken(base) && key) { const { $extends: _e, $ref: _r, ...own } = node; walk(merge(base, own), path, inherited, [...extended, key]); return; }
+      for (const [k, v] of Object.entries(node)) if ((!k.startsWith('$') || k === '$root') && k !== '__proto__' && isObj(v)) walk(v, [...path, k], type, extended);
+    };
+    walk(set, [], undefined, []);
   }
+  for (const t of Object.values(tokens)) {
+    const last = parseTokenAlias(t.value) === null ? undefined : end(tokens, t);
+    if (last) t.type = last.type;
+  }
+  // One token the app cannot read (a formula, an alias to a skipped one) does not stop the rest.
+  const bad = Object.keys(tokens).filter((name) => { try { validateTokens(chain(tokens, name)); return false; } catch { return true; } });
+  for (const name of bad) { delete tokens[name]; skipped.push(name); }
   if (!Object.keys(tokens).length) throw new Error('The file has no design tokens this app can read.');
-  return { tokens, skipped };
+  return { tokens, skipped, off };
 }
 
 /** A token and the ones its alias goes through. */
@@ -57,15 +111,48 @@ function chain(tokens: KitTokens, name: string): KitTokens {
   for (let cur: string | null = name; cur !== null && tokens[cur] && !out[cur]; cur = parseTokenAlias(tokens[cur].value)) out[cur] = tokens[cur];
   return out;
 }
+/** The token an alias ends in; undefined when it goes nowhere. */
+function end(tokens: KitTokens, from: KitToken): KitToken | undefined {
+  let t: KitToken | undefined = from;
+  for (let i = 0; t && i < 20; i++) { const next = parseTokenAlias(t.value); if (next === null) return t; t = tokens[next]; }
+  return undefined;
+}
 
-export function tokensToFile(tokens: KitTokens): string {
-  const root: Json = {};
-  for (const [name, t] of Object.entries(tokens) as Array<[string, KitToken]>) {
-    const path = name.split('.');
-    let at = root;
-    for (const part of path.slice(0, -1)) at = (at[part] ??= {}) as Json;
-    const last = path[path.length - 1], leaf = { $type: t.type, $value: t.value, ...(t.description ? { $description: t.description } : {}) };
-    at[last] = isObj(at[last]) ? { ...(at[last] as Json), ...leaf } : leaf;
+export type TokenFormat = 'w3c' | 'penpot';
+const families = (v: string) => v.split(',').map((f) => f.trim().replace(/^(['"])(.*)\1$/, '$2')).filter(Boolean);
+function size(v: string | number): { value: number; unit: string } | undefined {
+  const m = /^(-?\d+(?:\.\d+)?)(px|rem)?$/.exec(String(v).trim());
+  return m ? { value: Number(m[1]), unit: m[2] ?? 'px' } : undefined;
+}
+function write({ type, value }: KitToken, format: TokenFormat): { $type: string; $value: unknown } | undefined {
+  const w3c = format === 'w3c', some = ($type: string, $value: unknown) => ($value === undefined ? undefined : { $type, $value });
+  if (type === 'color') return some('color', w3c ? colorObject(String(value)) : colorHex(String(value)));
+  if (type === 'dimension') { const s = size(value); return some('dimension', s && (w3c ? s : `${s.value}${s.unit}`)); }
+  if (type === 'fontFamily') { const f = families(String(value)); return some(w3c ? 'fontFamily' : 'fontFamilies', f.length > 1 ? (w3c ? f : f.join(', ')) : f[0]); }
+  if (type === 'number') return some('number', w3c ? Number(value) : String(value));
+  return w3c ? some('string', String(value)) : undefined;
+}
+
+/** The tokens as a file, and the names of the ones that format has no way to write (with the ones that point to them). */
+export function tokensToFile(tokens: KitTokens, format: TokenFormat = 'w3c', set = 'Tokens'): { text: string; left: string[] } {
+  const entries = Object.entries(tokens).map(([name, t]) => { const last = end(tokens, t); return { name, t, out: last && write(last, format) }; });
+  const kept = entries.filter((e) => e.out), names = new Set(kept.map((e) => e.name)), groups = new Set<string>();
+  for (const n of names) for (let i = n.indexOf('.'); i > 0; i = n.indexOf('.', i + 1)) groups.add(n.slice(0, i));
+  // A token that is also a group of tokens: the standard calls it $root; Penpot has no such thing.
+  const outName = (n: string) => {
+    if (!groups.has(n)) return n;
+    let own = format === 'w3c' ? `${n}.$root` : `${n}.root`;
+    while (names.has(own) || groups.has(own)) own += '-';
+    return own;
+  };
+  const tree: Json = Object.create(null) as Json;
+  for (const { name, t, out } of kept) {
+    const path = outName(name).split('.'), alias = parseTokenAlias(t.value);
+    let at = tree;
+    for (const part of path.slice(0, -1)) at = (at[part] ??= Object.create(null) as Json) as Json;
+    at[path[path.length - 1]] = { $type: out!.$type, $value: alias === null ? out!.$value : `{${outName(alias)}}`, ...(t.description ? { $description: t.description } : {}) };
   }
-  return `${JSON.stringify(root, null, 2)}\n`;
+  const title = set.trim().replace(/[/$.]+/g, '-') || 'Tokens';
+  const file = format === 'w3c' ? tree : { [title]: tree, $themes: [], $metadata: { tokenSetOrder: [title], activeThemes: [], activeSets: [title] } };
+  return { text: `${JSON.stringify(file, null, 2)}\n`, left: entries.filter((e) => !e.out).map((e) => e.name) };
 }
