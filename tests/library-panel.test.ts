@@ -21,7 +21,7 @@ const asset = (id: string, over: Partial<Asset> = {}) => ({ id, kind: 'image', o
 const gen = (id: string, prompt: string, over: Partial<Generation> = {}) => ({ id, sessionId: sid(), kind: 'image', prompt, modelName: 'Seedance', provider: 'demo', status: 'done', assetIds: [], settings: { count: 1, advanced: {}, aspect: '1:1', resolution: '1k' }, estimate: { usd: 0 }, createdAt: 1, ...over }) as unknown as Generation;
 const q = <T extends Element = HTMLElement>(sel: string) => host.querySelector<T>(sel)!;
 const click = (el: Element | null) => act(() => (el as HTMLElement).click());
-const names = () => [...host.querySelectorAll('.g-tile .g-open')].map((b) => b.getAttribute('data-title'));
+const names = () => [...host.querySelectorAll('.g-tile:not(.lib-tile) .g-open')].map((b) => b.getAttribute('data-title'));
 const bar = (label: string) => q(`.pc-bar [aria-label^="${label}"]`);
 const radio = (text: string) => [...document.querySelectorAll('[role="radio"]')].find((b) => b.textContent === text) ?? null;
 const source = (name: string) => { click(q('.pc-source')); click([...document.querySelectorAll('[role="menuitem"]')].find((b) => b.textContent?.startsWith(name)) ?? null); };
@@ -113,7 +113,7 @@ describe('Library top bar', () => {
   it('card view lays tiles out in justified rows that keep each asset ratio', () => {
     act(() => useStore.setState((st) => ({ assets: { ...st.assets, a: { ...st.assets.a, width: 200, height: 100 }, b: { ...st.assets.b, width: 100, height: 200 } } })));
     const cells = [...host.querySelectorAll<HTMLElement>('.jg-cell')];
-    expect(cells).toHaveLength(3);
+    expect(cells).toHaveLength(6);
     const ratio = (c: HTMLElement) => parseFloat(c.style.width) / parseFloat(c.style.height);
     const byName = Object.fromEntries(cells.map((c) => [c.querySelector('.g-open')?.getAttribute('data-title'), c]));
     expect(ratio(byName.Mango)).toBeCloseTo(2, 3);
@@ -242,7 +242,7 @@ describe('Library source selector', () => {
     const items = [...document.querySelectorAll('[role="menuitem"]')];
     expect(items.map((b) => b.textContent)).toEqual([
       'All', 'Character2', 'Location1', 'Product0', 'Object0', 'Style0',
-      'Moodboards0', 'Design systems0', 'Brand kits0',
+      'Moodboards0', 'Design systems0', 'Brand kits0', 'Fonts0',
     ]);
     expect(document.querySelector('.pc-menu-sep')).not.toBeNull();
     expect(items[0].getAttribute('aria-current')).toBe('true');
@@ -276,7 +276,7 @@ describe('Library source selector', () => {
     expect(q('.pc-split').contains(q('.pc-bar'))).toBe(false);
     expect(q('.pc-main').querySelector('.gallery-scroll')).not.toBeNull();
     expect(host.querySelector('.gallery-count')).toBeNull(); // no standalone results line
-    expect(q('.pc-bar [aria-label="Search"]').getAttribute('data-tip')).toContain('3 results');
+    expect(q('.pc-bar [aria-label="Search"]').getAttribute('data-tip')).toContain('6 results');
   });
 });
 
@@ -427,7 +427,7 @@ describe('Library cards', () => {
 });
 
 describe('Library list columns', () => {
-  const rows = () => [...host.querySelectorAll('.library-layout-list .pc-info-title')].map((t) => t.textContent);
+  const rows = () => [...host.querySelectorAll('.library-layout-list .g-tile:not(.lib-tile) .pc-info-title')].map((t) => t.textContent);
   const head = (label: string) => q(`.pc-list-head [aria-label^="Sort by ${label}"]`);
   const toList = () => { click(bar('View')); click(radio('List')); };
 

@@ -44,7 +44,7 @@ it('View offers Grid, Cards and List; Cards shows horizontal tiles with details,
   click(radio('Cards'));
   expect(localStorage.getItem('ogs.libraryView')).toBe('"tile"');
   const tiles = [...host.querySelectorAll('.library-layout-tile > .pc-tile')];
-  expect(tiles).toHaveLength(2);
+  expect(tiles).toHaveLength(3);
   const cherry = tiles.find((t) => t.querySelector('.pc-info-title')?.textContent === 'Cherry')!;
   expect([...cherry.querySelectorAll('.pc-stat')].map((s) => s.textContent)).toEqual(['16:9Aspect', '720pResolution', '5sDuration']);
   expect(cherry.querySelector('[aria-label="Use as reference"]')).toBeNull();

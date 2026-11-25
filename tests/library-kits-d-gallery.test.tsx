@@ -97,7 +97,7 @@ describe('Lote D Parte 1: Library kit categories, cards, menu, versions, compone
     const labels = [...document.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent);
     expect(labels).toEqual([
       'All', 'Character1', 'Location0', 'Product0', 'Object0', 'Style0',
-      'Moodboards1', 'Design systems1', 'Brand kits0',
+      'Moodboards1', 'Design systems1', 'Brand kits0', 'Fonts0',
     ]);
 
     await click(menuItem('Character'));

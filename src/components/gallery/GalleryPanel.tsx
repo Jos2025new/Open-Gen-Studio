@@ -27,7 +27,7 @@ import { CardActions, Figures } from './GalleryTiles';
 import { SearchToggle, CardMenu, GridSizeSlider, LayoutSegmented, MenuConfirm, MenuItem, PanelPopover, SortSegmented, SourceSelect, ToggleRow, asItemView, useTapReveal, type ItemView, type RailItem, type SortState } from '../ui/PanelControls';
 import { JustifiedGrid } from '../ui/JustifiedGrid';
 import { rowHeightFor } from '../../lib/justifiedRows';
-import { FontTile, UploadFonts } from './FontTile';
+import { FontTile, UploadFonts, useFontUses } from './FontTile';
 import { GeneratedAssets } from './GeneratedAssets';
 import './GalleryLayout.css';
 
@@ -35,7 +35,7 @@ type LibraryKind = SubjectKind | KitKind | 'font';
 type Category = 'all' | LibraryKind;
 type OpenSpace = 'studio' | 'designer' | 'nodes';
 const SUBJECT_ICONS: Record<SubjectKind, LucideIcon> = { character: UserRound, object: Shapes, product: Tag, location: Box, style: Palette };
-/** All shows what was generated; each category shows the saved library items of that kind. */
+/** All shows everything; each category shows the saved library items of that kind. */
 const ORDER: SubjectKind[] = ['character', 'location', 'product', 'object', 'style'];
 const isKitKind = (k: string): k is KitKind => Object.prototype.hasOwnProperty.call(KIT_KINDS, k);
 const itemKind = (x: Subject): LibraryKind => (isKit(x) ? (x.kind as KitKind) : ((x.kind as SubjectKind | 'font' | undefined) ?? 'character'));
@@ -54,6 +54,7 @@ function coverOf(item: Subject, assets: Record<string, Asset>): string | undefin
   const hasImage = (id?: string): id is string => Boolean(id && assets[id]?.kind === 'image');
   return [item.frontalAssetId, ...gAssets, ...(ver?.assetIds ?? [])].find(hasImage) ?? subjectAssetIds(item).find(hasImage);
 }
+const entryRatio = (item: Subject, assets: Record<string, Asset>): number => { const a = assets[coverOf(item, assets) ?? '']; return a && a.width > 0 && a.height > 0 ? a.width / a.height : 1; };
 const canOpenNodes = (item: Subject, assets: Record<string, Asset>) => Boolean(item.graph?.nodes.length || kitImageAssetIds(item, assets).length);
 function goSpace(space: OpenSpace) {
   if (space === 'studio') setStudioBoard({ open: true, view: 'designer' });
@@ -78,7 +79,8 @@ export function GalleryPanel() {
     <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />
   </div>;
   const library = useStore((st) => st.library), assets = useStore((st) => st.assets), sessionId = useStore((st) => st.activeSessionId), workspace = useStore((st) => st.ui.workspace);
-  const counts = (k: LibraryKind) => library.filter((x) => itemKind(x) === k && !x.userHidden).length;
+  const uses = useFontUses(), others = otherFonts(library, uses);
+  const counts = (k: LibraryKind) => [...library, ...others].filter((x) => itemKind(x) === k && !x.userHidden).length;
   const items = SOURCES.map((x) => (x.id === 'all' ? x : { ...x, count: counts(x.id as LibraryKind) }));
   const source = <SourceSelect items={items} value={category} onChange={setCategory} label="Library source" separatorAfter="all" allLabel="Library" />;
   const page = openKit ? library.find((x) => x.id === openKit && hasSections(x)) : undefined;
@@ -92,14 +94,16 @@ export function GalleryPanel() {
   return (
     <div className="gallery" role="region" aria-label="Library">
       {category === 'all'
-        ? <GeneratedAssets source={source} chrome={chrome} view={view} setView={setStored} cols={cols} setCols={setCols} />
-        : <LibraryAssets onOpenKit={setOpenKit} source={source} chrome={chrome} kind={category} view={view} setView={setStored} cols={cols} setCols={setCols} />}
+        ? <GeneratedAssets showEntry={(x, v, cells) => ({ ratio: entryRatio(x, assets), node: x.kind === 'font' ? <FontTile item={x} uses={uses.get(x.name) ?? []} view={v} cells={cells} /> : <LibraryTile item={x} view={v} cells={cells} onOpenKit={setOpenKit} /> })} source={source} chrome={chrome} view={view} setView={setStored} cols={cols} setCols={setCols} />
+        : <LibraryAssets onOpenKit={setOpenKit} source={source} chrome={chrome} kind={category} uses={uses} view={view} setView={setStored} cols={cols} setCols={setCols} />}
     </div>
   );
 }
 
-function LibraryAssets({ onOpenKit, source, chrome, kind, view, setView, cols, setCols }: {
-  onOpenKit: (id: string) => void; source: ReactNode; chrome: ReactNode; kind: LibraryKind; view: ItemView; setView: (v: ItemView) => void; cols: number; setCols: (c: number) => void;
+const otherFonts = (library: readonly Subject[], uses: ReturnType<typeof useFontUses>): Subject[] => [...new Set([...uses.keys(), ...library.flatMap((s) => (s.fonts ?? []).map((f) => f.family))])].filter((f) => !library.some((s) => s.kind === 'font' && s.name === f)).map((f) => ({ id: `font:${f}`, name: f, kind: 'font', refAssetIds: [] }));
+
+function LibraryAssets({ onOpenKit, source, chrome, kind, uses, view, setView, cols, setCols }: {
+  onOpenKit: (id: string) => void; source: ReactNode; chrome: ReactNode; kind: LibraryKind; uses: ReturnType<typeof useFontUses>; view: ItemView; setView: (v: ItemView) => void; cols: number; setCols: (c: number) => void;
 }) {
   const library = useStore((s) => s.library), assets = useStore((s) => s.assets);
   const sessionId = useStore((s) => s.activeSessionId), workspace = useStore((s) => s.ui.workspace);
@@ -107,18 +111,17 @@ function LibraryAssets({ onOpenKit, source, chrome, kind, view, setView, cols, s
   const [q, setQ] = useState(''), [sort, setSort] = useState<SortState>({ by: 'name', asc: true });
   const [showHidden, setShowHidden] = useState(false), omni = useStore((s) => !!s.ui.omni);
   const needle = q.trim().toLowerCase(), kitKind = isKitKind(kind);
-  const list = library.filter((x) => itemKind(x) === kind && x.name.toLowerCase().includes(needle) && (showHidden || !x.userHidden))
+  // Fonts of designs and kits that are not entries of their own show as well.
+  const listed = kind === 'font' ? [...library, ...otherFonts(library, uses)] : library;
+  const list = listed.filter((x) => itemKind(x) === kind && x.name.toLowerCase().includes(needle) && (showHidden || !x.userHidden))
     .sort((a, b) => (sort.asc ? 1 : -1) * a.name.localeCompare(b.name));
   // Nodes has nothing to show for an empty entry: Library stays open with its new card.
   const space = omni ? 'nodes' : spaceOf(workspace);
   const { busy: creating, create } = useNewKit(sessionId, space, () => { if (space !== 'nodes') goSpace(space); });
-  const emptyMsg = library.some((x) => itemKind(x) === kind) ? 'Nothing matches this search.'
+  const emptyMsg = listed.some((x) => itemKind(x) === kind) ? 'Nothing matches this search.'
     : kitKind || kind === 'font' ? 'No saved items yet.' : 'Save a result with Send to → Save to Library, or let the agent create references. Mention them as @Name in any prompt.';
-  const tile = (x: Subject) => (x.kind === 'font' ? <FontTile key={x.id} item={x} view={view} /> : <LibraryTile key={x.id} item={x} view={view} onOpenKit={onOpenKit} />);
-  const gridItems = list.map((x) => {
-    const a = assets[coverOf(x, assets) ?? ''];
-    return { id: x.id, ratio: a && a.width > 0 && a.height > 0 ? a.width / a.height : 1, node: tile(x) };
-  });
+  const tile = (x: Subject) => (x.kind === 'font' ? <FontTile key={x.id} item={x} uses={uses.get(x.name) ?? []} view={view} /> : <LibraryTile key={x.id} item={x} view={view} onOpenKit={onOpenKit} />);
+  const gridItems = list.map((x) => ({ id: x.id, ratio: entryRatio(x, assets), node: tile(x) }));
   return (
     <>
       <div className="gallery-controls generated-controls"><div className="pc-bar">
@@ -226,7 +229,7 @@ function KitMenuBody({ item, close }: { item: Subject; close: () => void }) {
   </>;
 }
 
-function LibraryTile({ item, view, onOpenKit }: { item: Subject; view: ItemView; onOpenKit: (id: string) => void }) {
+function LibraryTile({ item, view, cells, onOpenKit }: { item: Subject; view: ItemView; /** Its columns in a list that has them. */ cells?: ReactNode; onOpenKit: (id: string) => void }) {
   const assets = useStore((s) => s.assets), sessionId = useStore((s) => s.activeSessionId), workspace = useStore((s) => s.ui.workspace);
   const kit = isKit(item), cover = coverOf(item, assets), title = kit ? item.name : `@${item.name}`;
   const open = () => {
@@ -256,7 +259,7 @@ function LibraryTile({ item, view, onOpenKit }: { item: Subject; view: ItemView;
     return <div className={`g-tile lib-tile pc-row${item.userHidden ? ' is-hidden-item' : ''}`}>
       <button type="button" className="g-open pc-thumb" style={glyphStyle} aria-label={`Open ${title}`} onClick={open}>{thumb}</button>
       <span className="pc-text"><span className="pc-info-title">{title}</span><span className="pc-info-sub">{item.description || kindLabel}</span></span>
-      {hiddenMark}<span className="pc-tools">{openButton('pc-go')}{menu}</span>
+      {hiddenMark}{cells}<span className="pc-tools">{openButton('pc-go')}{menu}</span>
     </div>;
   }
   const figures = <Figures items={kit
