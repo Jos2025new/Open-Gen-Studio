@@ -25,6 +25,26 @@ El agente clasifica la petición y lo anuncia en una línea al empezar. Pregunta
 
 **Decisión firme:** un ADR «Aceptado» con fundamento. Reemplazarlo exige la palabra explícita del usuario y un ADR que diga «Sustituye a NNNN». Lo dicho de pasada en el chat no ata.
 
+## Arranque: qué es lo actual y cómo lanzar workers
+
+Para cualquier agente, antes de explorar:
+
+1. **Lo actual es `main`**, en el worktree `ogs-merge`: ahí se lee y, con el sí del usuario, se fusiona; no se desarrolla. `Open_Gen_Studio` es la carpeta de la app real, en una rama vieja: su código, docs y AGENTS.md están atrasados.
+2. **Estado vigente:** `~/.local/share/ogs-workers/estado.sh` (solo lee): commit de `main`, ramas sin fusionar, workers en marcha, RAM y últimas corridas.
+3. **Worktree propio**, desde `ogs-merge`: `git worktree add ../ogs-<t> -b task/<t> main && ln -s "$(realpath ../ogs-grok-friccion/node_modules)" ../ogs-<t>/node_modules`. `ogs-grok-friccion` guarda las dependencias compartidas: no borrarlo.
+4. **Lanzar** (encargos e informes en `~/.local/share/ogs-workers/`; clase: sencillo, estandar, complejo o pesado):
+
+| Worker | Comando |
+|---|---|
+| Neon | `PTIMEOUT=30m ~/.local/share/ogs-workers/agy-run.sh "<worktree>" <log> <encargo-absoluto> complejo gemini-4-neon-high` |
+| Hydrogen | el mismo, con `gemini-4-hydrogen-high` |
+| GPT Sol | `MEM=3G PTIMEOUT=30m ~/.local/share/ogs-workers/codex-run.sh <log> <encargo-absoluto> complejo gpt-6.2-sol` (arranca en `/tmp`: la ruta del worktree va en el encargo) |
+| Haiku, Sonnet, Opus | subagentes de Claude |
+
+- **Un solo `agy` a la vez entre todas las sesiones:** el segundo corta al primero. Con uno en marcha, espera o usa Sol o un subagente.
+- `agy-run.sh` no lanza con menos de 1500 MiB libres y no deja línea en `ledger.tsv`: comprueba que el proceso existe antes de decir que trabaja.
+- El encargo lleva alcance, worktree, commit por parte e informe en `bus/AAAAMMDD-<modelo>-<tema>.md`.
+
 ## Orquestación: no repetir (sesión 8, [historial 076](history/076-2026-11-W47-master-dinero-dplus.md))
 
 Valen para quien orquesta y para cada worker:
