@@ -1,7 +1,8 @@
+.pc-menu-pop:has(.kit-tokens) { width: min(21rem, 92vw) !important; }
 .kit-tokens { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.375rem; }
 .kit-tokens-rows { display: flex; flex-direction: column; gap: 0.25rem; max-height: 50vh; overflow-y: auto; }
-.kit-token { display: grid; grid-template-columns: 2rem 1fr 4.75rem auto; gap: 0.375rem; align-items: center; }
+.kit-token { display: grid; grid-template-columns: 2.5rem 1fr 1fr auto; gap: 0.375rem; align-items: center; }
 .kit-token input { min-width: 0; }
-.kit-token input[type='color'] { width: 2rem; height: 1.75rem; padding: 0; border: 0; background: none; }
+.kit-token input[type='color'] { width: 2.5rem; height: 1.75rem; padding: 0; border: 0; background: none; }
 .kit-token-type { font-size: 0.75rem; }
 .kit-tokens-add { display: flex; flex-wrap: wrap; gap: 0.125rem; }

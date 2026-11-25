@@ -34,9 +34,10 @@ export function KitTokens({ item, onDone }: { item: Subject; onDone: () => void 
   const [rows, setRows] = useState(() => rowsOf(item.tokens)), [busy, setBusy] = useState(false), file = useRef<HTMLInputElement>(null);
   const patch = (i: number, p: Partial<Row>) => setRows((rs) => rs.map((r, k) => (k === i ? { ...r, ...p } : r)));
   const add = (type: KitTokenType) => setRows((rs) => {
-    let n = rs.length + 1;
-    while (rs.some((r) => r.name === `${type}.${n}`)) n++;
-    return [...rs, { name: `${type}.${n}`, type, value: START[type] }];
+    let n = 1;
+    const stem = LABELS[type].toLowerCase();
+    while (rs.some((r) => r.name === `${stem}.${n}`)) n++;
+    return [...rs, { name: `${stem}.${n}`, type, value: START[type] }];
   });
   const importFile = async (f?: File) => {
     if (!f) return;

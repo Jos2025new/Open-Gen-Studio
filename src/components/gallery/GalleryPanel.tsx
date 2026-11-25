@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import {
   Box, ChevronLeft, Eye, EyeOff, Funnel, Grid2X2, History, Layers, LayoutGrid, Maximize2, MessageSquare,
-  Minimize2, Palette, PenTool, Plus, Shapes, Sparkles, Tag, Trash, UserRound, Workflow, X, type LucideIcon,
+  Minimize2, Palette, Pencil, PenTool, Plus, Shapes, Sparkles, Tag, Trash, UserRound, Workflow, X, type LucideIcon,
 } from '../ui/icons';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { setUserHidden } from '../../store/userHidden';
@@ -139,7 +139,7 @@ function LibraryAssets({ source, chrome, kind, view, setView, cols, setCols }: {
   );
 }
 
-type KitMenuView = 'menu' | 'versions' | 'components' | 'tokens' | 'into' | 'remove' | { restore: KitVersionRef };
+type KitMenuView = 'menu' | 'versions' | 'components' | 'tokens' | 'into' | 'rename' | 'remove' | { restore: KitVersionRef };
 function KitMenuBody({ item, close }: { item: Subject; close: () => void }) {
   const sessionId = useStore((s) => s.activeSessionId), library = useStore((s) => s.library), assets = useStore((s) => s.assets);
   const session = useStore((s) => s.sessions[s.activeSessionId]), ui = useStore((s) => s.ui);
@@ -173,6 +173,13 @@ function KitMenuBody({ item, close }: { item: Subject; close: () => void }) {
     <MenuItem icon={ChevronLeft} onClick={() => setSub('menu')}>Tokens</MenuItem>
     <KitTokens item={item} onDone={close} />
   </>;
+  if (sub === 'rename') return <>
+    <MenuItem icon={ChevronLeft} onClick={() => setSub('menu')}>Rename</MenuItem>
+    <form className="subject-new" onSubmit={(e) => { e.preventDefault(); const name = String(new FormData(e.currentTarget).get('name') ?? '').trim(); if (name) void run(() => saveItem({ subjectId: item.id, mode: 'overwrite', space: 'library', by: 'user', name })); }}>
+      <input name="name" autoFocus aria-label="Name" defaultValue={item.name} disabled={busy} />
+      <Button size="sm" variant="primary" type="submit" disabled={busy}>Save</Button>
+    </form>
+  </>;
   if (sub === 'into') return <>
     <MenuItem icon={ChevronLeft} onClick={() => setSub('menu')}>Add to brand kit</MenuItem>
     {brandKits.map((k) => <MenuItem key={k.id} icon={KIT_META['brand-kit'].icon} disabled={busy} selected={k.kits?.includes(item.id)} onClick={() => void run(() => saveItem({ subjectId: k.id, mode: 'overwrite', space: 'library', by: 'user', kits: k.kits?.includes(item.id) ? k.kits.filter((x) => x !== item.id) : [...(k.kits ?? []), item.id] }))}>{k.name}</MenuItem>)}
@@ -196,6 +203,7 @@ function KitMenuBody({ item, close }: { item: Subject; close: () => void }) {
     <MenuItem icon={Sparkles} selected={using} onClick={() => { setComposer({ kitId: using ? null : item.id }); close(); }}>Use with the agent</MenuItem>
     {KIT_KINDS[item.kind as KitKind].tokens ? <MenuItem icon={Palette} onClick={() => setSub('tokens')}>Tokens<span className="pc-count num">{Object.keys(item.tokens ?? {}).length}</span></MenuItem> : null}
     {item.kind !== 'brand-kit' ? <MenuItem icon={KIT_META['brand-kit'].icon} onClick={() => setSub('into')}>Add to brand kit</MenuItem> : null}
+    <MenuItem icon={Pencil} onClick={() => setSub('rename')}>Rename</MenuItem>
     <MenuItem icon={History} disabled={!versions.length} onClick={() => setSub('versions')}>Versions<span className="pc-count num">{versions.length}</span></MenuItem>
     {designerDoc && compCount
       ? <MenuItem icon={Layers} disabled={busy} onClick={openComps}>Components<span className="pc-count num">{compCount}</span></MenuItem> : null}
