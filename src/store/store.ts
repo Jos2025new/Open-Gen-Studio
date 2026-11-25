@@ -454,7 +454,7 @@ export function reconcileDeletionNotices(sessionId: string): void {
     const keepIds = new Set(remaining.map((n) => n.id));
     feed.push({
       ...item,
-      text: `Deleted nodes: ${remaining.map((n) => n.data.title).join(', ')}. Results remain in the gallery.`,
+      text: `Deleted nodes: ${remaining.map((n) => n.data.title).join(', ')}. Results remain in the Library.`,
       undoNodes: { nodes: remaining, edges: item.undoNodes.edges.filter((e) => keepIds.has(e.source) || keepIds.has(e.target)) },
     });
   }

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { asset, graphOf, hoisted, mkAsset, putImageBlob, resetStore, text } from './library-kits-final-fixtures';
-import { deleteLayer, duplicateLayer, flattenLayers, getDoc, mergeDown, patchLayer, placeAsset, rasterizeLayer, redoDoc, replaceLayerPixels, undoDoc } from '../src/engine/design/actions';
+import { deleteLayer, duplicateLayer, flattenLayers, getDoc, mergeDown, patchLayer, placeAsset, rasterizeLayer, redoDoc, undoDoc } from '../src/engine/design/actions';
 import { groupLayers, setGroupFlag } from '../src/engine/design/groups';
 import { canUndo, dropHistory } from '../src/engine/design/history';
 import { saveAssetEdit } from '../src/engine/assetRevisions';
@@ -141,18 +141,21 @@ it.each(KIT_KIND_LIST)('%s brings an edited layer back with one Undo when Nodes 
   expect((await readKitVersion(saved.versionId!))!.doc!.layers.some((l) => l.type === 'raster' && l.sourceAssetId === 'a')).toBe(true);
 });
 
-it('a document left open does not bring back what Nodes removed, and drops it when opened', async () => {
-  const { sid, id, current, layer, save } = await fixture('moodboard'), a = layer('na');
+it.each(KIT_KIND_LIST)('%s left open does not bring back what Nodes removed, and drops it when opened', async (kind) => {
+  const { sid, id, current, layer, save } = await fixture(kind), a = layer('na');
   const { added, groupId } = libraryToNodes(sid, id);
   expect(deleteNodes(sid, [added.find((n) => assetOf(n) === 'a')!.id])).toBeNull();
   await nodesToLibrary({ subjectId: id, sessionId: sid, groupId: groupId!, mode: 'overwrite' });
-  expect(nodeIds((await save()).graph)).not.toContain('na');
+  const saved = await save(), snap = (await readKitVersion(saved.versionId!))!;
+  expect(nodeIds(saved.graph)).not.toContain('na');
+  expect(libraryToNodes(sid, id).added.map(assetOf)).not.toContain('a');
+  expect(new Set(snap.storedRasterIds)).toEqual(new Set(snap.doc!.layers.filter((l) => l.type === 'raster').map((l) => l.id)));
   await libraryToDesigner(sid, id);
   expect(current().layers.map((l) => l.id)).not.toContain(a);
 });
 
-it('an image changed in Nodes shows in a document opened anew, and one replaced in Designer reaches Nodes', async () => {
-  const { sid, id, doc, layer, save } = await fixture('moodboard');
+it('an image changed in Nodes shows in a document opened anew, and an open document does not change it back', async () => {
+  const { sid, id, save } = await fixture('moodboard');
   await save();
   const { added, groupId } = libraryToNodes(sid, id), n = added.find((x) => assetOf(x) === 'a')!;
   expect(editCompound(sid, 'set-asset', (g) => ({ ...g, nodes: g.nodes.map((x) => (x.id === n.id ? { ...x, data: { ...x.data, assetId: 'c' } as GraphNode['data'] } : x)) }))).toBeNull();
@@ -162,11 +165,10 @@ it('an image changed in Nodes shows in a document opened anew, and one replaced 
   const opened = await libraryToDesigner(other.id, id), l = opened.layers.find((x) => x.id === opened.board!.at.na.layer);
   expect(l?.type === 'raster' && l.sourceAssetId).toBe('c');
   expect(canUndo(opened.id)).toBe(false);
-  await replaceLayerPixels(sid, doc.id, layer('nb'), 'c');
-  expect((await save()).graph?.nodes.find((x) => x.id === 'nb')?.data).toMatchObject({ assetId: 'c' });
+  expect((await save()).graph?.nodes.find((x) => x.id === 'na')?.data).toMatchObject({ assetId: 'c' });
 });
 
-it.each(KIT_KIND_LIST)('%s keeps positions through replace, group, merge, flatten and rasterize', async (kind) => {
+it.each(KIT_KIND_LIST)('%s keeps positions through group, merge, flatten and rasterize', async (kind) => {
   const { sid, id, doc, layer, current, save, graph } = await fixture(kind);
   const a = layer('na'), b = layer('nb'), note = layer('note');
   const group = groupLayers(sid, doc.id, [a, b, note])!;

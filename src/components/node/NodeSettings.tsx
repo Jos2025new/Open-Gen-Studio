@@ -102,7 +102,7 @@ function InputRefs({ node }: { node: GraphNode }) {
         </span>
       ))}
       {free ? (
-        <button ref={pop.ref} type="button" className="nt-ref nt-ref-add" onClick={pop.toggle} data-tip={`Add ${free.label.toLowerCase()} from the gallery`}>
+        <button ref={pop.ref} type="button" className="nt-ref nt-ref-add" onClick={pop.toggle} data-tip={`Add ${free.label.toLowerCase()} from Library`}>
           <Plus size={13} />
           <span>Ref</span>
         </button>

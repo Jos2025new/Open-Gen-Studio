@@ -4,7 +4,7 @@ import { addTextLayer, assetCanvas, getDoc, mutateDoc, patchLayer, placeAssetCan
 import { resizeCanvas } from './design/canvasSize';
 import * as D from './design/doc';
 import { openHistoryGroup } from './design/history';
-import { ensureBuffers, getBuffer, isUnreadable, paintingLive } from './design/raster';
+import { ensureBuffers, getRasterSurface, isUnreadable, paintingLive } from './design/raster';
 import { layerBox } from './design/render';
 import { NODE_WIDTH } from './flow/graph-layout';
 import { boardLayout, placedAt, placeNodes, unplaced } from './libraryLayout';
@@ -57,8 +57,7 @@ export function graphFromDoc(graph: Graph | undefined, doc: DesignDoc, joins: bo
     const text = e.layer.type === 'text' && e.layer.text !== e.at.text && e.layer.text.trim() ? e.layer.text : undefined;
     const position = e.movedHere ? spot(e.p) : unplaced(n.position) ? { x: e.at.x, y: e.at.y } : n.position;
     if (position !== n.position || text !== undefined) at[n.id] = { ...e.at, ...(position !== n.position ? position : {}), ...(text !== undefined ? { text } : {}) };
-    const image = e.layer.type === 'raster' && isImageAsset(e.layer.sourceAssetId) ? e.layer.sourceAssetId : undefined;
-    return { ...n, position, data: text !== undefined && n.data.kind === 'text' ? { ...n.data, text } : image && n.data.kind === 'asset' && image !== n.data.assetId ? { ...n.data, assetId: image } : n.data };
+    return { ...n, position, data: text !== undefined && n.data.kind === 'text' ? { ...n.data, text } : n.data };
   });
   for (const l of fresh) {
     const p = cornerOf(l), id = uid('nd');
@@ -111,15 +110,13 @@ interface BoardImages {
 /** Resolve imports before opening the document's history group. Existing pixels must also be ready for undo. */
 export async function loadBoardImages(doc: DesignDoc, graph: Graph | undefined, kind: string | undefined): Promise<BoardImages> {
   const items = boardNodes(graph), images: BoardImages['images'] = new Map();
-  const kept = new Set(withoutGone(doc, graph).layers.map((l) => l.id));
-  await ensureBuffers(doc.layers.filter((l) => l.type === 'raster' && !kept.has(l.id) && !getBuffer(l.id)));
   const taken = new Set(Object.values(doc.board?.at ?? {}).map(a => a.layer));
   for (const n of items) {
     if (n.data.kind !== 'asset' || !n.data.assetId) continue;
     const id = n.data.assetId, entry = linked(doc, n.id);
     if (doc.board?.at[n.id]) {
       if (entry?.layer.type !== 'raster' || entry.layer.sourceAssetId === id || !canRefresh(entry.layer)) continue;
-      if (!getBuffer(entry.layer.id)) await ensureBuffers([entry.layer]);
+      await ensureBuffers([entry.layer]);
     } else {
       const own = ownLayer(doc, n, taken, kind);
       if (own) { taken.add(own.id); continue; }
@@ -162,7 +159,7 @@ function updateBoard(sessionId: string, docId: string, graph: Graph | undefined,
   for (const n of items) {
     const d = n.data, e = linked(doc, n.id);
     if (d.kind !== 'asset' || !d.assetId || e?.layer.type !== 'raster' || e.layer.sourceAssetId === d.assetId) continue;
-    if (!canRefresh(e.layer) || paintingLive() || !getBuffer(e.layer.id)) {
+    if (!canRefresh(e.layer) || paintingLive() || !getRasterSurface(e.layer.id)) {
       toast(`Kept "${e.layer.name}" as it is.`, 'info');
       continue;
     }

@@ -235,12 +235,14 @@ export function saveItem(opts: {
       let storedDoc: DesignDoc | undefined, storedRasterIds: string[] | undefined, docRev: string | undefined;
       if (workDoc || (prevSnap?.doc && opts.mode === 'copy')) {
         if (workDoc) await flushRaster();
-        const src = workDoc ? { ...workDoc, ...(back?.board ? { board: back.board } : {}) } : withoutGone(prevSnap!.doc!, graph);
+        // A document opened before keeps on screen what another space removed; the saved one does not.
+        const src = withoutGone(workDoc ? { ...workDoc, ...(back?.board ? { board: back.board } : {}) } : prevSnap!.doc!, graph);
         const copied = await copyDocPixels(src, workDoc && opts.mode === 'overwrite' ? prevSnap?.doc : null, workDoc ? undefined : expectedRasterIds(prevSnap!), written);
         storedDoc = remapDoc(src, copied.map, { newDocId: false }); storedRasterIds = copied.storedIds; docRev = uid('drev');
       } else if (prevSnap?.doc) {
         for (const rid of expectedRasterIds(prevSnap)) if (!(await blobDb.get(rKey(rid)))) throw new Error(`Missing expected pixel blob "${rKey(rid)}".`);
-        storedDoc = withoutGone(prevSnap.doc, graph); storedRasterIds = prevSnap.storedRasterIds ?? rasterBufferIds(prevSnap.doc.layers); docRev = prevSnap.docRev ?? cur.docRev ?? uid('drev');
+        storedDoc = withoutGone(prevSnap.doc, graph); const ids = new Set(rasterBufferIds(storedDoc.layers));
+        storedRasterIds = (prevSnap.storedRasterIds ?? [...ids]).filter((rid) => ids.has(rid)); docRev = prevSnap.docRev ?? cur.docRev ?? uid('drev');
       }
       const at = Date.now(), targetEntry: Subject = opts.mode === 'copy'
         ? { id: targetId, name: copyName(opts.name?.trim() || cur.name), kind, refAssetIds: [], copiedFrom: cur.id, draft: opts.by === 'user' ? false : Boolean(cur.draft), origin: { space: opts.space, by: opts.by, at, ...(session ? { sessionId: session.id, sessionTitle: session.title } : {}) } }

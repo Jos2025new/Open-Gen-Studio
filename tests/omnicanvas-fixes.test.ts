@@ -101,7 +101,7 @@ describe('omnicanvas deletion and undo', () => {
       workspace: 'node',
       type: 'notice',
       level: 'info',
-      text: 'Deleted nodes: Agent. Results remain in the gallery.',
+      text: 'Deleted nodes: Agent. Results remain in the Library.',
       undoNodes: { nodes: [structuredClone(agent)], edges: [] },
     });
     ensureOmniNodes(sid);

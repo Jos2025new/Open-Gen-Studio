@@ -14,7 +14,7 @@ export function SaveDesignToLibrary({ doc, sessionId, space, busy, setBusy, onDo
     if (busy) return;
     setBusy(true);
     onDone();
-    try { await runDesignOutput(sessionId, doc.id, true, undefined); } finally { setBusy(false); }
+    try { await runDesignOutput(sessionId, doc.id, true); } finally { setBusy(false); }
   };
   return <div className="confirm-pop">
     <Segmented size="sm" value={mode} onChange={setMode} options={[{ value: 'image', label: 'Image' }, { value: 'editable', label: 'Editable' }]} />

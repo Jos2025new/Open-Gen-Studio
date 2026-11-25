@@ -78,7 +78,7 @@ it.each(['designer', 'studio'] as const)('%s offers one Save to Library flow wit
   expect(button('Image')?.getAttribute('aria-checked')).toBe('true');
   expect(runDesignOutput).not.toHaveBeenCalled();
   await click(button('Save'));
-  expect(runDesignOutput).toHaveBeenCalledWith(s.id, doc.id, true, undefined);
+  expect(runDesignOutput).toHaveBeenCalledWith(s.id, doc.id, true);
 
   await act(async () => addDoc(s.id, linked));
   await render(linked);
