@@ -46,6 +46,7 @@ import { App } from './App';
 import { installDoneNotice } from './lib/doneNotice';
 import { installOwnFonts } from './engine/fontFiles';
 import { installTokenSync } from './engine/design/tokenBind';
+import { installActiveKit } from './engine/activeKit';
 import { installDoneSignal } from './lib/doneSignal';
 import { installBoardAutoOpen } from './lib/studioBoard';
 import { watchAccessibility } from './lib/theme';
@@ -58,6 +59,7 @@ installBoardAutoOpen();
 installDoneNotice();
 installDoneSignal();
 installTokenSync();
+installActiveKit();
 installOwnFonts();
 
 startKeySync();

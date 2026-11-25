@@ -13,7 +13,8 @@ export const FONT_ACCEPT = '.ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,f
 export const isFontFile = (f: { name: string }) => /\.(ttf|otf|woff2?)$/i.test(f.name);
 const fontKey = (id: string) => `font:${id}`;
 const bytesOf = new Map<string, Promise<Uint8Array | null>>();
-const shown = new Set<string>();
+/** The fonts the page has; null while one loads. */
+const shown = new Map<string, FontFace | null>();
 
 const bytes = (id: string): Promise<Uint8Array | null> => {
   let p = bytesOf.get(id);
@@ -86,13 +87,20 @@ export function keepInLibrary(fonts: readonly KitFont[]): void {
   });
 }
 
-/** Makes the Library's font files available to the page; text that waited for one redraws by itself (a face made from bytes does not announce itself). */
+/** Keeps the page's fonts equal to the user's; text that waited for one redraws by itself (a face made from bytes does not announce itself). */
 export function showFonts(): void {
-  if (typeof FontFace === 'undefined' || typeof document === 'undefined') return;
-  for (const f of allFonts()) {
+  if (typeof FontFace === 'undefined' || typeof document === 'undefined' || !document.fonts) return;
+  const fonts = allFonts(), ids = new Set(fonts.map((f) => f.id)), told = () => document.fonts.dispatchEvent(new Event('loadingdone'));
+  for (const [id, one] of shown) if (!ids.has(id)) { shown.delete(id); if (one && document.fonts.delete(one)) told(); }
+  for (const f of fonts) {
     if (shown.has(f.id)) continue;
-    shown.add(f.id);
-    void bytes(f.id).then(async (data) => { if (!data) { shown.delete(f.id); return; } const one = face(f, data); await one.load(); document.fonts.add(one); document.fonts.dispatchEvent(new Event('loadingdone')); }).catch(() => undefined);
+    shown.set(f.id, null);
+    void bytes(f.id).then(async (data) => {
+      const one = data && face(f, data);
+      await one?.load();
+      if (!one || !shown.has(f.id)) { shown.delete(f.id); return; }
+      shown.set(f.id, one); document.fonts.add(one); told();
+    }).catch(() => undefined);
   }
 }
 
@@ -101,8 +109,9 @@ export function installOwnFonts(): () => void {
   return useStore.subscribe((st, prev) => { if (st.library !== prev.library || st.activeSessionId !== prev.activeSessionId) showFonts(); });
 }
 
-/** The file of a font for exports: the user's nearest weight, else one the app ships; null when there is none. */
-export async function loadFontFile(family: string, weight: number): Promise<Uint8Array | null> {
-  const own = allFonts().filter((f) => f.family === family).sort((a, b) => Number(a.italic ?? false) - Number(b.italic ?? false) || Math.abs(a.weight - weight) - Math.abs(b.weight - weight))[0];
+/** The file of a font for exports: the user's, of that slant and the nearest weight, else one the app ships; null when there is none. */
+export async function loadFontFile(family: string, weight: number, italic = false): Promise<Uint8Array | null> {
+  const off = (f: KitFont) => Number((f.italic ?? false) !== italic);
+  const own = allFonts().filter((f) => f.family === family).sort((a, b) => off(a) - off(b) || Math.abs(a.weight - weight) - Math.abs(b.weight - weight))[0];
   return (own && (await bytes(own.id))) ?? loadBundledFont(family, weight);
 }

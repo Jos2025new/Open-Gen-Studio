@@ -7,15 +7,15 @@ import { mutateDoc } from '../../engine/design/actions';
 import { FONT_NAMES, fontNames } from '../../engine/design/doc';
 import { docModes, familyPatch, tokenChoices, tokenOf, tokenPatch } from '../../engine/design/tokenBind';
 import type { KitTokenType, TokenRef } from '../../engine/libraryTypes';
-import type { DesignDoc, TextStyle } from '../../engine/types';
-import { MenuItem } from '../ui/primitives';
-import { InlineSelect, useTokenMode } from './InlineControls';
+import type { DesignDoc, TextLayer, TextStyle } from '../../engine/types';
+import { Field, MenuItem } from '../ui/primitives';
+import { InlineColor, InlineSelect, InlineToggle, useTokenMode } from './InlineControls';
 
 /* What the tokens of the brand in use give besides its colors: fonts, sizes and the mode of the page. */
 const key = (r: TokenRef) => `{${r.kit}/${r.token}}`;
 function useChoices(type: KitTokenType) {
-  const library = useStore((s) => s.library), kitId = useStore((s) => s.composer.kitId), mode = useTokenMode();
-  return useMemo(() => tokenChoices(type, mode), [type, library, kitId, mode]);
+  const library = useStore((s) => s.library), kitId = useStore((s) => s.composer.kitId), [mode, own] = useTokenMode();
+  return useMemo(() => tokenChoices(type, mode, own), [type, library, kitId, mode, own]);
 }
 
 export function FontField({ value, onChange }: { value: TextStyle; onChange: (patch: Partial<TextStyle>) => void }) {
@@ -50,6 +50,19 @@ export function SizeTokenField({ value, onChange }: { value: TextStyle; onChange
   if (!choices.length) return null;
   return <InlineSelect label="Brand size" value={ref ? key(ref) : ''} options={[{ value: '', label: 'None' }, ...choices.map((c) => ({ value: key(c.ref), label: `${c.label} · ${c.ref.value}px` }))]}
     onChange={(v) => { const c = choices.find((x) => key(x.ref) === v); onChange({ fontSize: c ? Number(c.ref.value) : value.fontSize, fontSizeToken: c?.ref }); }} />;
+}
+
+/** What a picked text layer has in Layer properties. */
+export function TextLayerFields({ layer, onChange }: { layer: TextLayer; onChange: (patch: Partial<TextLayer>) => void }) {
+  return <>
+    <Field label="Text"><textarea rows={3} value={layer.text} onChange={(e) => onChange({ text: e.target.value })} /></Field>
+    <FontField value={layer} onChange={onChange} />
+    <div className="property-grid"><Field label="Size"><input type="number" min={4} max={1000} value={layer.fontSize} onChange={(e) => onChange({ fontSize: Math.min(1000, Math.max(4, +e.target.value)) })} /></Field><Field label="Weight"><select value={layer.fontWeight} onChange={(e) => onChange({ fontWeight: +e.target.value })}>{[100, 200, 300, 400, 500, 600, 700, 800, 900].map((w) => <option key={w}>{w}</option>)}</select></Field></div>
+    <SizeTokenField value={layer} onChange={onChange} />
+    <InlineToggle label="Italic" checked={!!layer.italic} onChange={(on) => onChange({ italic: on || undefined })} />
+    <Field label="Text color"><InlineColor label="Text color" value={layer.color} token={tokenOf(layer, 'color')} onChange={(c, t) => onChange(tokenPatch('color', c, t))} /></Field>
+    <Field label="Alignment"><select value={layer.align} onChange={(e) => onChange({ align: e.target.value as TextLayer['align'] })}>{['left', 'center', 'right'].map((a) => <option key={a}>{a}</option>)}</select></Field>
+  </>;
 }
 
 /** Light, Dark…: which values the page takes from its brand; nothing when the brand has one set of values. */

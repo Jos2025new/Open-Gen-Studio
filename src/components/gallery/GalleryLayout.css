@@ -63,6 +63,8 @@
 .pc-row .font-sample { font-size: 1.125rem; }
 .glyph-named { display: grid; justify-items: center; gap: 0.5rem; max-width: 90%; color: var(--text-3); }
 .glyph-named small { max-width: 100%; overflow: hidden; color: var(--text-2); font-size: var(--fs-s); text-overflow: ellipsis; white-space: nowrap; }
+.glyph-colors { display: flex; width: 5rem; height: 1.75rem; overflow: hidden; border: 1px solid var(--border); border-radius: 6px; }
+.glyph-colors > i { flex: 1; }
 .font-uses { max-height: 18rem; overflow: auto; }
 .font-use { display: grid; min-width: 0; }
 .font-use > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

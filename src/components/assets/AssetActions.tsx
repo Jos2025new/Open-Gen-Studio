@@ -257,6 +257,7 @@ export function SendToMenu({ assetId, size = 'sm' }: { assetId: string; size?: '
   const close = () => { pop.close(); setSubject(false); setStyleForm(false); setMood(false); };
   const addToKit = async (target?: Subject, kind: KitKind = 'moodboard') => {
     if (moodRef.current) return;
+    if (target?.graph?.nodes.some((n) => n.data.kind === 'asset' && n.data.assetId === assetId)) { toast(`Already in "${target.name}".`, 'info'); close(); return; }
     moodRef.current = true; setMoodBusy(true);
     try {
       const space = workspace === 'chat' ? 'studio' : workspace === 'node' ? 'nodes' : 'designer';

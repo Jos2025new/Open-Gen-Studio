@@ -9,8 +9,8 @@ function measurer(): CanvasRenderingContext2D {
   return measureCtx;
 }
 
-export function fontFor(l: Pick<TextLayer, 'fontWeight' | 'fontSize' | 'fontFamily'>): string {
-  return `${l.fontWeight} ${l.fontSize}px ${fontStack(l.fontFamily)}`;
+export function fontFor(l: Pick<TextLayer, 'fontWeight' | 'fontSize' | 'fontFamily' | 'italic'>): string {
+  return `${l.italic ? 'italic ' : ''}${l.fontWeight} ${l.fontSize}px ${fontStack(l.fontFamily)}`;
 }
 
 export function applyLetterSpacing(ctx: CanvasRenderingContext2D, px: number): void {

@@ -59,8 +59,8 @@ export function InlineChoice<T extends string | number>({ label, value, options,
   </div>;
 }
 
-/** The mode of the document on screen. */
-export const useTokenMode = () => useStore((s) => { const x = s.sessions[s.activeSessionId]; return x?.docs.find((d) => d.id === x.activeDocId)?.tokenMode; });
+/** The mode of the document on screen, and the Library entry it belongs to. */
+export const useTokenMode = () => useStore(useShallow((s) => { const x = s.sessions[s.activeSessionId], d = x?.docs.find((y) => y.id === x.activeDocId); return [d?.tokenMode, d?.library?.subjectId] as const; }));
 
 /**
  * A color in the bar: click for the picker, a hex field, the recent colors and the saved ones (shared by every tool).
@@ -72,8 +72,8 @@ export function InlineColor({ label, value, onChange, showValue = false, iconOnl
   const [hex, setHex] = useState(() => hexShown(value, alpha?.value));
   const [hue, setHue] = useState(() => colorHsl(value)[0]);
   useEffect(() => { const [h, s] = colorHsl(value); if (s > 0) setHue(h); }, [value]);
-  const kit = useStore(activeKit), library = useStore((s) => s.library), kitColors = useStore(useShallow(activeKitColors)), mode = useTokenMode();
-  const tokens = useMemo(() => (pop.open ? tokenChoices('color', mode) : []), [pop.open, kit, library, mode]);
+  const kit = useStore(activeKit), library = useStore((s) => s.library), kitColors = useStore(useShallow(activeKitColors)), [mode, own] = useTokenMode();
+  const tokens = useMemo(() => (pop.open ? tokenChoices('color', mode, own) : []), [pop.open, kit, library, mode, own]);
   const plain = kitColors.filter((c) => !tokens.some((t) => t.ref.value === c));
   const close = () => { rememberColor(value); pop.close(); };
   const pick = (c: string) => { onChange(c); setHex(hexShown(c, alpha?.value)); };
@@ -98,7 +98,7 @@ export function InlineColor({ label, value, onChange, showValue = false, iconOnl
           <input className="swatch-hex" value={hex} aria-label="Hex" spellCheck={false} onChange={(e) => { setHex(e.target.value); const p = parseHexAlpha(e.target.value); if (p) { onChange(p.color); if (alpha && e.target.value.trim().length === 9) alpha.onChange(opacityFromAlpha(p.alpha)); } }} />
           <button type="button" className="sb-link" onClick={() => saveSwatch(value)} disabled={sw.saved.includes(value.toLowerCase())}>Save</button>
         </div>
-        {kit && tokens.length + plain.length > 0 && <><span className="field-label">{kit.name}</span><div className="swatch-grid">{tokens.map(tokenChip)}{plain.map((c) => chip(c, false))}</div></>}
+        {tokens.length + plain.length > 0 && <><span className="field-label">{kit?.name ?? tokens[0]?.kit}</span><div className="swatch-grid">{tokens.map(tokenChip)}{plain.map((c) => chip(c, false))}</div></>}
         {sw.recent.length > 0 && <><span className="field-label">Recent</span><div className="swatch-grid">{sw.recent.map((c) => chip(c, false))}</div></>}
         {sw.saved.length > 0 && <><span className="field-label">Saved</span><div className="swatch-grid">{sw.saved.map((c) => chip(c, true))}</div></>}
       </div>

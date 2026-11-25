@@ -75,6 +75,7 @@ export interface ShapeSpec extends ObjectMeta {
 
 /** Optional text-style fields (absent = off / as typed, so older text is unchanged); see design/textLayout.ts. */
 export interface TextExtras {
+  italic?: boolean;
   underline?: boolean;
   strike?: boolean;
   textCase?: 'upper' | 'lower' | 'title';

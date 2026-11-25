@@ -7,6 +7,7 @@ import * as A from './actions';
 import { docCommand, docOf, hasTarget, layerOf, layerRef } from './commandKit';
 import { getBuffer } from './raster';
 import { BLEND_MODES } from './render';
+import { writtenStyle } from './tokenBind';
 
 /* The Designer's layers as commands (ADR 0030). Each wraps the action the interface already calls. */
 
@@ -14,9 +15,14 @@ const one = z.object({ layer: layerRef }).strict();
 const name = z.string().min(1).max(80);
 const asset = z.string().min(1).max(80);
 const textStyle = z
-  .object({ fontFamily: z.string(), fontSize: z.number().positive(), fontWeight: z.number(), color: z.string(), align: z.enum(['left', 'center', 'right']), lineHeight: z.number().positive(), letterSpacing: z.number(), underline: z.boolean(), strike: z.boolean(), textCase: z.enum(['upper', 'lower', 'title']) })
+  .object({ fontFamily: z.string(), fontSize: z.number().positive().or(z.string()), fontWeight: z.number(), italic: z.boolean(), color: z.string(), align: z.enum(['left', 'center', 'right']), lineHeight: z.number().positive(), letterSpacing: z.number(), underline: z.boolean(), strike: z.boolean(), textCase: z.enum(['upper', 'lower', 'title']) })
   .partial()
   .strict();
+
+const styleIn = (on: { session: string; doc: string }, style?: z.infer<typeof textStyle>) => {
+  const doc = A.getDoc(on.session, on.doc);
+  return style ? writtenStyle(style, doc?.library?.subjectId, doc?.tokenMode) : {};
+};
 
 /** An action answers null when it did nothing and told the person with a notice; a command must say it to its caller. */
 function made(layer: string | null | undefined, why: string): { layer: string } {
@@ -52,7 +58,7 @@ export const commands = [
     description: 'A text layer on top. x, y and width (wrap width; 0 = no wrap) in document px. Returns {layer}.',
     args: z.object({ text: z.string().min(1).max(4000), x: z.number(), y: z.number(), width: z.number().min(0), style: textStyle.optional(), name: name.optional() }).strict(),
     effect: 'write',
-    run: (on, args) => made(A.addTextLayer(on.session, on.doc, args.text, { x: args.x, y: args.y, width: args.width }, args.style ?? {}, args.name), 'The text could not be added.'),
+    run: (on, args) => made(A.addTextLayer(on.session, on.doc, args.text, { x: args.x, y: args.y, width: args.width }, styleIn(on, args.style), args.name), 'The text could not be added.'),
   }),
   docCommand({
     id: 'designer.layer.add_shapes',
@@ -104,7 +110,7 @@ export const commands = [
       }
       if ((patch.text !== undefined || style !== undefined) && target.type !== 'text') throw new Error('Only a text layer has text or text style.');
       if ((patch.x !== undefined || patch.y !== undefined) && target.type !== 'raster' && target.type !== 'text') throw new Error('Only raster and text layers have x/y position.');
-      const merged = { ...patch, ...(style ?? {}) };
+      const merged = { ...patch, ...styleIn(on, style) };
       if (!Object.values(merged).some((value) => value !== undefined)) throw new Error('Nothing to change: give at least one field.');
       A.patchLayer(on.session, on.doc, layer, merged as Partial<Layer>);
     },

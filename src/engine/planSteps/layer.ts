@@ -1,6 +1,6 @@
 import { parseTokenAlias } from '../libraryTokens';
 import { parsePath } from '../design/path';
-import { tokenProblem } from '../design/tokenBind';
+import { tokenProblem, writtenStyle } from '../design/tokenBind';
 import type { LayerStep, LayerType, ShapeSpec, StrokeSpec, TextStyle } from '../types';
 import { num } from './shared';
 import type { RawStep, StepEnv } from './env';
@@ -12,13 +12,16 @@ function color(v: unknown, fallback: string | null): string | null {
   return typeof v === 'string' && (HEX.test(v.trim()) || parseTokenAlias(v) !== null) ? v.trim() : fallback;
 }
 
-function normalizeTextStyle(s: Record<string, unknown> | undefined): Partial<TextStyle> {
+function normalizeTextStyle(s: Record<string, unknown> | undefined, own?: string): Partial<TextStyle> {
   if (!s) return {};
   const out: Partial<TextStyle> = {};
   const g = (a: string, b: string) => s[a] ?? s[b];
   if (g('font_family', 'fontFamily') != null) out.fontFamily = String(g('font_family', 'fontFamily'));
-  if (g('font_size', 'fontSize') != null) out.fontSize = Math.max(6, Math.min(800, num(g('font_size', 'fontSize'), 64)));
+  const size = g('font_size', 'fontSize');
+  if (parseTokenAlias(size) !== null) { if (!tokenProblem({ fontSize: size }, own)) Object.assign(out, writtenStyle({ fontSize: size as string }, own)); }
+  else if (size != null) out.fontSize = Math.max(6, Math.min(800, num(g('font_size', 'fontSize'), 64)));
   if (g('font_weight', 'fontWeight') != null) out.fontWeight = Math.max(100, Math.min(900, Math.round(num(g('font_weight', 'fontWeight'), 600) / 100) * 100));
+  if (typeof s.italic === 'boolean') out.italic = s.italic || undefined;
   const c = color(s.color, null);
   if (c) out.color = c;
   if (s.align === 'left' || s.align === 'center' || s.align === 'right') out.align = s.align;
@@ -116,7 +119,7 @@ export async function normalizeLayer(s: RawStep, env: StepEnv): Promise<void> {
     if (layerType === 'text' && !s.text?.trim()) errors.push(`${where}: text layers need "text".`);
     if (layerType === 'vector' && !s.shapes?.length && !drawing) errors.push(`${where}: vector layers need "shapes" or "strokes".`);
   }
-  const tokens = tokenProblem([s.style, s.shapes, s.strokes]);
+  const tokens = tokenProblem([s.style, s.shapes, s.strokes], ctx.docKit?.());
   if (tokens) errors.push(`${where}: ${tokens}`);
   const step: LayerStep = {
     id: s.id!,
@@ -126,7 +129,7 @@ export async function normalizeLayer(s: RawStep, env: StepEnv): Promise<void> {
     source: layerType === 'raster' ? s.source : undefined,
     target,
     text: layerType === 'text' ? s.text?.trim() : undefined,
-    style: layerType === 'text' ? normalizeTextStyle(s.style) : undefined,
+    style: layerType === 'text' ? normalizeTextStyle(s.style, ctx.docKit?.()) : undefined,
     box: s.box ? { x: num(s.box.x, 0), y: num(s.box.y, 0), width: num(s.box.width, 0) } : undefined,
     shapes: layerType === 'vector' ? normalizeShapes(s.shapes, errors, where) : undefined,
     strokes,

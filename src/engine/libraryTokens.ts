@@ -25,6 +25,14 @@ export const tokenModes = (tokens: KitTokens = {}): string[] => [...new Set(Obje
 export const tokensIn = (tokens: KitTokens, mode?: string): KitTokens => Object.fromEntries(Object.entries(tokens).map(([name, { modes, ...t }]) => [name, { ...t, value: (mode !== undefined ? modes?.[mode] : undefined) ?? t.value }]));
 
 /** The value a token ends in, following its aliases. */
+/** The edits made from `base` to `mine`, over what the entry has now: what changed meanwhile and was not edited stays. */
+export function mergeTokens(base: KitTokens, mine: KitTokens, live: KitTokens): KitTokens {
+  const out: KitTokens = {}, text = JSON.stringify;
+  for (const [name, t] of Object.entries(live)) if (!base[name] || mine[name]) out[name] = t;
+  for (const [name, t] of Object.entries(mine)) if (text(base[name]) !== text(t)) out[name] = t;
+  return out;
+}
+
 export function resolveToken(tokens: KitTokens, name: string, mode?: string): string | number | undefined {
   let cur: string | null = name;
   for (let i = 0; cur !== null && i < 20; i++) {

@@ -1,15 +1,17 @@
 import { setDoc, useStore } from '../../store/store';
-import { activeKit, activeKitItems } from '../activeKit';
+import { activeKitItems } from '../activeKit';
 import { parseTokenAlias, resolveToken } from '../libraryTokens';
 import { colorHex } from '../libraryTokensColor';
 import type { KitTokenType, TokenRef } from '../libraryTypes';
-import type { Layer, Subject } from '../types';
+import type { Layer, Subject, TextStyle } from '../types';
 import type { DesignDoc } from './docType';
 
 /* Values of a document taken from the tokens of a Library entry: they change when the token or the document's mode does. */
 type Field = 'color' | 'fill' | 'stroke' | 'fontFamily' | 'fontSize' | 'background';
 type Bag = Record<string, unknown>;
 const TYPE: Record<Field, KitTokenType> = { color: 'color', fill: 'color', stroke: 'color', background: 'color', fontFamily: 'fontFamily', fontSize: 'dimension' };
+/** What a token that does not exist leaves. */
+const NONE: Partial<Record<KitTokenType, string | number>> = { color: '#000000', fontFamily: 'Inter', dimension: 32 };
 const key = (f: Field) => `${f}Token`;
 
 /** A token's value as the Designer uses it: an opaque hex color, px, or a font name; undefined when it has none. */
@@ -39,40 +41,49 @@ export const tokenOf = (obj: object, field: Field): TokenRef | undefined => {
 };
 
 export interface TokenChoice { ref: TokenRef; label: string; kit: string }
-/** The tokens of the entry in use, and of those it contains, that fit a field. */
-export function tokenChoices(type: KitTokenType, mode?: string, st = useStore.getState()): TokenChoice[] {
-  return activeKitItems(st).flatMap((s) => Object.entries(s.tokens ?? {}).flatMap(([token, t]) => {
+/** The tokens that fit a field: of the entry in use, then of the one the document belongs to (`own`), and of those they contain. */
+export function tokenChoices(type: KitTokenType, mode?: string, own?: string, st = useStore.getState()): TokenChoice[] {
+  return activeKitItems(st, own).flatMap((s) => Object.entries(s.tokens ?? {}).flatMap(([token, t]) => {
     const value = t.type === type ? tokenValue(s, token, mode) : undefined;
     return value === undefined ? [] : [{ ref: { kit: s.id, token, value }, label: token, kit: s.name }];
   }));
 }
 
-const WRITTEN: Record<string, Field> = { color: 'color', fill: 'fill', stroke: 'stroke', background: 'background', fontFamily: 'fontFamily', font_family: 'fontFamily' };
+const WRITTEN: Record<string, Field> = { color: 'color', fill: 'fill', stroke: 'stroke', background: 'background', fontFamily: 'fontFamily', font_family: 'fontFamily', fontSize: 'fontSize', font_size: 'fontSize' };
+/** A style as written: a size as "{token}" becomes its number (text is laid out at once); the other tokens are placed by syncTokens. */
+export function writtenStyle(style: Omit<Partial<TextStyle>, 'fontSize'> & { fontSize?: number | string }, own?: string, mode?: string): Partial<TextStyle> {
+  const { fontSize, ...rest } = style, alias = parseTokenAlias(fontSize);
+  if (typeof fontSize !== 'string') return fontSize === undefined ? rest : { ...rest, fontSize };
+  const found = tokenChoices('dimension', mode, own).find((c) => c.ref.token === alias)?.ref;
+  if (!found) throw new Error(`No size token "${fontSize}".`);
+  return { ...rest, fontSize: Number(found.value), fontSizeToken: found };
+}
+
 /** What is wrong with the "{token}" values of what the agent writes: the ones the entry in use does not have, and the ones it does. */
-export function tokenProblem(written: unknown): string | null {
+export function tokenProblem(written: unknown, own?: string): string | null {
   const bad = new Map<string, KitTokenType>();
   const walk = (v: unknown): void => {
     if (Array.isArray(v)) v.forEach(walk);
     else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) {
       const type = Object.hasOwn(WRITTEN, k) ? TYPE[WRITTEN[k]] : undefined, alias = type ? parseTokenAlias(x) : null;
-      if (alias !== null && !tokenChoices(type!).some((c) => c.ref.token === alias)) bad.set(alias, type!);
+      if (alias !== null && !tokenChoices(type!, undefined, own).some((c) => c.ref.token === alias)) bad.set(alias, type!);
       else walk(x);
     }
   };
   walk(written);
   if (!bad.size) return null;
-  const kit = activeKit(), has = [...new Set(bad.values())].map((t) => `${t}: ${[...new Set(tokenChoices(t).map((c) => c.label))].slice(0, 30).join(', ') || 'none'}`);
+  const [kit] = activeKitItems(undefined, own), has = [...new Set(bad.values())].map((t) => `${t}: ${[...new Set(tokenChoices(t, undefined, own).map((c) => c.label))].slice(0, 30).join(', ') || 'none'}`);
   return `no token ${[...bad.keys()].map((n) => `"{${n}}"`).join(', ')}${kit ? ` in ${kit.name}; it has ${has.join('; ')}` : ': no brand is in use'}. Write one of its tokens or a plain value.`;
 }
 
 /** One object with its fields up to date; the same object when nothing changed. A value written as "{token}" becomes that token's. */
-function fresh<T extends object>(obj: T, fields: readonly Field[], library: readonly Subject[], mode?: string): T {
+function fresh<T extends object>(obj: T, fields: readonly Field[], library: readonly Subject[], mode?: string, own?: string): T {
   let out: Bag | null = null;
   for (const f of fields) {
     const value = (obj as Bag)[f], alias = parseTokenAlias(value);
     if (alias !== null) {
-      const found = tokenChoices(TYPE[f], mode).find((c) => c.ref.token === alias);
-      out = { ...(out ?? obj), [f]: found?.ref.value ?? (TYPE[f] === 'color' ? '#000000' : 'Inter'), [key(f)]: found?.ref };
+      const found = tokenChoices(TYPE[f], mode, own).find((c) => c.ref.token === alias);
+      out = { ...(out ?? obj), [f]: found?.ref.value ?? NONE[TYPE[f]], [key(f)]: found?.ref };
       continue;
     }
     const ref = tokenOf(obj, f);
@@ -89,7 +100,7 @@ function each<T>(list: readonly T[], fn: (x: T) => T): T[] {
 
 /** The document with its token values up to date; the same one when nothing changed. */
 function syncTokens(doc: DesignDoc, library: readonly Subject[]): DesignDoc {
-  const mode = doc.tokenMode, one = <T extends object>(x: T, ...f: Field[]) => fresh(x, f, library, mode);
+  const own = doc.library?.subjectId, mode = doc.tokenMode, one = <T extends object>(x: T, ...f: Field[]) => fresh(x, f, library, mode, own);
   const layers = each(doc.layers, (l): Layer => {
     if (l.type === 'text') return one(l, 'color', 'fontFamily', 'fontSize');
     if (l.type !== 'vector') return l;
@@ -110,7 +121,7 @@ function syncTokens(doc: DesignDoc, library: readonly Subject[]): DesignDoc {
 
 /** The modes of the entries a document takes values from, and of the one in use. */
 export function docModes(doc: DesignDoc, st = useStore.getState()): string[] {
-  const ids = new Set(activeKitItems(st).map((s) => s.id));
+  const ids = new Set(activeKitItems(st, doc.library?.subjectId).map((s) => s.id));
   const from = (obj: object, ...fields: Field[]) => fields.forEach((f) => { const r = tokenOf(obj, f); if (r) ids.add(r.kit); });
   from(doc, 'background');
   for (const l of doc.layers) {

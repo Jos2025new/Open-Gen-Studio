@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { deleteSubject } from '../../engine/actions';
 import { getDoc, patchLayer } from '../../engine/design/actions';
-import { fontStack } from '../../engine/design/doc';
+import { FONT_STACKS, fontStack } from '../../engine/design/doc';
 import { tokenPatch } from '../../engine/design/tokenBind';
 import { fontUses, goToFontUse, type FontUse } from '../../engine/fontUse';
 import { FONT_ACCEPT, keepInLibrary, storeFonts } from '../../engine/fontFiles';
@@ -70,7 +70,7 @@ function FontMenu({ item, close, showUses }: { item: Subject; close: () => void;
 export function FontTile({ item, uses, view, cells }: { item: Subject; uses: readonly FontUse[]; view: ItemView; cells?: ReactNode }) {
   const { sessionId, docId } = useDesign(), pop = usePopover();
   const open = () => (docId ? applyFont(sessionId, docId, tokenPatch('fontFamily', item.name)) : pop.toggle()), tap = useTapReveal(open);
-  const faces = item.fonts ?? [], used = uses.length ? countLabel(uses.length) : 'Not used';
+  const faces = item.fonts ?? [], noFile = !faces.length && !FONT_STACKS[item.name], used = [uses.length ? countLabel(uses.length) : noFile ? '' : 'Not used', noFile ? 'No font file' : ''].filter(Boolean).join(', ');
   const sub = [...faces.map((f) => `${f.variable ? 'Variable' : f.weight}${f.italic ? ' italic' : ''}`), ...(view === 'card' ? [] : [used])].join(', ');
   const label = docId ? `Use ${item.name}` : `Designs with ${item.name}`;
   const sample = <span className="font-sample" style={{ fontFamily: fontStack(item.name), fontWeight: faces[0]?.weight }}>Aa{view === 'list' ? null : <><small>{item.name}</small>{view === 'card' ? <small>{used}</small> : null}</>}</span>;

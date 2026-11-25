@@ -10,6 +10,7 @@ import { VIEWABLE_MEDIA_KINDS, type LlmMessage, type PlanFeedItem, type Question
 import { appendFeed, autoTitleSession, removeFeedItem, setComposer, updateFeedItem } from '../../store/store';
 import { buildContext } from './context';
 import { activeKit, activeKitImages, loadActiveKit } from '../activeKit';
+import { activeDoc } from '../design/actions';
 import { fontById, keepInSession } from '../fontFiles';
 import { agentSeesImages, attachmentParts, stripImages, trimReferenceResults, userMessage } from './attachments';
 import { startRequest } from './metrics';
@@ -150,8 +151,9 @@ async function deliver(text: string, opts: { attachments?: string[]; agentNodeId
     return;
   }
   startRequest(sessionId, { request: clean, workspace, engine: engineLabel(sessionId, to.id), attachments: attachments.length });
-  if (activeKit()) {
-    await loadActiveKit();
+  const own = docKit(sessionId, workspace);
+  if (activeKit() || own) {
+    await loadActiveKit(own);
     if (stop.aborted) return;
   }
   const ctx = buildContext(session(sessionId), contextOpts(sessionId, to.id, workspace, attachments));
@@ -195,8 +197,10 @@ async function visibleAttachments(sessionId: string, workspace: Workspace, attac
 
 function contextOpts(sessionId: string, owner: string, workspace: Workspace, attachments: string[]) {
   const agent = agentOf(sessionId, owner);
-  return { workspace, style: get().composer.agentStyle, round: agent.questionRound, maxRounds: get().settings.guidedRounds, attachments, agent };
+  return { workspace, style: get().composer.agentStyle, round: agent.questionRound, maxRounds: get().settings.guidedRounds, attachments, agent, docKit: docKit(sessionId, workspace) };
 }
+/** The Library entry the design on screen belongs to. */
+const docKit = (sessionId: string, workspace: Workspace) => (workspace === 'designer' ? activeDoc(sessionId)?.library?.subjectId : undefined);
 
 function resolvePendingAsSuperseded(sessionId: string, owner: string): void {
   const s = session(sessionId);

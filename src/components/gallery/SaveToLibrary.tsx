@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { isKit, KIT_KIND_LIST, type KitKind } from '../../engine/libraryTypes';
-import { createItem, deleteItem, saveItem } from '../../engine/libraryVersions';
+import { saveAsNew, saveItem } from '../../engine/libraryVersions';
 import { nodesToLibrary } from '../../engine/flow/fromLibrary';
 import type { DesignDoc, GraphGroup, Subject } from '../../engine/types';
 import { setDoc, toast, useStore } from '../../store/store';
@@ -25,11 +25,7 @@ export function SaveToLibrary({ space, sessionId, doc, group, nodeIds, onDone }:
       if (space === 'nodes') {
         saved = await nodesToLibrary({ sessionId, mode, subjectId: linked?.id, kind, groupId: group?.id, nodeIds: group ? undefined : nodeIds, name: clean, by: 'user' });
       } else if (mode === 'new') {
-        const created = await createItem({ name: clean, kind, space, by: 'user', sessionId, draft: true, open: false });
-        try { saved = await saveItem({ subjectId: created.subject.id, mode: 'overwrite', space, by: 'user', sessionId, docId: doc!.id, name: clean }); }
-        catch (err) { await deleteItem(created.subject.id); throw err; }
-        const link = { subjectId: saved.id, versionId: saved.versionId!, ...(saved.docRev ? { docRev: saved.docRev } : {}), ...(space === 'studio' ? { view: 'studio' as const } : {}) };
-        setDoc(sessionId, doc!.id, (d) => ({ ...d, name: saved.name, library: link }));
+        saved = await saveAsNew({ sessionId, docId: doc!.id, name: clean, kind, space, by: 'user' });
       } else {
         saved = await saveItem({ subjectId: linked!.id, mode, space, by: 'user', sessionId, docId: doc!.id, name: clean });
         if (mode === 'overwrite') setDoc(sessionId, doc!.id, (d) => (d.library?.subjectId === saved.id ? { ...d, name: saved.name } : d));

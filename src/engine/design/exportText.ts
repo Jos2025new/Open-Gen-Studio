@@ -3,8 +3,10 @@ import { buildSfnt } from './sfnt';
 import type { TextLayer } from '../types';
 import type { Font } from 'opentype.js';
 
-export type FontLoader = (family: string, weight: number) => Promise<Uint8Array | null>;
-export interface LoadedFont { family: string; weight: number; woff: Uint8Array }
+export type FontLoader = (family: string, weight: number, italic?: boolean) => Promise<Uint8Array | null>;
+export interface LoadedFont { family: string; weight: number; italic?: boolean; woff: Uint8Array }
+/** Asked for in italic, and the file has none: the page slants it. */
+export const isSlanted = (italic: boolean | undefined, file: Uint8Array) => Boolean(italic) && !fontInfo(file)?.italic;
 
 const kindOf = (b: Uint8Array): 'woff' | 'ttf' | 'otf' | null => {
   const tag = String.fromCharCode(...b.subarray(0, 4));
@@ -77,10 +79,10 @@ async function parseFont(woff: Uint8Array): Promise<Font> {
 export async function collectFonts(layers: TextLayer[], load?: FontLoader) {
   const found = new Map<string, LoadedFont>(), missing = new Set<string>();
   for (const l of layers) {
-    const key = `${l.fontFamily}|${l.fontWeight}`;
+    const key = `${l.fontFamily}|${l.fontWeight}${l.italic ? '|italic' : ''}`;
     if (found.has(key)) continue;
-    const woff = await load?.(l.fontFamily, l.fontWeight);
-    if (woff) found.set(key, { family: l.fontFamily, weight: l.fontWeight, woff });
+    const woff = await load?.(l.fontFamily, l.fontWeight, l.italic);
+    if (woff) found.set(key, { family: l.fontFamily, weight: l.fontWeight, ...(l.italic ? { italic: true } : {}), woff });
     else missing.add(l.fontFamily);
   }
   return { found, missing: [...missing] };
@@ -88,18 +90,21 @@ export async function collectFonts(layers: TextLayer[], load?: FontLoader) {
 
 /** Embedded @font-face rules (base64 WOFF), one per family and weight used. */
 export function fontFaceCss(fonts: Iterable<LoadedFont>): string {
-  return [...fonts].map((f) => `@font-face{font-family:'${f.family}';font-weight:${f.weight};src:url(data:font/${kindOf(f.woff) ?? 'woff'};base64,${base64(f.woff)}) format('${{ woff: 'woff', ttf: 'truetype', otf: 'opentype' }[kindOf(f.woff) ?? 'woff']}')}`).join('');
+  return [...fonts].map((f) => `@font-face{font-family:'${f.family}';font-weight:${f.weight};${f.italic && !isSlanted(true, f.woff) ? 'font-style:italic;' : ''}src:url(data:font/${kindOf(f.woff) ?? 'woff'};base64,${base64(f.woff)}) format('${{ woff: 'woff', ttf: 'truetype', otf: 'opentype' }[kindOf(f.woff) ?? 'woff']}')}`).join('');
 }
 
 /** Path data for each line of a laid-out text, placed exactly where the live text would be. */
 export async function textPathData(woff: Uint8Array, l: TextLayer, t: { lines: string[]; width: number; lineHeightPx: number }, ascent: number): Promise<string[]> {
   const font = await parseFont(woff);
   const options = { kerning: true, letterSpacing: l.letterSpacing ? l.letterSpacing / l.fontSize : 0 };
-  const pad = (t.lineHeightPx - l.fontSize) / 2;
+  const pad = (t.lineHeightPx - l.fontSize) / 2, slanted = isSlanted(l.italic, woff);
   const edge = l.align === 'center' ? l.x + t.width / 2 : l.align === 'right' ? l.x + t.width : l.x;
   return t.lines.map((line, i) => {
     const w = font.getAdvanceWidth(line, l.fontSize, options);
     const x = l.align === 'center' ? edge - w / 2 : l.align === 'right' ? edge - w : edge;
-    return font.getPath(line, x, l.y + i * t.lineHeightPx + pad + ascent, l.fontSize, options).toPathData(3);
+    const base = l.y + i * t.lineHeightPx + pad + ascent, path = font.getPath(line, x, base, l.fontSize, options);
+    // The slant the browser gives a font without italics.
+    if (slanted) for (const c of path.commands) for (const k of ['', '1', '2']) if (`x${k}` in c) c[`x${k}`] += (base - c[`y${k}`]) / 4;
+    return path.toPathData(3);
   }).filter(Boolean);
 }

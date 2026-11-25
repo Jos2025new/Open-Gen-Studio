@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { TextLayer } from '../../engine/types';
 import type { View } from '../../engine/design/viewCoordinates';
 import { layoutText } from '../../engine/design/render';
-import { fontStack } from '../../engine/design/doc';
+import { fontFor } from '../../engine/design/textLayout';
 
 /* The in-place text editor over the canvas: a textarea placed and transformed like the text it edits (Stage.tsx). */
 export function TextEditor({ layer, view, onDone }: { layer: TextLayer; view: View; onDone: (text: string) => void }) {
@@ -60,7 +60,7 @@ export function TextEditor({ layer, view, onDone }: { layer: TextLayer; view: Vi
         width: Math.max(8, lay.width * z) + layer.fontSize * 0.3 * z,
         height: lay.height * z + 2,
         whiteSpace: layer.width > 0 ? 'pre-wrap' : 'pre',
-        font: `${layer.fontWeight} ${layer.fontSize * z}px ${fontStack(layer.fontFamily)}`,
+        font: fontFor({ ...layer, fontSize: layer.fontSize * z }),
         lineHeight: `${layer.lineHeight}`,
         letterSpacing: `${layer.letterSpacing * z}px`,
         textTransform: layer.textCase === 'upper' ? 'uppercase' : layer.textCase === 'lower' ? 'lowercase' : layer.textCase === 'title' ? 'capitalize' : undefined,

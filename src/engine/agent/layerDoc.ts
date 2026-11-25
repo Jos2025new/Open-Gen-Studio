@@ -2,7 +2,7 @@
 export const LAYER_DOC = {
   target: '"base" (layer 1), "new", or an existing layer id of the same type.',
   source: 'image reference; "base" is layer 1: the main generated image always goes to base.',
-  style: '{font_family: Inter|Grotesk|Serif|Display|Condensed|Mono, font_size, font_weight, color "#hex", align left|center|right, line_height, letter_spacing}.',
+  style: '{font_family: Inter|Grotesk|Serif|Display|Condensed|Mono, font_size, font_weight, italic true|false, color "#hex", align left|center|right, line_height, letter_spacing}.',
   box: '{x, y, width}: text position and wrap width in document pixels.',
   shapes:
     'vector layer shapes in document px: {type: rect|ellipse|line, x, y, w, h, fill "#hex"|null, stroke "#hex"|null, stroke_width, radius} or {type: "path", d, fill, stroke, stroke_width} with absolute commands only (M L C Q S T Z) for precise curves.',

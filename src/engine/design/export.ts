@@ -10,7 +10,7 @@ import { shapeMatrix } from './shapeTransform';
 import { multiply } from './matrix';
 import { inkscapePrimAttrs } from './inkscapeShape';
 import { decorationRects } from './textLayout';
-import { base64, canOutline, textPathData } from './exportText';
+import { base64, canOutline, textPathData, type FontLoader } from './exportText';
 import { blurFilterSvg, blurRegion, cornerRadii, roundRectPath, strokeAlignOf, strokeLookSvg } from './shapeLook';
 import type { DesignDoc, Layer, TextLayer, VectorShape } from '../types';
 import { fontStack, shapeBox, type Box } from './doc';
@@ -39,7 +39,7 @@ export interface SvgDeps {
   /** Distance from the top of the em box to the baseline, in px (canvas 'top' baseline → SVG alphabetic). */
   ascent: (layer: TextLayer) => number;
   /** WOFF bytes of the bundled font for a family and weight; null when the app has none (system fonts). */
-  fontFile?: (family: string, weight: number) => Promise<Uint8Array | null>;
+  fontFile?: FontLoader;
   /** Pixel size of a raster layer's buffer (for the print preflight). */
   rasterSize?: (layer: Extract<Layer, { type: 'raster' }>) => { w: number; h: number } | null;
   /** Data URL of a document drawn on its page (or on `box` of it), transparent where nothing is. With it, what an
@@ -142,7 +142,7 @@ export function textSvg(l: TextLayer, t: { lines: string[]; width: number; lineH
   const spans = t.lines.map((line, i) => `<tspan x="${n(ax)}" y="${n(l.y + i * t.lineHeightPx + pad + ascent)}">${xmlEscape(line)}</tspan>`).join('');
   const spacing = l.letterSpacing ? ` letter-spacing="${n(l.letterSpacing)}"` : '';
   const bars = decorationRects(l, t, ascent).map((r) => `<rect x="${n(r.x)}" y="${n(r.y)}" width="${n(r.w)}" height="${n(r.h)}" fill="${xmlEscape(l.color)}"/>`).join('');
-  const el = paths ? `<g fill="${xmlEscape(l.color)}">${paths.map((d) => `<path d="${d}"/>`).join('')}</g>` : `<text xml:space="preserve" font-family="${xmlEscape(fontStack(l.fontFamily))}" font-size="${n(l.fontSize)}" font-weight="${l.fontWeight}" fill="${xmlEscape(l.color)}" text-anchor="${anchor}"${spacing}>${spans}</text>`;
+  const el = paths ? `<g fill="${xmlEscape(l.color)}">${paths.map((d) => `<path d="${d}"/>`).join('')}</g>` : `<text xml:space="preserve" font-family="${xmlEscape(fontStack(l.fontFamily))}" font-size="${n(l.fontSize)}" font-weight="${l.fontWeight}"${l.italic ? ' font-style="italic"' : ''} fill="${xmlEscape(l.color)}" text-anchor="${anchor}"${spacing}>${spans}</text>`;
   return bars ? `<g>${el}${bars}</g>` : el;
 }
 
@@ -274,7 +274,7 @@ async function buildSvg(doc: DesignDoc, deps: SvgDeps, viewport: SvgViewport | u
       const t = deps.layout(l);
       let paths: string[] | undefined;
       if (build.text === 'paths') {
-        const woff = await deps.fontFile?.(l.fontFamily, l.fontWeight);
+        const woff = await deps.fontFile?.(l.fontFamily, l.fontWeight, l.italic);
         if (woff && canOutline(woff)) paths = await textPathData(woff, l, t, deps.ascent(l));
         else deps.notice?.(`“${l.fontFamily}” is a system font the app cannot read, so its text stays live text instead of paths.`);
       }
@@ -309,7 +309,7 @@ async function buildSvg(doc: DesignDoc, deps: SvgDeps, viewport: SvgViewport | u
  * PDF from the same SVG (jsPDF + svg2pdf.js, loaded only when used). Shapes and images stay vector/embedded;
  * text uses the PDF standard fonts unless the family is embedded, so it may not match the design fonts.
  */
-export async function svgToPdf(svg: string, width: number, height: number, page?: PdfPage, print?: PrintOptions, fonts: { family: string; weight: number; sfnt: Uint8Array }[] = []): Promise<Blob> {
+export async function svgToPdf(svg: string, width: number, height: number, page?: PdfPage, print?: PrintOptions, fonts: { family: string; weight: number; italic?: boolean; sfnt: Uint8Array }[] = []): Promise<Blob> {
   const [{ jsPDF, GState }, { svg2pdf }, { svgIntoPdf }] = await Promise.all([import('jspdf'), import('svg2pdf.js'), import('./pdfLook')]);
   const el = new DOMParser().parseFromString(svg, 'image/svg+xml').documentElement;
   const layout = page ? pageLayout(page, width, height, print) : undefined;
@@ -317,10 +317,10 @@ export async function svgToPdf(svg: string, width: number, height: number, page?
     unit: 'px', format: layout ? [layout.pageWidth, layout.pageHeight] : [width, height],
     orientation: layout ? (layout.pageWidth >= layout.pageHeight ? 'landscape' : 'portrait') : width >= height ? 'landscape' : 'portrait', hotfixes: ['px_scaling'],
   });
-  // Embedded fonts: one regular and one bold file per family (jsPDF knows two weights).
+  // Embedded fonts: one regular and one bold file per family, and their italics (jsPDF knows two weights).
   const registered = new Set<string>();
   for (const f of fonts) {
-    const style = f.weight >= 600 ? 'bold' : 'normal', key = `${f.family}|${style}`;
+    const style = `${f.weight >= 600 ? 'bold' : ''}${f.italic ? 'italic' : ''}` || 'normal', key = `${f.family}|${style}`;
     if (registered.has(key)) continue;
     registered.add(key);
     pdf.addFileToVFS(`${key}.ttf`, base64(f.sfnt));

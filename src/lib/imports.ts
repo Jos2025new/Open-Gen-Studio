@@ -7,6 +7,9 @@
 export const EPS_NEEDS_GHOSTSCRIPT = 'To import EPS, install Ghostscript on this computer (gs). OGS converts the file locally; nothing is sent elsewhere.';
 export const EPS_PREVIEW_ONLY = 'This EPS only carries a low-resolution preview (TIFF), which the browser cannot show. ' + EPS_NEEDS_GHOSTSCRIPT;
 
+/** Pictures the file pickers offer: those the browser shows, and those converted here. */
+export const PICTURE_ACCEPT = 'image/png,image/jpeg,image/webp,image/svg+xml,.svg,image/heic,image/heif,.heic,.heif';
+
 export const isSvg = (f: File) => /\.svgz?$/i.test(f.name) || f.type === 'image/svg+xml';
 const isEps = (f: File) => /\.eps$/i.test(f.name) || f.type === 'application/postscript' || f.type === 'application/eps';
 const isHeic = (f: File) => /\.hei[cf]$/i.test(f.name) || f.type === 'image/heic' || f.type === 'image/heif';

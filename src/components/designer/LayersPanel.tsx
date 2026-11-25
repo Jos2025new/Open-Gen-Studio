@@ -24,7 +24,7 @@ import { LayerUnreadable } from './LayerUnreadable';
 import { EditOps, ToolSettings } from './ToolSettings';
 import { ShapeLookFields } from './ShapeLookFields';
 import { tokenPatch, tokenOf } from '../../engine/design/tokenBind';
-import { FontField, TokenModeField } from './TokenFields';
+import { TextLayerFields, TokenModeField } from './TokenFields';
 import { InlineColor, InlineSlider, InlineToggle } from './InlineControls';
 import { pickedIn, useObjectSelection } from '../../engine/design/objectSelection';
 import { groupLayers, groupMembers, liveGroups, patchGroup, selectGroup, setGroupFlag, ungroup } from '../../engine/design/groups';
@@ -267,20 +267,15 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
       </section>}
       {tool === 'hand' ? <p className="field-hint">Pan has no additional settings.</p> : <ToolSettings sessionId={sessionId} doc={doc} selectedCurve={selectedCurve} />}
     </section>}
-    {tab === 'props' && !layer && <><p className="empty-block">Select a layer to see its properties.</p><TokenModeField sessionId={sessionId} doc={doc} /></>}
+    {tab === 'props' && !layer && <p className="empty-block">Select a layer to see its properties.</p>}
+    {tab === 'props' && <TokenModeField sessionId={sessionId} doc={doc} />}
     {layer && <>
       {tab === 'props' && <details className="layer-details" open={propertiesOpen} onToggle={(e) => setPropertiesOpen(e.currentTarget.open)}>
       <summary>Layer properties</summary>
       <fieldset className="layer-properties form-stack" disabled={layer.locked} aria-label="Layer properties">
         {layer.type === 'fx' ? <FxEditor key={layer.id} sessionId={sessionId} doc={doc} layer={layer} /> : <LayerGeometry sessionId={sessionId} doc={doc} layer={layer} />}
         {layer.type === 'raster' && layer.sourceAssetId && <InlineToggle label="Allow painting on this image" checked={!!layer.allowPaint} onChange={(v) => patch({ allowPaint: v })} />}
-        {layer.type === 'text' && <>
-          <Field label="Text"><textarea rows={3} value={layer.text} onChange={(e) => patch({ text: e.target.value })} /></Field>
-          <FontField value={layer} onChange={patch} />
-          <div className="property-grid"><Field label="Size"><input type="number" min={4} max={1000} value={layer.fontSize} onChange={(e) => patch({ fontSize: Math.min(1000, Math.max(4, +e.target.value)) })} /></Field><Field label="Weight"><select value={layer.fontWeight} onChange={(e) => patch({ fontWeight: +e.target.value })}>{[300, 400, 500, 600, 700, 800, 900].map((w) => <option key={w}>{w}</option>)}</select></Field></div>
-          <Field label="Text color"><InlineColor label="Text color" value={layer.color} token={tokenOf(layer, 'color')} onChange={(c, t) => patch(tokenPatch('color', c, t))} /></Field>
-          <Field label="Alignment"><select value={layer.align} onChange={(e) => patch({ align: e.target.value as 'left' | 'center' | 'right' })}>{['left', 'center', 'right'].map((a) => <option key={a}>{a}</option>)}</select></Field>
-        </>}
+        {layer.type === 'text' && <TextLayerFields layer={layer} onChange={patch} />}
         {layer.type === 'vector' && layer.strokes?.length ? (() => {
           // The strokes picked on the canvas (Edit, Objects mode) are the ones restyled; with none picked, all of them.
           const pickedHere = layer.strokes.filter((st) => pickedIn(objPick, layer.id).includes(st.id));

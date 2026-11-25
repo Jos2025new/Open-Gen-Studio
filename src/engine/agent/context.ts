@@ -268,7 +268,7 @@ function alternatives(): string {
 export const WRAPUP_RULE =
   'MUST reply in at most 2 short sentences: say it is ready (or what failed; you have not seen the result, so say what you asked for — "I asked to keep everything else" — never that it came out right or intact; name the model as the summary’s "made with" says, in your own words (never copy the summary’s notation, brackets or ids; never the model you asked for if it differs, and say it differs); the shape and size listed are what came out; say something differs from what was asked only when the summary says "delivered differs" (e.g. "you asked 9:16, it came 1:1"), never by comparing with values from your plan or the settings) and offer 1-2 next steps or leaving it as is. Text only: no tools, no new plan.';
 
-export function buildContext(session: Session, opts: { workspace: Workspace; style: AgentStyle; round: number; maxRounds: number; attachments: string[]; /** The state of the agent the context is for (its confirmed settings), not the one on screen. */ agent?: AgentState }): string {
+export function buildContext(session: Session, opts: { workspace: Workspace; style: AgentStyle; round: number; maxRounds: number; attachments: string[]; /** Of the agent it is for, not the one on screen. */ agent?: AgentState; docKit?: string }): string {
   const st = get();
   const lines: string[] = [];
   lines.push(`workspace: ${opts.workspace}`);
@@ -286,7 +286,7 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   const wf = workflowById(st.composer.workflowId);
   if (wf) lines.push(`workflow (${WORKFLOW_CONTRACT}):\n${describeWorkflow(wf)}`);
   const subjects = mentionableSubjects(st.library);
-  lines.push(...libraryLines(st), ...captureLines(subjects, st.composer), ...contrastLines(session), peopleLookLine(st.settings));
+  lines.push(...libraryLines(st, opts.docKit), ...captureLines(subjects, st.composer), ...contrastLines(session), peopleLookLine(st.settings));
   lines.push(composerChosen('image') ? `image model (picked by the user): ${describeModel('image')}` : `image model (app default, not picked by the user): ${describeModel('image')}`);
   // An unpicked video model is only an app default: steps follow the purpose table (C2).
   lines.push(composerChosen('video') ? `video model (picked by the user): ${describeModel('video')}` : `video model: none picked by the user; ${videoRouteLine()}`);

@@ -6,6 +6,7 @@ import * as A from './actions';
 import { docCommand, docOf, hasTarget, layerRef } from './commandKit';
 import { approxLayerBox } from './doc';
 import { EXPORT_FORMATS } from './exportSettings';
+import { parseTokenAlias } from '../libraryTokens';
 import { groupLayers, liveGroups, patchGroup, ungroup } from './groups';
 import { canRedo, canUndo } from './history';
 
@@ -69,7 +70,7 @@ export const commands = [
     id: 'designer.doc.new',
     title: 'New document',
     description: 'A blank document; it becomes the one on screen. Returns {doc}.',
-    args: z.object({ width: side, height: side, name: z.string().min(1).max(80).optional(), background: hexColor.nullable().optional() }).strict(),
+    args: z.object({ width: side, height: side, name: z.string().min(1).max(80).optional(), background: hexColor.or(z.string().refine((v) => parseTokenAlias(v) !== null)).nullable().optional() }).strict(),
     effect: 'write',
     needs: ['session'],
     run: ({ on }, args) => {

@@ -13,6 +13,7 @@ import { activeLayer } from '../../engine/design/doc';
 import { activeDoc } from '../../engine/design/actions';
 import { clipTrim, paramByRole, placeKeyframes, routeVideoInputs } from '../../engine/params';
 import { beginJourney, recordJourneyEvent } from '../../lib/journeyTrace';
+import { PICTURE_ACCEPT } from '../../lib/imports';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { Chip } from '../ui/primitives';
@@ -30,12 +31,13 @@ export { SendDirect };
 
 export function AttachStrip({ ids }: { ids: string[] }) {
   if (!ids.length) return null;
+  const media = ids.filter((id) => !fontById(id));
   const remove = (id: string) => setComposer((c) => ({ attachments: c.attachments.filter((a) => a !== id) }));
   return (
     <div className="composer-attachments" role="list" aria-label={`${ids.length} attached`}>
         {ids.map((id, index) => (
           <span key={id} className="attach-thumb" role="listitem">
-            {fontById(id) ? <FontThumb font={fontById(id)!} /> : <button type="button" className="attachment-preview-button" aria-label={`Preview attachment ${index + 1}`} onClick={() => setUi({ lightbox: { assetIds: ids, index } })}>
+            {fontById(id) ? <FontThumb font={fontById(id)!} /> : <button type="button" className="attachment-preview-button" aria-label={`Preview attachment ${index + 1}`} onClick={() => setUi({ lightbox: { assetIds: media, index: media.indexOf(id) } })}>
               <AssetMedia assetId={id} hoverPlay={false} draggable={false} />
             </button>}
             <AttachTiming id={id} />
@@ -435,7 +437,7 @@ export function Composer({ chatNodeId }: { chatNodeId?: string } = {}) {
         <input
           ref={fileRef}
           type="file"
-          accept={['image/png,image/jpeg,image/webp', mode === 'agent' || videoRefs.videos ? 'video/mp4,video/webm' : '', mode === 'agent' ? FONT_ACCEPT : '', takesAudio ? 'audio/*' : '', mode === 'model3d' ? '.glb,model/gltf-binary' : ''].filter(Boolean).join(',')}
+          accept={[PICTURE_ACCEPT, mode === 'agent' || videoRefs.videos ? 'video/mp4,video/webm' : '', mode === 'agent' ? FONT_ACCEPT : '', takesAudio ? 'audio/*' : '', mode === 'model3d' ? '.glb,model/gltf-binary' : ''].filter(Boolean).join(',')}
           multiple={mode !== 'video' || videoRefs.multiple}
           hidden
           onChange={(e) => {

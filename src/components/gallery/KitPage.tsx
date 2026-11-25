@@ -16,6 +16,7 @@ import { addCategory, addToSection, kitSections, moveToSection, removeCategory, 
 import { resolveToken } from '../../engine/libraryTokens';
 import { createItem, readKitVersion, saveItem } from '../../engine/libraryVersions';
 import type { GraphNode, Subject } from '../../engine/types';
+import { PICTURE_ACCEPT, isSvg } from '../../lib/imports';
 import { AssetMedia } from '../ui/AssetMedia';
 import { ChevronLeft, Images, Layers, PenTool, Plus, Shapes, Sparkles, Trash, Type, Upload } from '../ui/icons';
 import { Button, IconButton } from '../ui/primitives';
@@ -49,7 +50,7 @@ export function KitPage({ item, chrome, menu, cover, onBack, onOpen, onDesign }:
       <div className="pc-grp pc-left kit-crumbs">
         <IconButton icon={ChevronLeft} label="Back" size="sm" onClick={section ? () => setTitle(null) : onBack} />
         {section ? <><button type="button" className="kit-crumb" onClick={() => setTitle(null)}>{item.name}</button><span className="faint">/</span><strong>{section.title}</strong></> : <strong>{item.name}</strong>}
-        <div className="pc-icons"><IconButton icon={Sparkles} label="Use with the agent" size="sm" active={using} aria-pressed={using} onClick={() => setComposer({ kitId: using ? null : item.id })} />{menu}</div>
+        <div className="pc-icons"><Button size="sm" icon={Sparkles} variant={using ? 'primary' : 'secondary'} aria-pressed={using} data-tip="The agent and the Designer follow it" onClick={() => setComposer({ kitId: using ? null : item.id })}>{using ? 'In use' : 'Use'}</Button>{menu}</div>
       </div>
       <div className="pc-grp pc-right">{chrome}</div>
     </div></div>
@@ -94,7 +95,7 @@ function SectionTile({ item, section, cover, onOpen }: { item: Subject; section:
 interface SectionProps { item: Subject; section: KitSection; sections: KitSection[]; busy: boolean; run: Run; cover: (s: Subject) => string | undefined; onOpen: (s: Subject) => void; onDesign: () => void; onGone: () => void; }
 function Section(p: SectionProps) {
   const { item, section, run } = p;
-  if (section.type === 'tokens') return <div className="kit-section"><Swatches item={item} section={section} />{section.title === 'Fonts' && <Fonts {...p} />}<KitTokens key={item.versionId} item={item} types={section.tokens} onDone={() => undefined} /></div>;
+  if (section.type === 'tokens') return <div className="kit-section"><Swatches item={item} section={section} />{section.title === 'Fonts' && <Fonts {...p} />}<KitTokens key={item.id} item={item} types={section.tokens} /></div>;
   if (section.type === 'components') return <Components {...p} />;
   if (section.type === 'kits') return <Inside {...p} />;
   if (section.type === 'text') return <div className="kit-section"><Texts {...p} nodes={sectionNodes(item, section)} /><NewText onAdd={(text) => run(() => addToSection(item.id, section.title, { texts: [text] }))} /></div>;
@@ -130,7 +131,7 @@ function Fonts({ item, busy, run }: SectionProps) {
     </div>
     {families.map((f) => <div key={f} className="kit-font">
       <button type="button" className="kit-font-use" aria-label={`Use ${f}`} style={{ fontFamily: fontStack(f) }} onClick={() => use(f)}>{f}</button>
-      <IconButton icon={Trash} label={`Remove ${f}`} size="sm" disabled={busy} onClick={() => removeFont(item.id, f)} />
+      <IconButton icon={Trash} label={`Remove ${f}`} size="sm" disabled={busy} onClick={() => void run(() => removeFont(item.id, f))} />
     </div>)}
   </>;
 }
@@ -139,7 +140,7 @@ function Items({ item, section, sections, busy, run, onGone }: SectionProps) {
   const { sessionId, docId } = useDesign(), workspace = useStore((s) => s.ui.workspace);
   const nodes = sectionNodes(item, section), file = useRef<HTMLInputElement>(null), [over, setOver] = useState(false);
   const add = (assetIds: string[]) => run(async () => { if (assetIds.length) await addToSection(item.id, section.title, { assetIds }); });
-  const upload = (files: FileList | null) => { const list = [...(files ?? [])].filter((f) => f.type.startsWith('image/')); if (list.length) void run(async () => { const ids = await uploadFiles(list); if (ids.length) await addToSection(item.id, section.title, { assetIds: ids }); }); };
+  const upload = (files: FileList | null) => { const list = [...(files ?? [])].filter((f) => f.type.startsWith('image/') || isSvg(f)); if (list.length) void run(async () => { const ids = await uploadFiles(list); if (ids.length) await addToSection(item.id, section.title, { assetIds: ids }); }); };
   const use = (id: string) => {
     if (docId) void placeAsset(sessionId, docId, id, 'new');
     else if (workspace === 'node') sendToNodes(id);
@@ -149,7 +150,7 @@ function Items({ item, section, sections, busy, run, onGone }: SectionProps) {
   return <div className={`kit-section${over ? ' is-over' : ''}`} onDragOver={(e) => { if (accepts(e)) { e.preventDefault(); setOver(true); } }} onDragLeave={() => setOver(false)}
     onDrop={(e) => { setOver(false); if (!accepts(e)) return; e.preventDefault(); const id = e.dataTransfer.getData('application/x-ogs-asset'); if (id) void add([id]); else upload(e.dataTransfer.files); }}>
     <div className="kit-add">
-      <input ref={file} type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden onChange={(e) => { upload(e.target.files); e.target.value = ''; }} />
+      <input ref={file} type="file" accept={`${PICTURE_ACCEPT},image/gif`} multiple hidden onChange={(e) => { upload(e.target.files); e.target.value = ''; }} />
       <Button size="sm" icon={Upload} disabled={busy} onClick={() => file.current?.click()}>Upload</Button>
       <FromLibrary disabled={busy} taken={new Set(nodes.flatMap((n) => assetOf(n) ?? []))} onAdd={(ids) => void add(ids)} />
       {section.custom && !nodes.length ? <IconButton icon={Trash} label={`Remove ${section.title}`} size="sm" onClick={() => { removeCategory(item.id, section.title); onGone(); }} /> : null}

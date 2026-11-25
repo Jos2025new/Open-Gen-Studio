@@ -6,7 +6,9 @@ import { runCommandsTool } from '../src/engine/agent/commandCalls';
 import { createItem, saveItem } from '../src/engine/libraryVersions';
 import type { KitTokens } from '../src/engine/libraryTypes';
 import type { TextLayer, VectorLayer } from '../src/engine/types';
-import { setComposer } from '../src/store/store';
+import { run } from '../src/engine/commands';
+import { activeKitLines } from '../src/engine/activeKit';
+import { setComposer, useStore } from '../src/store/store';
 
 const TOKENS: KitTokens = { sea: { type: 'color', value: '#0a4d68', modes: { Dark: '#88ccee' } }, main: { type: 'color', value: '{sea}' }, title: { type: 'fontFamily', value: 'Playfair Display, serif' }, big: { type: 'dimension', value: '2rem' } };
 
@@ -86,5 +88,43 @@ describe('tokens in the Designer', () => {
     const { deleteItem } = await import('../src/engine/libraryVersions');
     await deleteItem(kit);
     expect(layer<TextLayer>(0).fontSize).toBe(40);
+  });
+
+  it('the design of an entry uses its tokens with no brand in use, and the agent reads them', async () => {
+    const { openItem } = { openItem: (await import('../src/engine/libraryVersions')).libraryToDesigner };
+    setComposer({ kitId: null });
+    await openItem(sid, kit);
+    const own = getDoc(sid, useStore.getState().sessions[sid].activeDocId!)!;
+    expect(own.library?.subjectId).toBe(kit);
+    expect(tokenChoices('color', undefined, kit).map((c) => c.label)).toEqual(['sea', 'main']);
+    expect(tokenProblem({ fill: '{main}' }, kit)).toBeNull();
+    expect(activeKitLines(undefined, kit)[0]).toMatch(/^the document on screen is of this brand kit:\n.*Marea/s);
+    expect(activeKitLines(undefined, kit).join()).not.toContain('picked by the user');
+    const res = await runCommandsTool(sid, { seq: [{ cmd: 'designer.layer.add_text', args: { text: 'Own', x: 0, y: 0, width: 0, style: { color: '{main}', fontSize: '{big}', italic: true } } }] });
+    expect(res.text).not.toMatch(/no token/);
+    expect(getDoc(sid, own.id)!.layers.find((l) => l.type === 'text' && l.text === 'Own')).toMatchObject({ color: '#0a4d68', fontSize: 32, italic: true, fontSizeToken: { kit, token: 'big', value: 32 } });
+  });
+
+  it('sizes and the page background are written as tokens; one that does not exist is refused', async () => {
+    const say = (seq: unknown[]) => runCommandsTool(sid, { seq });
+    const made = await say([{ cmd: 'designer.doc.new', args: { width: 200, height: 200, background: '{sea}' } }, { cmd: 'designer.layer.add_text', args: { text: 'T', x: 0, y: 0, width: 0, style: { fontSize: '{big}' } } }]);
+    expect(made.done).toBe(true);
+    const page = getDoc(sid, useStore.getState().sessions[sid].activeDocId!)!;
+    expect(page).toMatchObject({ background: '#0a4d68', backgroundToken: { token: 'sea' } });
+    await save({ ...TOKENS, big: { type: 'dimension', value: '48px' } });
+    expect(getDoc(sid, page.id)!.layers.find((l) => l.type === 'text')).toMatchObject({ fontSize: 48 });
+    expect((await say([{ cmd: 'designer.layer.add_text', args: { text: 'T', x: 0, y: 0, width: 0, style: { fontSize: '{huge}' } } }])).text).toMatch(/no token "\{huge\}"/);
+    expect((await say([{ cmd: 'designer.doc.new', args: { width: 200, height: 200, background: 'blue' } }])).done).toBe(false);
+  });
+
+  it('a design becomes a new entry from the agent too, and stays linked to it', async () => {
+    const res = await run({ cmd: 'library.item.save', on: { session: sid }, args: { mode: 'new', kind: 'design-system', name: 'Cards', doc } }, { caller: 'agent' });
+    expect(res.ok).toBe(true);
+    const made = useStore.getState().library.find((s) => s.name === 'Cards')!;
+    expect(made.kind).toBe('design-system');
+    expect(getDoc(sid, doc)!.library).toMatchObject({ subjectId: made.id, versionId: made.versionId });
+    const again = await run({ cmd: 'library.item.save', on: { session: sid }, args: { mode: 'new', kind: 'design-system', name: 'Cards 2', doc } }, { caller: 'agent' });
+    expect(again.ok).toBe(false);
+    expect(useStore.getState().library.some((s) => s.name === 'Cards 2')).toBe(false);
   });
 });

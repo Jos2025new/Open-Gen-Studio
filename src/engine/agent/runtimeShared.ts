@@ -253,6 +253,7 @@ function planContext(sessionId: string, workspace: Workspace, strict: boolean, o
     defaultSettings: (kind: MediaKind) => get().composer[kind].settings,
     asset: (id: string) => get().assets[id],
     layer: (id: string) => doc?.layers.find((l) => l.id === id),
+    docKit: () => doc?.library?.subjectId,
     suggestModel,
     // Direct keeps session model precedence.
     composerChosen: (kind: MediaKind) => get().composer.agentStyle === 'direct' || Boolean((kind === 'image' || kind === 'video') && agentOf(sessionId, owner).settings?.[kind]) || composerChosen(kind),

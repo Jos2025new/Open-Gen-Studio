@@ -1,7 +1,6 @@
-import { useRef, useState } from 'react';
-import { useStore } from '../../store/store';
+import { useEffect, useRef, useState } from 'react';
 import { downloadBlob } from '../../lib/media';
-import { resolveToken, tokenModes, tokensIn } from '../../engine/libraryTokens';
+import { mergeTokens, resolveToken, tokenModes, tokensIn } from '../../engine/libraryTokens';
 import { tokensFromFile, tokensToFile, withMode, type TokenFormat } from '../../engine/libraryTokensFile';
 import { TOKEN_TYPES, type KitToken, type KitTokens as Tokens, type KitTokenType } from '../../engine/libraryTypes';
 import type { Subject } from '../../engine/types';
@@ -32,9 +31,29 @@ function tokensOf(rows: readonly Row[]): Tokens {
   return out;
 }
 
-/** The design tokens of a design system or brand kit: seen, edited, imported and exported. Save makes a version. */
-export function KitTokens({ item, onDone, types = TOKEN_TYPES }: { item: Subject; onDone: () => void; /** Only these types show; the rest stay as they are. */ types?: readonly KitTokenType[] }) {
+/** The design tokens of a design system or brand kit: seen, edited, imported and exported. Save makes a version; so does leaving with edits. */
+export function KitTokens({ item, onDone, types = TOKEN_TYPES }: { item: Subject; onDone?: () => void; /** Only these types show; the rest stay as they are. */ types?: readonly KitTokenType[] }) {
   const [rows, setRows] = useState(() => rowsOf(item.tokens)), [modes, setModes] = useState(() => tokenModes(item.tokens)), [busy, setBusy] = useState(false), [exporting, setExporting] = useState(false), file = useRef<HTMLInputElement>(null);
+  // Edits are kept over what the entry gets meanwhile (a font uploaded, the agent), and saved when the editor closes.
+  const base = useRef(item.tokens), edits = useRef(rows);
+  edits.current = rows;
+  const mine = () => ({ from: tokensOf(rowsOf(base.current)), to: tokensOf(edits.current) });
+  const store = () => { const { from, to } = mine(); return saveItem({ subjectId: item.id, mode: 'overwrite', space: 'library', by: 'user', tokens: (live) => mergeTokens(from, to, live) }); };
+  useEffect(() => {
+    if (item.tokens === base.current) return;
+    try {
+      const { from, to } = mine(), next = mergeTokens(from, to, tokensOf(rowsOf(item.tokens)));
+      base.current = item.tokens;
+      setRows(rowsOf(next));
+      setModes((ms) => [...new Set([...ms, ...tokenModes(next)])]);
+    } catch { /* a row is half written: the edits are placed when they are saved */ }
+  }, [item.tokens]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => {
+    try {
+      const { from, to } = mine();
+      if (JSON.stringify(from) !== JSON.stringify(to)) store().then(() => toast(`"${item.name}" saved.`, 'success'), (e: Error) => toast(`Not saved: ${e.message}`, 'error'));
+    } catch (e) { toast(`Not saved: ${(e as Error).message}`, 'error'); }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const patch = (i: number, p: Partial<Row>) => setRows((rs) => rs.map((r, k) => (k === i ? { ...r, ...p } : r)));
   const add = (type: KitTokenType) => setRows((rs) => {
     let n = 1;
@@ -75,12 +94,7 @@ export function KitTokens({ item, onDone, types = TOKEN_TYPES }: { item: Subject
   };
   const save = async () => {
     setBusy(true);
-    try {
-      const tokens = tokensOf(rows), live = useStore.getState().library.find((s) => s.id === item.id);
-      if (!live) throw new Error(`No Library item "${item.name}".`);
-      await saveItem({ subjectId: item.id, mode: 'overwrite', space: 'library', by: 'user', tokens });
-      onDone();
-    } catch (e) { toast((e as Error).message, 'error'); } finally { setBusy(false); }
+    try { base.current = (await store()).tokens; onDone?.(); } catch (e) { toast((e as Error).message, 'error'); } finally { setBusy(false); }
   };
   const color = (r: Row, mode?: string) => { const t = Object.fromEntries(rows.map((x) => [x.name, { type: x.type, value: x.value, modes: Object.fromEntries(Object.entries(x.modes ?? {}).filter(([, v]) => v.trim())) }])) as Tokens; return String(resolveToken(t, r.name, mode) ?? r.value); };
   const swatch = (name: string, shown: string, value: string, set: (v: string) => void) => <input type="color" aria-label={`${name} color`} value={/^#[0-9a-f]{6}/i.exec(shown)?.[0].toLowerCase() ?? '#000000'} onChange={(e) => set(e.target.value + (/^#[0-9a-f]{6}([0-9a-f]{2})$/i.exec(value)?.[1] ?? ''))} />;

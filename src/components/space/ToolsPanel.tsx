@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ImagePlus, Zap } from '../ui/icons';
 import { toast, setUi, useStore } from '../../store/store';
 import { uploadFiles } from '../../engine/actions';
+import { PICTURE_ACCEPT } from '../../lib/imports';
 import { OPS } from '../../engine/ops';
 import type { AssetKind, OpId } from '../../engine/types';
 import { OpFields, ViaPick, useOpRun } from '../assets/opRun';
@@ -114,7 +115,7 @@ export function InputSlot({ kind, verb, value, onChange }: { kind: AssetKind; ve
     const id = ids.find((i) => useStore.getState().assets[i]?.kind === kind);
     if (id) onChange(id);
   };
-  const accept = kind === 'image' ? 'image/png,image/jpeg,image/webp' : kind === 'video' ? 'video/mp4,video/webm' : 'audio/*';
+  const accept = kind === 'image' ? PICTURE_ACCEPT : kind === 'video' ? 'video/mp4,video/webm' : 'audio/*';
   return <div className="space-card space-slot" aria-label="Input"
     onDragOver={(e) => { if (e.dataTransfer.types.includes('Files') || e.dataTransfer.types.includes('application/x-ogs-asset')) e.preventDefault(); }}
     onDrop={(e) => {

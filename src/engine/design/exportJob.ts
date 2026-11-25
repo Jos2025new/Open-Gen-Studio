@@ -8,7 +8,7 @@ import { unionBox, type Box } from './doc';
 import { docToSvg, svgToPdf, xmlEscape, type SvgDeps } from './export';
 import { ExportError, exportError } from './exportErrors';
 import { checkRasterExport, drawExport, exportDoc, PREVIEW_MAX_SIDE, type RasterExport } from './exportRaster';
-import { canEmbedInPdf, collectFonts, fontFaceCss, woffToSfnt } from './exportText';
+import { canEmbedInPdf, collectFonts, fontFaceCss, isSlanted, woffToSfnt } from './exportText';
 import { printPixelRatio, printPreflight } from './exportPrint';
 import { autoSuffix, DEFAULT_JPEG_QUALITY, pageLayout, pdfPage, type ExportSettings } from './exportSettings';
 import type { ObjectPick } from './objectSelection';
@@ -236,14 +236,14 @@ async function renderOutput(doc: DesignDoc, settings: ExportSettings, target: Ex
     const texts = renderDoc.layers.filter((l): l is Extract<typeof l, { type: 'text' }> => l.type === 'text' && l.visible);
     const live = (settings.text ?? 'fonts') === 'fonts' && texts.length > 0;
     const { found, missing } = live ? await collectFonts(texts, deps.fontFile) : { found: new Map(), missing: [] as string[] };
-    if (format === 'pdf') for (const [k, f] of found) if (!canEmbedInPdf(f.woff)) { found.delete(k); missing.push(f.family); }
+    if (format === 'pdf') for (const [k, f] of found) if (!canEmbedInPdf(f.woff)) { found.delete(k); missing.push(f.family); } else if (isSlanted(f.italic, f.woff)) deps.notice?.(`“${f.family}” has no italic file, so the PDF shows it upright. Text as paths keeps the slant.`);
     missing.forEach((family) => deps.notice?.(`“${family}” is a system font the app cannot read, so its text keeps the font name.`));
     const svg = selection || options.mask ? await maskedSvg(renderDoc, options, ratio, settings.svg?.metadata !== false) : await docToSvg(renderDoc, pdfDeps, options, {
       ...settings.svg, text: settings.text ?? 'fonts', ...(format === 'pdf' ? { hidden: false, filters: false } : {}), fontFaces: format === 'svg' && live ? fontFaceCss(found.values()) : undefined,
     });
     signal?.throwIfAborted();
     bytes = format === 'pdf' ? await svgToPdf(svg, options.width, options.height, page, settings.print,
-      [...found.values()].map((f) => ({ family: f.family, weight: f.weight, sfnt: woffToSfnt(f.woff) }))) : new Blob([svg], { type: 'image/svg+xml' });
+      [...found.values()].map((f) => ({ family: f.family, weight: f.weight, italic: f.italic, sfnt: woffToSfnt(f.woff) }))) : new Blob([svg], { type: 'image/svg+xml' });
   }
   signal?.throwIfAborted();
   const extension = bytes.type === 'image/jpeg' ? 'jpg' : format;

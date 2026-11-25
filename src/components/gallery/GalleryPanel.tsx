@@ -7,6 +7,7 @@ import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { setUserHidden } from '../../store/userHidden';
 import { deleteSubject, SUBJECT_KINDS } from '../../engine/actions';
 import { isKit, KIT_KINDS, KIT_KIND_LIST, type KitKind, type KitVersionRef } from '../../engine/libraryTypes';
+import { kitColors } from '../../engine/activeKit';
 import { kitUsedBy, subjectAssetIds } from '../../engine/libraryGraph';
 import { createItem, deleteItem, libraryToDesigner, libraryToStudio, readKitVersion, restoreItemVersion, saveItem } from '../../engine/libraryVersions';
 import { insertComponent } from '../../engine/libraryInsert';
@@ -254,8 +255,9 @@ function LibraryTile({ item, view, cells, onOpenKit }: { item: Subject; view: It
     <Button size="sm" variant="secondary" className={className} disabled={!kit && !cover} onClick={(e) => { e.stopPropagation(); open(); }}>Open</Button>
   );
   const glyphStyle = !cover && (kit || view === 'card') && view !== 'tile' ? { display: 'grid', placeItems: 'center', color: 'var(--text-3)' } : undefined;
-  // With no image to tell it by, its name shows without the pointer over it.
-  const thumb = cover ? <AssetMedia assetId={cover} hoverPlay={view !== 'list'} /> : view === 'card' ? <span className="glyph-named"><KindIcon size={24} /><small>{title}</small></span> : kit ? <KindIcon size={view === 'list' ? 16 : 24} /> : null;
+  // With no image to tell it by, its name shows without the pointer over it, and its colors.
+  const colors = kit && !cover ? kitColors(item).slice(0, 8) : [];
+  const thumb = cover ? <AssetMedia assetId={cover} hoverPlay={view !== 'list'} /> : view === 'card' ? <span className="glyph-named">{colors.length ? <span className="glyph-colors">{colors.map((c) => <i key={c} style={{ background: c }} />)}</span> : <KindIcon size={24} />}<small>{title}</small></span> : kit ? <KindIcon size={view === 'list' ? 16 : 24} /> : null;
   if (view === 'list') {
     return <div className={`g-tile lib-tile pc-row${item.userHidden ? ' is-hidden-item' : ''}`}>
       <button type="button" className="g-open pc-thumb" style={glyphStyle} aria-label={`Open ${title}`} onClick={open}>{thumb}</button>

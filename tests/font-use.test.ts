@@ -69,7 +69,7 @@ it('Fonts shows how many designs use each; a click lists them and goes to one', 
   click([...document.querySelectorAll('[role="menuitem"]')].find((b) => b.textContent?.startsWith('Fonts')));
   expect(font('Pebble')?.textContent).toContain('2 designs');
   expect(font('Reed')?.textContent).toContain('Not used');
-  expect(font('Kelp')?.textContent).toContain('Not used');
+  expect(font('Kelp')?.textContent).toContain('No font file');
   // A font of the app that designs use shows as well, with nothing to remove.
   expect(font('Inter')?.textContent).toContain('2 designs');
   click(font('Pebble')?.querySelector('.g-open'));

@@ -264,7 +264,7 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
     const reason = AGENT_HIDDEN[command(step.cmd)?.id ?? step.cmd];
     if (reason) return { text: `Step ${i + 1}: "${step.cmd}" is not available to the agent: ${reason}. Nothing ran.`, done: false };
     // A Library step before it may be the one that makes the token.
-    const tokens = areaOf(step.cmd) === 'designer' && !seq.slice(0, i).some((p) => areaOf(p.cmd) === 'library') ? tokenProblem(step.args) : null;
+    const tokens = areaOf(step.cmd) === 'designer' && !seq.slice(0, i).some((p) => areaOf(p.cmd) === 'library') ? tokenProblem(step.args, (getDoc(sessionId, step.on?.doc ?? '') ?? activeDoc(sessionId))?.library?.subjectId) : null;
     if (tokens) return { text: `Step ${i + 1}: ${tokens} Nothing ran.`, done: false };
   }
   const doc = activeDoc(sessionId);

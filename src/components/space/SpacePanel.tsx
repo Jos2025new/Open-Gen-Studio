@@ -3,6 +3,7 @@ import { useRef } from 'react';
 import { Paperclip } from '../ui/icons';
 import { setComposer, toast, useStore } from '../../store/store';
 import { attachFiles } from '../../engine/actions';
+import { PICTURE_ACCEPT } from '../../lib/imports';
 import { attachProblem } from './actionRoute';
 import { hasImageTwin } from './actionGo';
 import type { ComposerMode, MediaKind } from '../../engine/types';
@@ -69,7 +70,7 @@ export function SpacePanel() {
       <div className="space-card">
         <span className="space-card-label">References</span>
         <AttachStrip ids={live} />
-        <input ref={fileRef} type="file" hidden multiple accept={['image/png,image/jpeg,image/webp', slots?.clips || slots?.refVideos || slots?.mixedRefs ? 'video/mp4,video/webm' : '', takesAudio ? 'audio/*' : '', mode === 'model3d' ? '.glb,model/gltf-binary' : ''].filter(Boolean).join(',')} onChange={(e) => { onFiles(e.target.files); e.target.value = ''; }} />
+        <input ref={fileRef} type="file" hidden multiple accept={[PICTURE_ACCEPT, slots?.clips || slots?.refVideos || slots?.mixedRefs ? 'video/mp4,video/webm' : '', takesAudio ? 'audio/*' : '', mode === 'model3d' ? '.glb,model/gltf-binary' : ''].filter(Boolean).join(',')} onChange={(e) => { onFiles(e.target.files); e.target.value = ''; }} />
         <button type="button" className="space-add" disabled={!takesInput && !takesAudio} onClick={() => fileRef.current?.click()}>
           <Paperclip size={14} />{takesInput || takesAudio ? 'Add references' : 'This model takes no input files'}
         </button>

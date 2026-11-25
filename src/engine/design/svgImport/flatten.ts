@@ -3,15 +3,15 @@ import { sanitizeSvg } from './sanitize';
 import { pageSetup } from './transforms';
 import { unsafeUseExpansion } from './useBudget';
 
-/** A whole SVG as one PNG (the node area takes images, not layers): sanitized first, then drawn by the browser. */
-export async function flattenSvg(text: string, maxSide = 4096): Promise<Blob | string> {
+/** A whole SVG as one PNG (images, not layers): sanitized first, then drawn by the browser. It has no pixels of its own, so a small one (an icon, a logo) is drawn large. */
+export async function flattenSvg(text: string, maxSide = 4096, minSide = 1024): Promise<Blob | string> {
   const clean = sanitizeSvg(text);
   if ('error' in clean) return clean.error;
   const { root } = clean;
   if (unsafeUseExpansion(root)) return 'SVG use expansion limit reached; rasterization stopped.';
   const page = pageSetup(root);
   if (!root.getAttribute('viewBox')) root.setAttribute('viewBox', `0 0 ${page.width} ${page.height}`);
-  const k = Math.min(1, maxSide / Math.max(page.width, page.height));
+  const side = Math.max(page.width, page.height), k = Math.min(maxSide / side, Math.max(1, minSide / side));
   const w = Math.max(1, Math.round(page.width * k)), h = Math.max(1, Math.round(page.height * k));
   root.setAttribute('width', String(w));
   root.setAttribute('height', String(h));

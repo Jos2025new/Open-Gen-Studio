@@ -5,6 +5,8 @@ import { saveItem } from './libraryVersions';
 
 /* The user's own fonts: files kept with a Library entry, usable in the Designer and in its exports. */
 
+const first = (v: unknown) => String(v).split(',')[0].trim();
+
 /** Adds font files to an entry: their family becomes one of its font tokens. Returns the families added. */
 export async function addFonts(subjectId: string, files: readonly File[]): Promise<string[]> {
   return putFonts(subjectId, await storeFonts(files), 'user');
@@ -16,15 +18,18 @@ export async function putFonts(subjectId: string, fonts: readonly KitFont[], by:
   const live = useStore.getState().library.find((s) => s.id === subjectId);
   if (!live) throw new Error('The Library entry is gone.');
   if (live.kind !== 'brand-kit' && live.kind !== 'design-system') throw new Error('Fonts go in a brand kit or a design system.');
-  const tokens: KitTokens = { ...live.tokens }, families = [...new Set(fonts.map((f) => f.family))];
-  for (const family of families) {
-    if (Object.values(tokens).some((t) => t.type === 'fontFamily' && String(t.value).split(',')[0].trim() === family)) continue;
-    let n = 1;
-    while (tokens[`font.${n}`]) n++;
-    tokens[`font.${n}`] = { type: 'fontFamily', value: family };
-  }
-  await saveItem({ subjectId, mode: 'overwrite', space: 'library', by, tokens });
-  useStore.setState((st) => ({ library: st.library.map((s) => (s.id === subjectId ? { ...s, fonts: withFonts(s.fonts, fonts) } : s)) }));
+  const families = [...new Set(fonts.map((f) => f.family))];
+  const tokens = (prev: KitTokens) => {
+    const next: KitTokens = { ...prev };
+    for (const family of families) {
+      if (Object.values(next).some((t) => t.type === 'fontFamily' && first(t.value) === family)) continue;
+      let n = 1;
+      while (next[`font.${n}`]) n++;
+      next[`font.${n}`] = { type: 'fontFamily', value: family };
+    }
+    return next;
+  };
+  await saveItem({ subjectId, mode: 'overwrite', space: 'library', by, tokens, fonts: (prev) => withFonts(prev, fonts) });
   showFonts();
   return families;
 }
@@ -36,7 +41,10 @@ export const fontsOf = (ids: readonly string[]): KitFont[] => ids.map((id) => {
   return f;
 });
 
-/** Removes a family's files from the entry; its versions keep working with the token's name. */
-export function removeFont(subjectId: string, family: string): void {
-  useStore.setState((st) => ({ library: st.library.map((s) => (s.id === subjectId ? { ...s, fonts: (s.fonts ?? []).filter((f) => f.family !== family) } : s)) }));
+/** Removes a family's files from the entry, and the token its upload made when no other token points to it; Versions brings both back. */
+export async function removeFont(subjectId: string, family: string): Promise<void> {
+  const tokens = (prev: KitTokens) => Object.fromEntries(Object.entries(prev).filter(([name, t]) =>
+    !(/^font\.\d+$/.test(name) && t.type === 'fontFamily' && first(t.value) === family && !Object.values(prev).some((o) => [o.value, ...Object.values(o.modes ?? {})].some((v) => v === `{${name}}`)))));
+  await saveItem({ subjectId, mode: 'overwrite', space: 'library', by: 'user', tokens, fonts: (prev) => prev.filter((f) => f.family !== family) });
+  showFonts();
 }

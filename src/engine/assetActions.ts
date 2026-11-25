@@ -4,6 +4,7 @@ import { GLB_MIME, validateGlb } from '../lib/model3d';
 import { uid } from '../lib/id';
 import { deleteAssetBlobs, putAssetBlob } from '../lib/idb';
 import { probeMedia } from '../lib/media';
+import { prepareImportFile } from '../lib/imports';
 import { runsGeneration } from './flow/graph';
 import { placeFor } from './place';
 import { MEDIA_KINDS, type Asset, type GraphNode } from './types';
@@ -114,7 +115,10 @@ export async function uploadFiles(files: File[]): Promise<string[]> {
   const st = get();
   const sessionId = st.activeSessionId;
   const out: Asset[] = [];
-  for (const f of files) {
+  for (const given of files) {
+    // SVG, HEIC and EPS become a PNG here, whichever way they came in.
+    const f = await prepareImportFile(given);
+    if (typeof f === 'string') { toast(`${given.name}: ${f}`, 'error'); continue; }
     const is3d = /\.glb$/i.test(f.name);
     if (!is3d && !AUDIO_MIME.test(f.type) && !/^image\/(png|jpeg|webp|gif)$|^video\/(mp4|webm|quicktime)$/.test(f.type)) {
       toast(`${f.name}: unsupported file type`, 'error');

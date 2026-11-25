@@ -37,7 +37,7 @@ export function kitSections(s: Subject): KitSection[] {
 
 const isItem = (n: GraphNode) => n.data.kind === 'asset' || n.data.kind === 'text';
 /** The images and texts of a section. */
-export function sectionNodes(s: Subject, section: KitSection): GraphNode[] {
+export function sectionNodes(s: Pick<Subject, 'kind' | 'graph'>, section: Pick<KitSection, 'title'>): GraphNode[] {
   const home = (n: GraphNode) => (n.data.kind === 'text' ? 'Guidelines' : HOME[s.kind ?? ''] ?? '');
   return (s.graph?.nodes ?? []).filter((n) => isItem(n) && same(n.data.section ?? home(n), section.title));
 }
@@ -55,13 +55,13 @@ const sectionOf = (subjectId: string, title: string): string => {
 
 /** Adds images and texts to a section; a new name makes a new category. Shared by the page and the agent. */
 export async function addToSection(subjectId: string, title: string, add: { assetIds?: readonly string[]; texts?: readonly string[] }, by: 'user' | 'agent' = 'user'): Promise<Subject> {
-  const section = sectionOf(subjectId, title), assets = useStore.getState().assets;
+  const section = sectionOf(subjectId, title), { assets, library } = useStore.getState(), entry = library.find((x) => x.id === subjectId)!;
   const texts = (add.texts ?? []).map((t) => t.trim()).filter(Boolean);
   if (!add.assetIds?.length && !texts.length) throw new Error('Nothing to add.');
   return saveItem({
     subjectId, mode: 'overwrite', space: 'library', by,
     graph: (g) => {
-      const has = new Set((g?.nodes ?? []).flatMap((n) => (n.data.kind === 'asset' && n.data.section === section && n.data.assetId ? [n.data.assetId] : [])));
+      const has = new Set(sectionNodes({ kind: entry.kind, graph: g }, { title: section }).flatMap((n) => (n.data.kind === 'asset' && n.data.assetId ? [n.data.assetId] : [])));
       const node = (data: GraphNode['data']): GraphNode => ({ id: uid('nd'), position: { x: 0, y: 0 }, data });
       return { ...(g ?? { edges: [] }), nodes: [
         ...(g?.nodes ?? []),

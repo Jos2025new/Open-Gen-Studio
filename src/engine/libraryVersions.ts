@@ -12,7 +12,7 @@ import { NODE_WIDTH } from './flow/graph-layout';
 import { boardLayout, fromOrigin } from './libraryLayout';
 import { copyDocPixels, expectedRasterIds, readKitVersion, remapDoc, rKey, vKey, withCleanup, writeVerified, type KitVersionSnapshot } from './librarySnapshot';
 import { validateTokens } from './libraryTokens';
-import { isKit, KIT_KINDS, type KitActor, type KitKind, type KitTokens, type KitVersionRef, type LibrarySpace } from './libraryTypes';
+import { isKit, KIT_KINDS, type KitActor, type KitFont, type KitKind, type KitTokens, type KitVersionRef, type LibrarySpace } from './libraryTypes';
 import type { Asset, DesignDoc, Graph, Subject } from './types';
 
 export { cleanupKeys, copyDocPixels, expectedRasterIds, readKitVersion, type KitVersionSnapshot } from './librarySnapshot';
@@ -85,13 +85,15 @@ function optionalFields(c: { description?: string; graph?: Graph; kits?: string[
 /** Single verified version writer shared by create, save, and restore: writes blob, re-reads live store, cleans up on error. */
 async function commitVersion(
   entry: Subject,
-  c: { mode: 'append' | 'create'; at: number; by: KitActor; space: LibrarySpace; label?: string; name?: string; description?: string; graph?: Graph; kits?: string[]; tokens?: KitTokens; doc?: DesignDoc; docRev?: string; storedRasterIds?: string[]; clearsDraft?: boolean; checkAssetIds?: string[]; newKitIds?: readonly string[]; createSessionId?: string; copyAssets?: Record<string, Asset>; liveRevs?: ReadonlyMap<string, number> },
+  c: { mode: 'append' | 'create'; at: number; by: KitActor; space: LibrarySpace; label?: string; name?: string; description?: string; graph?: Graph; kits?: string[]; tokens?: KitTokens; fonts?: KitFont[]; sections?: string[]; doc?: DesignDoc; docRev?: string; storedRasterIds?: string[]; clearsDraft?: boolean; checkAssetIds?: string[]; newKitIds?: readonly string[]; createSessionId?: string; copyAssets?: Record<string, Asset>; liveRevs?: ReadonlyMap<string, number> },
   written: string[],
 ): Promise<Subject> {
   const verId = uid('lv'), groupIds = docGroupIds(c.doc), fields = optionalFields({ description: c.description, graph: c.graph, kits: c.kits, tokens: c.tokens, docRev: c.docRev, groupIds });
   const revs = graphImageRevs(fields.graph);
   const snap: KitVersionSnapshot = { id: verId, subjectId: entry.id, at: c.at, by: c.by, space: c.space, ...(c.label ? { label: c.label } : {}), ...(fields.graph ? { graph: fields.graph } : {}), ...(fields.kits ? { kits: fields.kits } : {}), ...(fields.tokens ? { tokens: fields.tokens } : {}), ...(c.doc ? { doc: c.doc, ...(c.docRev ? { docRev: c.docRev } : {}), ...(c.storedRasterIds ? { storedRasterIds: c.storedRasterIds } : {}) } : {}) };
   if (Object.keys(revs).length) snap.revs = revs;
+  const kept = get().library.find((x) => x.id === entry.id) ?? entry, fonts = c.fonts ?? kept.fonts, sections = c.sections ?? kept.sections;
+  if (entry.kind !== 'moodboard') Object.assign(snap, { fonts: fonts ?? [], sections: sections ?? [] });
   const encoded = new TextEncoder().encode(JSON.stringify(snap));
   await writeVerified(vKey(verId), new Blob([encoded], { type: 'application/json' }), encoded, written);
   const ref: KitVersionRef = { id: verId, at: c.at, by: c.by, space: c.space, ...(c.label ? { label: c.label } : {}), assetIds: snapshotAssets(entry, fields.graph, c.doc), ...(c.docRev ? { docRev: c.docRev } : {}), ...(groupIds?.length ? { groupIds } : {}) };
@@ -108,7 +110,7 @@ async function commitVersion(
     const live = st.library.find((x) => x.id === entry.id);
     if (!live || !isKit(live)) return {};
     const { graph: _g, kits: _k, tokens: _t, docRev: _dr, groupIds: _gi, description: _d, ...base } = live;
-    updated = { ...base, name: c.name ?? live.name, ...optionalFields({ ...fields, description: c.description !== undefined ? c.description : live.description }), draft: c.clearsDraft ? false : live.draft, versionId: verId, versions: [...(live.versions ?? []), ref], origin: live.origin };
+    updated = { ...base, name: c.name ?? live.name, ...optionalFields({ ...fields, description: c.description !== undefined ? c.description : live.description }), ...(c.fonts ? { fonts: c.fonts } : {}), ...(c.sections ? { sections: c.sections } : {}), draft: c.clearsDraft ? false : live.draft, versionId: verId, versions: [...(live.versions ?? []), ref], origin: live.origin };
     return {
       library: st.library.map((x) => (x.id === entry.id ? updated! : x)),
       ...(c.copyAssets ? { assets: { ...st.assets, ...c.copyAssets } } : {}),
@@ -214,7 +216,7 @@ function copyName(name: string): string {
 
 export function saveItem(opts: {
   subjectId: string; mode: 'overwrite' | 'copy'; space: LibrarySpace; by: KitActor; sessionId?: string; docId?: string;
-  label?: string; name?: string; description?: string; graph?: Graph | ((prev?: Graph) => Graph); kits?: string[]; tokens?: KitTokens;
+  label?: string; name?: string; description?: string; graph?: Graph | ((prev?: Graph) => Graph); kits?: string[]; tokens?: KitTokens | ((prev: KitTokens) => KitTokens); fonts?: (prev: KitFont[]) => KitFont[];
 }): Promise<Subject> {
   return serialize(opts.subjectId, async () => {
     const cur = requireItem(opts.subjectId), kind = cur.kind as KitKind, targetId = opts.mode === 'copy' ? uid('sub') : cur.id;
@@ -224,7 +226,7 @@ export function saveItem(opts: {
     // A linked design writes back what it changed; a loose one only starts an entry that is still empty.
     const back = workDoc && opts.graph === undefined && (owner === cur.id ? workDoc.board || !hasGraph(cur.graph) : !hasGraph(cur.graph)) ? graphFromDoc(cur.graph, owner === cur.id ? workDoc : { ...workDoc, board: undefined }, kind === 'moodboard') : undefined;
     const graph = typeof opts.graph === 'function' ? opts.graph(cur.graph) : opts.graph !== undefined ? fromOrigin(opts.graph) : back ? back.graph : cur.graph;
-    const kits = opts.kits !== undefined ? opts.kits : cur.kits, tokens = opts.tokens !== undefined ? opts.tokens : cur.tokens;
+    const kits = opts.kits !== undefined ? opts.kits : cur.kits, tokens = typeof opts.tokens === 'function' ? opts.tokens(cur.tokens ?? {}) : opts.tokens !== undefined ? opts.tokens : cur.tokens;
     const newKitIds = kits?.filter((id) => !cur.kits?.includes(id));
     const checkAssetIds = validateContent(kind, targetId, { graph, kits, tokens, checkAssets: opts.graph !== undefined, newKitIds });
     const session = opts.sessionId ? get().sessions[opts.sessionId] : undefined;
@@ -251,7 +253,7 @@ export function saveItem(opts: {
         mode: opts.mode === 'copy' ? 'create' : 'append', at, by: opts.by, space: opts.space, label: opts.label,
         name: opts.mode === 'overwrite' && opts.name?.trim() ? opts.name.trim() : undefined,
         description: opts.description !== undefined ? opts.description : (opts.mode === 'copy' ? cur.description : undefined),
-        graph, kits, tokens, doc: storedDoc, docRev, storedRasterIds, clearsDraft: opts.by === 'user', checkAssetIds, newKitIds,
+        graph, kits, tokens, fonts: opts.fonts?.(cur.fonts ?? []), doc: storedDoc, docRev, storedRasterIds, clearsDraft: opts.by === 'user', checkAssetIds, newKitIds,
       }, written);
       if (opts.mode === 'overwrite' && workDoc && opts.sessionId) setDoc(opts.sessionId, workDoc.id, (d) => (back?.board ? { ...d, board: { ...back.board, ...(d.board ? { x: d.board.x, y: d.board.y } : {}) } } : d));
       if (opts.mode === 'overwrite' && workDoc && opts.sessionId && workDoc.library?.subjectId === cur.id) {
@@ -260,6 +262,17 @@ export function saveItem(opts: {
       return saved;
     });
   });
+}
+
+/** A design of its own becomes a new entry and stays linked to it. */
+export async function saveAsNew(o: { sessionId: string; docId: string; name: string; kind: KitKind; space: LibrarySpace; by: KitActor; description?: string; label?: string }): Promise<Subject> {
+  const { kind, space, by, sessionId, docId, name, description } = o;
+  const { subject } = await createItem({ name, kind, space, by, sessionId, description, draft: by === 'user' || space === 'studio', open: false });
+  try {
+    const saved = await saveItem({ subjectId: subject.id, mode: 'overwrite', space, by, sessionId, docId, name, label: o.label });
+    setDoc(sessionId, docId, (d) => ({ ...d, name: saved.name, library: { subjectId: saved.id, versionId: saved.versionId!, ...(saved.docRev ? { docRev: saved.docRev } : {}), ...(space === 'studio' ? { view: 'studio' as const } : {}) } }));
+    return saved;
+  } catch (err) { await deleteItem(subject.id); throw err; }
 }
 
 async function restoreGraphImages(snap: KitVersionSnapshot, written: string[]) {
@@ -301,7 +314,7 @@ export function restoreItemVersion(opts: { subjectId: string; versionId: string;
         const restored = await restoreGraphImages(snap, images);
         return commitVersion(cur, {
           mode: 'append', at: Date.now(), by: opts.by, space: opts.space, label: opts.label ?? `Restore ${opts.versionId}`,
-          ...restored, kits: snap.kits, tokens: snap.tokens,
+          ...restored, kits: snap.kits, tokens: snap.tokens, fonts: snap.fonts, sections: snap.sections,
           docRev: snap.doc ? (snap.docRev ?? uid('drev')) : undefined, storedRasterIds: snap.storedRasterIds, clearsDraft: opts.by === 'user',
         }, written);
       });

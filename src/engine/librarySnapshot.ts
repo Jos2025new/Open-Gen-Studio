@@ -1,13 +1,15 @@
 import { uid } from '../lib/id';
 import { blobDb } from '../lib/idb';
 import { isUnreadable, rasterBufferIds } from './design/raster';
-import type { KitActor, KitTokens, LibrarySpace } from './libraryTypes';
+import type { KitActor, KitFont, KitTokens, LibrarySpace } from './libraryTypes';
 import type { DesignDoc, Graph, Layer } from './types';
 
 export interface KitVersionSnapshot {
   id: string; subjectId: string; at: number; by: KitActor; space: LibrarySpace;
   label?: string; graph?: Graph; kits?: string[]; tokens?: KitTokens; doc?: DesignDoc;
   docRev?: string; storedRasterIds?: string[]; revs?: Record<string, number>;
+  /** Versions saved before 2026-11-25 carry neither: restoring one keeps those of the entry. */
+  fonts?: KitFont[]; sections?: string[];
 }
 export const rKey = (id: string) => `raster:${id}`, vKey = (id: string) => `libver:${id}`;
 

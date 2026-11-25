@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { resetStore } from './library-kits-final-fixtures';
+import { hoisted, resetStore } from './library-kits-final-fixtures';
 import { fontNames, fontStack } from '../src/engine/design/doc';
-import { canEmbedInPdf, canOutline, fontFaceCss, fontInfo, textPathData, woffToSfnt } from '../src/engine/design/exportText';
+import { canEmbedInPdf, canOutline, collectFonts, fontFaceCss, fontInfo, isSlanted, textPathData, woffToSfnt } from '../src/engine/design/exportText';
 import { newTextLayer } from '../src/engine/design/doc';
+import { fontFor } from '../src/engine/design/textLayout';
 import { createItem, saveItem } from '../src/engine/libraryVersions';
 import { loadFontFile } from '../src/engine/fontFiles';
 import { addFonts, removeFont } from '../src/engine/ownFonts';
@@ -54,8 +55,9 @@ describe('own fonts', () => {
     await addFonts(kit, [new File([ttf], 'again.ttf')]);
     expect(item().fonts).toMatchObject([{ name: 'again.ttf' }]);
     expect(Object.keys(item().tokens!)).toEqual(['sea', 'font.1']);
-    removeFont(kit, 'Inter');
+    await removeFont(kit, 'Inter');
     expect(item().fonts).toEqual([]);
+    expect(Object.keys(item().tokens!)).toEqual(['sea']);
     await expect(addFonts(kit, [new File(['nope'], 'x.ttf')])).rejects.toThrow('not a TTF, OTF or WOFF');
   });
 
@@ -119,5 +121,41 @@ describe('own fonts', () => {
     expect(fontStack('Playfair Display')).toMatch(/^'Playfair Display', /);
     expect(fontStack("a';}<b")).toMatch(/^'ab', /);
     expect(fontNames([{ id: 'x', name: 'x', refAssetIds: [], tokens: { t: { type: 'fontFamily', value: 'Lora, serif' }, s: { type: 'fontFamily', value: 'Serif' } } }] as never)).toEqual(['Lora']);
+  });
+
+  it('italics: the file of that slant is taken, and a font without one is slanted in paths', async () => {
+    const font = (id: string, italic?: boolean) => ({ id, family: 'Marea Sans', weight: 400, name: `${id}.ttf`, ...(italic ? { italic } : {}) });
+    const stored = await addFonts(kit, [new File([ttf], 'a.ttf')]);
+    expect(stored).toEqual(['Inter']);
+    const l = { ...newTextLayer('T', 'Hi', { x: 0, y: 0, width: 0 }), fontFamily: 'Inter', fontWeight: 700 }, t = { lines: ['Hi'], width: 50, lineHeightPx: 20 };
+    expect(fontFor(l)).not.toMatch(/^italic/);
+    expect(fontFor({ ...l, italic: true })).toMatch(/^italic 700 /);
+    const [plain] = await textPathData(ttf, l, t, 15), [slanted] = await textPathData(ttf, { ...l, italic: true }, t, 15);
+    expect(slanted).not.toEqual(plain);
+    // The baseline (y = 15 + …) does not move: the first point of H sits on it.
+    const first = (d: string) => /^M(-?[\d.]+)[ ,]?(-?[\d.]+)/.exec(d)!.slice(1).map(Number);
+    expect(first(slanted)[1]).toBe(first(plain)[1]);
+    expect(isSlanted(true, ttf)).toBe(true);
+    expect(isSlanted(false, ttf)).toBe(false);
+    expect(fontFaceCss([{ family: 'X', weight: 700, italic: true, woff: ttf }])).not.toContain('font-style');
+    const seen: string[] = [];
+    await collectFonts([l, { ...l, italic: true }], async (f, w, i) => { seen.push(`${f} ${w} ${Boolean(i)}`); return ttf; });
+    expect(seen).toEqual(['Inter 700 false', 'Inter 700 true']);
+    useStore.setState((st) => ({ library: st.library.map((s) => (s.id === kit ? { ...s, fonts: [font('font_up'), font('font_it', true)] } : s)) }));
+    hoisted.blobs.set('font:font_up', new Blob([new Uint8Array([1])]));
+    hoisted.blobs.set('font:font_it', new Blob([new Uint8Array([2])]));
+    expect([...(await loadFontFile('Marea Sans', 400))!]).toEqual([1]);
+    expect([...(await loadFontFile('Marea Sans', 400, true))!]).toEqual([2]);
+  });
+
+  it('a removed font leaves the page too', async () => {
+    const faces = new Set<unknown>();
+    vi.stubGlobal('document', { fonts: { add: (f: unknown) => faces.add(f), delete: (f: unknown) => faces.delete(f), dispatchEvent: () => true } });
+    await addFonts(kit, [new File([ttf], 'brand.ttf')]);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(faces.size).toBe(1);
+    await removeFont(kit, 'Inter');
+    expect(faces.size).toBe(0);
+    vi.unstubAllGlobals();
   });
 });
