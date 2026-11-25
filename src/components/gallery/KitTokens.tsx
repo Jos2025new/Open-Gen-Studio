@@ -73,7 +73,7 @@ export function KitTokens({ item, onDone, types = TOKEN_TYPES }: { item: Subject
         {rows.map((r, i) => types.includes(r.type) && (
           <div key={i} className="kit-token">
             {r.type === 'color'
-              ? <input type="color" aria-label={`${r.name} color`} value={/^#[0-9a-f]{6}$/i.test(color(r)) ? color(r) : '#000000'} onChange={(e) => patch(i, { value: e.target.value })} />
+              ? <input type="color" aria-label={`${r.name} color`} value={/^#[0-9a-f]{6}/i.exec(color(r))?.[0].toLowerCase() ?? '#000000'} onChange={(e) => patch(i, { value: e.target.value + (/^#[0-9a-f]{6}([0-9a-f]{2})$/i.exec(r.value)?.[1] ?? '') })} />
               : <span className="kit-token-type faint">{LABELS[r.type]}</span>}
             <input aria-label="Token name" value={r.name} disabled={busy} onChange={(e) => patch(i, { name: e.target.value })} />
             <input aria-label={`${r.name} value`} value={r.value} disabled={busy} onChange={(e) => patch(i, { value: e.target.value })} />
