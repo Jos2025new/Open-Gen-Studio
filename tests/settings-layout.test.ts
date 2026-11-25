@@ -52,7 +52,7 @@ it('each section groups its rows under titled cards, and rows lead with an icon'
   ]);
   expect(providerRows.every((label) => label.querySelector('.set-row-icon'))).toBe(true);
   tab('Data');
-  expect(groups()).toEqual(['Storage', 'Reset']);
+  expect(groups()).toEqual(['Library', 'Storage', 'Reset']);
 });
 
 it('Look shows each base as a small picture in its own colours; System shows dark and light halves', () => {
