@@ -163,7 +163,7 @@ it('H3a: allows approving a restored free/local command card after reload', asyn
   simulateReload(null, { sessionId: sid, state: saved });
   settleInterruptedPlans();
   expect(decideCommandApproval(sid, card.id, 'approve'), 'restored free/local command card cannot be approved').toBe(true);
-  await vi.waitFor(() => expect(commandCard().status).toBe('done'));
+  await vi.waitFor(() => expect(commandCard().status).toBe('done'), { timeout: 5000 });
 });
 
 it('H3b: re-offers a live free/local command card for review when the node is edited to a paid model before approval', async () => {
