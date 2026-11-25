@@ -37,11 +37,11 @@ import { CanvasNavigation, NODE_MAX_ZOOM, NODE_MIN_ZOOM, type NodeTool } from '.
 import { useCutTool } from './CutTool';
 import { GroupNode, Operations } from './Operations';
 import { DeleteRequestContext, LinkBar, useDeleteRequest } from './LinkBar';
-import { copyNodes, createEmptyGroup, groupNodes, hasNodeClipboard, pasteNodes, ungroup, wholeGroup } from '../../engine/flow/arrange';
+import { copyNodes, createEmptyGroup, groupChain, groupNodes, groupSubtree, hasNodeClipboard, pasteNodes, ungroup, wholeGroup } from '../../engine/flow/arrange';
 import { liveGroupsMap, useNodeDrag } from './useNodeDrag';
 import { EmbeddedControls } from '../studio/EmbeddedControls';
 import { loadNodeTool } from './nodeToolStorage';
-import { BoxSelectRect, NodeContextMenu } from './NodeCanvasMenus';
+import { BoxSelectRect, GroupContextMenu, NodeContextMenu } from './NodeCanvasMenus';
 import { NodeEmptyState } from './NodeEmptyState';
 import { useBoardFocus } from '../studio/useBoardFocus';
 import { closedGroupNotices, isNodeSelectable, useCanvasElements, useCanvasGroups } from './CanvasElements';
@@ -50,6 +50,7 @@ import { useCanvasGraphs, useCanvasNotices } from './useCanvasNotices';
 import { useLoadedIds } from './useLoadedIds';
 
 const nodeTypes = { studio: StudioNode, group: GroupNode };
+const inField = (t: EventTarget | null) => t instanceof Element && Boolean(t.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])'));
 
 /** `embedded`: Studio's board. A smaller canvas: no Add node, Operations, import from chat or top bar; shortcuts only while focus is inside it. */
 function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?: boolean }) {
@@ -176,10 +177,9 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   const groupNotices = useMemo(() => closedGroupNotices(revision.groups, closed, notices), [revision.groups, closed, notices]);
   const { frames, hidden } = useCanvasGroups(graph, measured, sessionId, closed, groupNotices, toggleGroup, dragPos, selected);
   const jumpToNode = useCallback((id: string) => {
-    const groups = revision.groups?.filter(g => g.nodeIds.includes(id)) ?? [];
-    if (groups.some(g => closed.has(g.id))) {
-      setClosed(prev => new Set([...prev].filter(gid => !groups.some(g => g.id === gid))));
-    }
+    const owner = revision.groups?.find((g) => g.nodeIds.includes(id));
+    const chain = owner ? groupChain(revision.groups, owner.id) : [];
+    if (chain.some((g) => closed.has(g.id))) setClosed((prev) => new Set([...prev].filter((gid) => !chain.some((g) => g.id === gid))));
     selectNodes([id]);
     focusNodes(sessionId, [id]);
   }, [revision.groups, closed, selectNodes, sessionId]);
@@ -194,12 +194,11 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
       const removed: string[] = [];
       const picks: Array<[string, boolean]> = [];
       const sizes: Array<[string, { width: number; height: number }]> = [];
-      const { groupById } = liveGroupsMap(sessionId);
+      const { liveGraph, groupById } = liveGroupsMap(sessionId);
       for (const c of changes) {
-        // A group frame: selecting it selects its nodes; deleting it ungroups; positions go to useNodeDrag.
         if ('id' in c && groupById.has(c.id)) {
           const g = groupById.get(c.id)!;
-          if (c.type === 'select') picks.push([g.id, c.selected], ...(c.selected ? g.nodeIds.map((id) => [id, true] as [string, boolean]) : []));
+          if (c.type === 'select') picks.push([g.id, c.selected], ...(c.selected ? [...groupSubtree(liveGraph?.groups, g.id).nodeIds].map((id) => [id, true] as [string, boolean]) : []));
           else if (c.type === 'remove') ungroup(sessionId, g.id);
           continue;
         }
@@ -311,10 +310,9 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
 
   useEffect(() => {
     const paste = (e: ClipboardEvent) => {
-      if (!insideRef.current || e.defaultPrevented || (e.target instanceof Element && e.target.closest('input, textarea, [contenteditable]:not([contenteditable="false"])'))) return;
+      if (!insideRef.current || e.defaultPrevented || inField(e.target)) return;
       const files = [...(e.clipboardData?.files ?? [])].filter(f => f.type.startsWith('image/'));
       if (!files.length) {
-        // Nodes copied in the app (Ctrl+C / Cut): pasted with their links.
         if (!hasNodeClipboard()) return;
         e.preventDefault();
         const ids = pasteNodes(sessionId);
@@ -328,11 +326,10 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     return () => document.removeEventListener('paste', paste);
   }, [importImages, sessionId, insideRef, selectNodes]);
 
-  // X (no modifier) takes the scissors and gives them back; Escape also leaves them. Not inside text fields.
   useEffect(() => {
     if (embedded) return;
     const key = (e: KeyboardEvent) => {
-      if (!insideRef.current || e.ctrlKey || e.metaKey || e.altKey || (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])'))) return;
+      if (!insideRef.current || e.ctrlKey || e.metaKey || e.altKey || inField(e.target)) return;
       const k = e.key.toLowerCase();
       if (k === 'x') { e.preventDefault(); pickToolRef.current(toolRef.current === 'cut' ? lastTool.current : 'cut'); }
       else if (k === 'escape' && toolRef.current === 'cut') pickToolRef.current(lastTool.current);
@@ -341,17 +338,18 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
     return () => window.removeEventListener('keydown', key);
   }, [embedded, insideRef]);
 
-  // Ctrl+C / Ctrl+X copy or cut the selected nodes; Ctrl+G groups them, Ctrl+Shift+G ungroups. Not inside text fields.
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (!insideRef.current || !(e.ctrlKey || e.metaKey) || (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])'))) return;
-      const ids = useStore.getState().sessions[sessionId]?.graph.nodes.filter((n) => selectedRef.current.has(n.id)).map((n) => n.id) ?? [];
+      if (!insideRef.current || !(e.ctrlKey || e.metaKey) || inField(e.target)) return;
+      const g = useStore.getState().sessions[sessionId]?.graph;
+      const ids = g?.nodes.filter((n) => selectedRef.current.has(n.id)).map((n) => n.id) ?? [];
+      const gids = g?.groups?.filter((x) => selectedRef.current.has(x.id)).map((x) => x.id) ?? [];
       const k = e.key.toLowerCase();
-      if (!ids.length || window.getSelection()?.toString()) return;
-      if (k === 'c') { copyNodes(sessionId, ids); toast(`Copied ${ids.length} node${ids.length === 1 ? '' : 's'}`, 'success'); }
-      else if (k === 'x') { requestDeleteRef.current(ids, [], () => { copyNodes(sessionId, ids); }); }
-      else if (k === 'g' && e.shiftKey) { const g = wholeGroup(useStore.getState().sessions[sessionId].graph, ids); if (g) ungroup(sessionId, g.id); }
-      else if (k === 'g' && ids.length > 1) groupNodes(sessionId, ids);
+      if ((!ids.length && !gids.length) || window.getSelection()?.toString()) return;
+      if (k === 'c') { const n = copyNodes(sessionId, ids, gids); toast(`Copied ${n}`, 'success'); }
+      else if (k === 'x') { requestDeleteRef.current([...gids, ...ids], [], () => { copyNodes(sessionId, ids, gids); }); }
+      else if (k === 'g' && e.shiftKey) { const grp = gids.length === 1 ? g?.groups?.find((x) => x.id === gids[0]) : wholeGroup(g!, ids); if (grp) ungroup(sessionId, grp.id); }
+      else if (k === 'g' && gids.length + ids.length > 1) groupNodes(sessionId, [...gids, ...ids]);
       else return;
       e.preventDefault();
     };
@@ -383,6 +381,7 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
   const menuOutput = useStore(s => menuSource ? outputPort(menuSource.data, s.assets) : null);
   const menuOpen = Boolean(menu) && (!menu?.from || Boolean(menuOutput));
   const menuNode = menu?.nodeId ? graph.nodes.find((n) => n.id === menu.nodeId) : undefined;
+  const menuGroup = menu?.nodeId ? graph.groups?.find((g) => g.id === menu.nodeId) : undefined;
   const menuPos = (m: { x: number; y: number }) => { const r = canvasRef.current?.getBoundingClientRect(); return rf.screenToFlowPosition({ x: m.x + (r?.left ?? 0), y: m.y + (r?.top ?? 0) }); };
   const emptyCanvas = !graph.nodes.length && !graph.groups?.length;
 
@@ -488,11 +487,13 @@ function Canvas({ embedded = false, omni = false }: { embedded?: boolean; omni?:
       </ReactFlow>
       </DeleteRequestContext.Provider>
       <div ref={menuAnchor} className="ctx-anchor" style={menu ? { left: menu.x, top: menu.y } : undefined} />
-      <Popover open={menuOpen} placement={menu?.from ? 'right-start' : 'top-start'} anchor={menuAnchor} onClose={() => setMenu(null)} width={240} label={menuNode ? 'Node' : 'Add node'}>
+      <Popover open={menuOpen} placement={menu?.from ? 'right-start' : 'top-start'} anchor={menuAnchor} onClose={() => setMenu(null)} width={240} label={menuNode ? 'Node' : menuGroup ? 'Group' : 'Add node'}>
         <div ref={connectionMenu}>
         {menu?.from ? <div className="menu-sep-label">Add connected node</div> : null}
         {menuNode ? (
           <NodeContextMenu onDuplicate={() => (duplicateNode(sessionId, menuNode), setMenu(null))} onDelete={() => { del.request([menuNode.id]); setMenu(null); }} />
+        ) : menuGroup ? (
+          <GroupContextMenu sessionId={sessionId} graph={graph} group={menuGroup} onDone={(pick) => { if (pick) selectNodes(pick); setMenu(null); }} onDelete={() => { del.request([menuGroup.id]); setMenu(null); }} />
         ) : menu ? (
           <AddNodeItems
             searchable={Boolean(menu.from)}

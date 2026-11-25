@@ -26,7 +26,7 @@ export default [{
     ['src/components/node/CanvasNotices.tsx', 'export function ProblemList'],
     ['src/components/node/NodeWorkspace.tsx', 'onJump={jumpToNode}'],
     ['src/components/node/nodes.tsx', 'node-port-missing'],
-    ['src/components/node/CanvasElements.ts', 'groupNotices(notices, group.nodeIds)'],
+    ['src/components/node/CanvasElements.ts', 'groupNotices(notices, [...groupSubtree(groups, group.id).nodeIds])'],
     ['src/components/omni/SpaceNode.tsx', 'count={data.spaceProblems ?? 0}'],
   ],
   tests: ['tests/node-notices.test.ts', 'tests/node-notices-ui.test.ts', 'tests/node-notices-canvas.test.ts'],
