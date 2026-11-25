@@ -107,7 +107,7 @@ export function InlineColor({ label, value, onChange, showValue = false, iconOnl
 }
 
 /** A short list in the bar: the value with a chevron; the choices open in the app's own menu. */
-export function InlineSelect<T extends string | number>({ label, value, options, icon, onChange }: { label: string; value: T; options: Array<T | { value: T; label: string }>; /** Shown alone, as a round button, instead of the name and value (the brush row). */ icon?: ReactNode; onChange: (v: T) => void }) {
+export function InlineSelect<T extends string | number>({ label, value, options, icon, more, onChange }: { label: string; value: T; options: Array<T | { value: T; label: string }>; /** Shown alone, as a round button, instead of the name and value (the brush row). */ icon?: ReactNode; /** Rows after the options. */ more?: (close: () => void) => ReactNode; onChange: (v: T) => void }) {
   const pop = usePopover();
   const items = options.map((o) => (typeof o === 'object' ? o : { value: o, label: String(o) }));
   const current = items.find((o) => o.value === value)?.label ?? String(value);
@@ -119,6 +119,7 @@ export function InlineSelect<T extends string | number>({ label, value, options,
       <div className="menu" role="listbox">
         {items.map((o) => <MenuItem key={String(o.value)} label={o.label} active={o.value === value} onClick={() => { onChange(o.value); pop.close(); }} />)}
       </div>
+      {more ? <div className="menu">{more(pop.close)}</div> : null}
     </Popover>
   </>;
 }

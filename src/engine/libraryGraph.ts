@@ -105,6 +105,7 @@ export function formatLibraryItemIndex(subject: Subject, library: readonly Subje
   const count = (doc?.layers.length ?? 0) + (subject.graph?.nodes.length ?? 0) + (subject.kits?.length ?? 0) + Object.keys(subject.tokens ?? {}).length;
   lines.push(`members: ${count || 'none yet'}${count ? ' (everything listed below belongs to this entry)' : ''}`);
   if (doc) lines.push(...docSummaryLines(doc, assets, new Set(dep.assetIds), isKit(subject) && subject.kind !== 'moodboard' ? 'component' : 'group'));
+  if (subject.fonts?.length) lines.push(`font files: ${subject.fonts.map((f) => `${f.family} ${f.variable ? 'variable' : f.weight}${f.italic ? ' italic' : ''}`).join(', ')}`);
   for (const [k, tok] of Object.entries(subject.tokens ?? {})) lines.push(`token ${k} (${tok.type}): ${shortText(String(tok.value), 80)}${Object.entries(tok.modes ?? {}).map(([m, v]) => `; ${m}: ${shortText(String(v), 60)}`).join('')}`);
   const nodes = subject.graph?.nodes ?? [], byNode = new Map(nodes.map((n) => [n.id, n]));
   for (const { id, data: d } of nodes) {

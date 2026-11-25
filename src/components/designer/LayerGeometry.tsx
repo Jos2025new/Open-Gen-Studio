@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link2, Link2Off } from '../ui/icons';
 import type { DesignDoc, Layer } from '../../engine/types';
 import { layerBox } from '../../engine/design/render';
@@ -14,12 +14,23 @@ const TIPS: Record<Key, string> = {
   h: 'Height of what the layer shows',
 };
 
+/** A font that arrives changes the measure of its text. */
+function useFontsLoaded() {
+  const [, again] = useState(0);
+  useEffect(() => {
+    const on = () => again((n) => n + 1);
+    document.fonts?.addEventListener('loadingdone', on);
+    return () => document.fonts?.removeEventListener('loadingdone', on);
+  }, []);
+}
+
 /**
  * Where the layer's visible content sits on the page, and how big it is, in page pixels: the box of what you see
  * (a painted stroke, a shape, the image), not the layer's internal frame. Type a value, or drag the letter left or
  * right (Shift: ×10). A drag is one undo step. W and H can keep their ratio.
  */
 export function LayerGeometry({ sessionId, doc, layer }: { sessionId: string; doc: DesignDoc; layer: Layer }) {
+  useFontsLoaded();
   const box = layerBox(layer);
   const [lock, setLock] = useState(layer.type === 'raster' && Boolean(layer.sourceAssetId));
   const [draft, setDraft] = useState<{ key: Key; text: string } | null>(null);

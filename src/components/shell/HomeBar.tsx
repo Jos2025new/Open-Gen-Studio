@@ -5,6 +5,7 @@ import { ArrowRight, Paperclip, X } from '../ui/icons';
 import { setComposer, setUi, useStore } from '../../store/store';
 import { agentAccepts } from '../../engine/agent/sendGate';
 import { attachFiles } from '../../engine/actions';
+import { FONT_ACCEPT, fontById } from '../../engine/fontFiles';
 import { sendAgentMessage } from '../../engine/agent/runtime';
 import { SPACES, openSpace } from './navModel';
 
@@ -17,7 +18,7 @@ export function HomeBar() {
   const busy = useRecipientThread(sessionId, undefined, (a) => a.busy, false); // the agent that would take this message
   const attachments = useStore((s) => s.composer.attachments);
   const assets = useStore((s) => s.assets);
-  const live = attachments.filter((id) => assets[id]);
+  const live = attachments.filter((id) => assets[id] || fontById(id));
   // The Composer's rule: not busy, and text or attachments. The draft is cleared only when the send is accepted (checked fresh, not from the render).
   const canSend = !busy && (text.trim().length > 0 || live.length > 0);
 
@@ -37,7 +38,7 @@ export function HomeBar() {
     </div>
     <div className="home-bar-row">
       <button type="button" className="home-chip" onClick={() => fileRef.current?.click()}><Paperclip size={14} />Attach</button>
-      <input ref={fileRef} type="file" hidden multiple accept="image/*,video/mp4,video/webm,audio/*" onChange={(e) => {
+      <input ref={fileRef} type="file" hidden multiple accept={`image/*,video/mp4,video/webm,audio/*,${FONT_ACCEPT}`} onChange={(e) => {
         const files = [...(e.target.files ?? [])];
         e.target.value = '';
         if (files.length) void attachFiles(files);
@@ -45,7 +46,7 @@ export function HomeBar() {
       <p className="home-bar-helper">The agent plans it and asks before spending</p>
     </div>
     {live.length > 0 && <ul className="home-bar-files" aria-label="Attached files">
-      {live.map((id) => <li key={id}><span>{assets[id].name || assets[id].kind}</span>
+      {live.map((id) => <li key={id}><span>{assets[id] ? assets[id].name || assets[id].kind : fontById(id)?.name}</span>
         <button type="button" aria-label="Remove" onClick={() => setComposer((c) => ({ attachments: c.attachments.filter((a) => a !== id) }))}><X size={12} /></button>
       </li>)}
     </ul>}

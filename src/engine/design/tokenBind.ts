@@ -27,6 +27,11 @@ export function tokenValue(kit: Subject | undefined, token: string, mode?: strin
 export function tokenPatch<F extends Field>(field: F, value: string, ref?: TokenRef) {
   return { [field]: value, [key(field)]: ref } as { [K in F]: string } & { [K in `${F}Token`]?: TokenRef };
 }
+/** A family of an entry, with its token when it has one. */
+export function familyPatch(kit: Subject, family: string) {
+  const token = Object.keys(kit.tokens ?? {}).find((n) => kit.tokens![n].type === 'fontFamily' && tokenValue(kit, n) === family);
+  return tokenPatch('fontFamily', family, token ? { kit: kit.id, token, value: family } : undefined);
+}
 /** The token a field's value comes from, while it still does. */
 export const tokenOf = (obj: object, field: Field): TokenRef | undefined => {
   const ref = (obj as Bag)[key(field)] as TokenRef | undefined;

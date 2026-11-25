@@ -9,6 +9,7 @@ import { formatLibraryItemIndex, shortText } from './libraryGraph';
 import { isKit, KIT_KIND_LIST, TOKEN_TYPES } from './libraryTypes';
 import { addToSection } from './librarySections';
 import { insertComponent } from './libraryInsert';
+import { fontsOf, putFonts } from './ownFonts';
 import { getDoc } from './design/actions';
 import { libraryToNodes, nodesToLibrary } from './flow/fromLibrary';
 import { createItem, deleteItem, libraryToDesigner, libraryToStudio, readKitVersion, restoreItemVersion, saveItem } from './libraryVersions';
@@ -63,7 +64,11 @@ export const commands = [
       return { id: s.id, index: idx.text, truncated: idx.truncated };
     } }),
   defineCommand({ id: 'library.item.list', title: 'List Library items', args: z.object({ kind: kitKind.optional() }).strict(), effect: 'read', run: (_ctx, args) => { const list = useStore.getState().library.filter((s) => isKit(s) && (!args.kind || s.kind === args.kind)); return { total: list.length, items: list.slice(0, 20).map((s) => ({ id: s.id, name: shortText(s.name, 120), kind: s.kind })), ...(list.length > 20 ? { truncated: true } : {}) }; } }),
-  defineCommand({ id: 'library.item.add', title: 'Add to a section of a brand kit or design system', args: z.object({ id, section: name, assets: z.array(id).optional(), texts: z.array(z.string()).optional() }).strict(), effect: 'write', available: (_ctx, args) => itemAvailable(args?.id), run: async (ctx, args) => itemRef(await addToSection(args.id, args.section, { assetIds: args.assets, texts: args.texts }, actorOf(ctx.caller))) }),
+  defineCommand({ id: 'library.item.add', title: 'Add to a section of a brand kit or design system', args: z.object({ id, section: name, assets: z.array(id).optional(), texts: z.array(z.string()).optional(), fonts: z.array(id).optional() }).strict(), effect: 'write', available: (_ctx, args) => itemAvailable(args?.id), run: async (ctx, args) => {
+    if (args.fonts?.length) await putFonts(args.id, fontsOf(args.fonts), actorOf(ctx.caller));
+    if (args.assets?.length || args.texts?.length || !args.fonts?.length) return itemRef(await addToSection(args.id, args.section, { assetIds: args.assets, texts: args.texts }, actorOf(ctx.caller)));
+    return itemRef(requireSubject(useStore.getState().library.find((s) => s.id === args.id), `No Library item "${args.id}".`));
+  } }),
   defineCommand({ id: 'library.item.insert', title: 'Insert component', args: z.object({ id, piece: id, at: point.optional() }).strict(), effect: 'write', needs: ['session', 'doc'], history: (on) => `designer:${on.doc}`, available: (ctx, args) => { const s = sessionAvailable(ctx.on.session); if (s !== true) return s; if (!getDoc(ctx.on.session!, ctx.on.doc ?? '')) return 'That document is not in this session.'; return itemAvailable(args?.id); }, run: (ctx, args) => insertComponent(ctx.on.session!, ctx.on.doc!, args.id, args.piece, args.at) }),
 ];
 export const LIBRARY_ACTIONS = { saveSubject: 'library.subject.save', deleteSubject: 'library.subject.delete', libraryItem: 'library.subject.get', subjectFromAsset: 'library.subject.from_asset', saveSheetViews: 'library.subject.from_sheet', subjectFromAttachments: 'library.subject.from_attachments', createRecraftStyle: 'library.style.create', createSubjectVoice: 'library.voice.create', createItem: 'library.item.create', saveItem: 'library.item.save', openItem: 'library.item.open', restoreItemVersion: 'library.item.restore', deleteItem: 'library.item.delete', readItem: 'library.item.read', listItems: 'library.item.list', insertComponent: 'library.item.insert', addToSection: 'library.item.add' } as const;

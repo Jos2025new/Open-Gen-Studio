@@ -26,7 +26,7 @@ import { describeChoice } from './settingsCard';
 import { nodeOutputAsset } from '../flow/graph';
 import { graphIndex } from '../flow/graphView';
 import { nodeSelection } from '../flow/selection';
-import { assetContextName } from './attachments';
+import { attachmentLines } from './attachments';
 import { studioLine, STUDIO_RULE } from './agentCanvas';
 import { viewReferenceLabel } from './assetSearch';
 import { assetShape } from './assetShape';
@@ -299,18 +299,7 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   lines.push(`audio model: ${describeModel('audio')}`);
   lines.push(`3D model: ${describeModel('model3d')}`);
   lines.push(`other models:\n${alternatives()}`);
-  if (opts.attachments.length) {
-    lines.push(
-      `attached by the user, @Image1 first: ${opts.attachments
-        .map((id) => {
-          const a = st.assets[id];
-          const view = a ? viewReferenceLabel(a, st.assets) : '';
-          return a ? `asset:${id} name=${JSON.stringify(assetContextName(a))} (${assetShape(a)})${view ? ` — ${view}` : ''}` : '';
-        })
-        .filter(Boolean)
-        .join(', ')}`,
-    );
-  }
+  lines.push(...attachmentLines(opts.attachments, session));
   // Only this canvas's results: the chat, the node canvas and the designer keep separate assets.
   const canvas = canvasIndex(session, st.generations);
   const liveNodeAssets = new Set(session.graph.nodes.flatMap(n => {

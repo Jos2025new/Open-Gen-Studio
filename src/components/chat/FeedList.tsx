@@ -12,6 +12,8 @@ import { copyText } from '../../engine/actions';
 import { useStore } from '../../store/store';
 import { IconButton } from '../ui/primitives';
 import { AssetMedia } from '../ui/AssetMedia';
+import { fontById } from '../../engine/fontFiles';
+import { FontThumb } from '../ui/FontThumb';
 import { StudioGeneration } from './StudioGeneration';
 import { GenerationCard } from './GenerationCard';
 import { PlanCard } from './PlanCard';
@@ -93,7 +95,7 @@ function UserMessage({ item, sessionId }: { item: Extract<FeedItem, { type: 'use
           <div className="bubble-attachments">
             {item.attachments.map((id) => (
               <span key={id} className="attach-thumb small">
-                <AssetMedia assetId={id} hoverPlay={false} />
+                {fontById(id) ? <FontThumb font={fontById(id)!} /> : <AssetMedia assetId={id} hoverPlay={false} />}
               </span>
             ))}
           </div>

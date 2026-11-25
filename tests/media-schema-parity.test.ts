@@ -23,7 +23,7 @@ async function sha256(value: unknown): Promise<string> {
 // `commands` updated after task/library-kits added library.item.*, designer.group.*, designer.doc.new/layer.set/add_text, nodes.node.* part fields, library.item.add and token modes.
 const BEFORE_HASHES = {
   tools: 'e69dd624a5d009182c5bdc149c520bb37c9c104ce5d4ba7a9c61a53c03e2fc3d',
-  commands: '05e119d1494a7f935325e52b6477e1d1db328e23e68f904133184b6c59603b61',
+  commands: '7e814079bf4ff81f7d74d0a0fea5458522cd79f26868a4df131aefc13ce8c646',
   findModels: 'bc71d19692f96f5c81151b1f2ac85694a11800259c5fc448c6bb9c8346a8332f',
   findAssets: '9a26a4fa02ec1123d71f36d8774024e087e392762fa65dc3ec1cb1cb4eaaac5c',
 };

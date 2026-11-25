@@ -5,8 +5,9 @@ import { addTextLayer, getDoc, patchLayer, placeAsset } from '../../engine/desig
 import { fontStack } from '../../engine/design/doc';
 import { patchPickedShapes } from '../../engine/design/multiObjectOps';
 import { objectPicks } from '../../engine/design/objectSelection';
-import { tokenPatch, tokenValue } from '../../engine/design/tokenBind';
+import { familyPatch, tokenPatch, tokenValue } from '../../engine/design/tokenBind';
 import { rememberColor } from '../../engine/design/swatches';
+import { FONT_ACCEPT } from '../../engine/fontFiles';
 import { addFonts, removeFont } from '../../engine/ownFonts';
 import { insertComponent } from '../../engine/libraryInsert';
 import { addCategory, addToSection, kitSections, moveToSection, removeCategory, removeFromSection, sectionNodes, setSectionText, type KitSection } from '../../engine/librarySections';
@@ -131,15 +132,14 @@ function Fonts({ item, busy, run }: SectionProps) {
   const { sessionId, docId } = useDesign(), file = useRef<HTMLInputElement>(null);
   const families = [...new Set((item.fonts ?? []).map((f) => f.family))];
   const use = (family: string) => {
-    const token = Object.keys(item.tokens ?? {}).find((n) => tokenValue(item, n) === family && item.tokens![n].type === 'fontFamily');
-    const patch = tokenPatch('fontFamily', family, token ? { kit: item.id, token, value: family } : undefined);
+    const patch = familyPatch(item, family);
     const doc = docId ? getDoc(sessionId, docId) : undefined, layer = doc?.layers.find((l) => l.id === doc.activeLayerId);
     if (doc && layer?.type === 'text' && !layer.locked) patchLayer(sessionId, doc.id, layer.id, patch);
     else setUi((u) => ({ text: { ...u.text, ...patch } }));
   };
   return <>
     <div className="kit-add">
-      <input ref={file} type="file" accept=".ttf,.otf,.woff,font/ttf,font/otf,font/woff" multiple hidden onChange={(e) => { const list = [...(e.target.files ?? [])]; e.target.value = ''; void run(async () => { const names = await addFonts(item.id, list); if (names.length) toast(`${names.join(', ')} added.`, 'success'); }); }} />
+      <input ref={file} type="file" accept={FONT_ACCEPT} multiple hidden onChange={(e) => { const list = [...(e.target.files ?? [])]; e.target.value = ''; void run(async () => { const names = await addFonts(item.id, list); if (names.length) toast(`${names.join(', ')} added.`, 'success'); }); }} />
       <Button size="sm" icon={Upload} disabled={busy} onClick={() => file.current?.click()}>Upload font</Button>
     </div>
     {families.map((f) => <div key={f} className="kit-font">

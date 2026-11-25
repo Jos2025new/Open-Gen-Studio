@@ -10,6 +10,7 @@ import { VIEWABLE_MEDIA_KINDS, type LlmMessage, type PlanFeedItem, type Question
 import { appendFeed, autoTitleSession, removeFeedItem, setComposer, updateFeedItem } from '../../store/store';
 import { buildContext } from './context';
 import { activeKit, activeKitImages, loadActiveKit } from '../activeKit';
+import { fontById, keepInSession } from '../fontFiles';
 import { agentSeesImages, attachmentParts, stripImages, trimReferenceResults, userMessage } from './attachments';
 import { startRequest } from './metrics';
 import { skillById } from '../skills';
@@ -69,6 +70,7 @@ async function deliver(text: string, opts: { attachments?: string[]; agentNodeId
   const attachments = [...(opts.attachments ?? st.composer.attachments)];
   const clean = text.trim();
   if (!clean && !attachments.length) return;
+  keepInSession(sessionId, attachments.flatMap((id) => fontById(id) ?? []));
   // Independent prompt nodes wired into the agent add their text to what the model reads (the chat shows only what was typed).
   const agentNode = agentNodeOf(sessionId, to.id);
   const wired = agentNode ? promptsWiredToAgent(sessionId, agentNode.id) : [];

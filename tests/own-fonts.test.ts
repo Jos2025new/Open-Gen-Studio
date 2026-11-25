@@ -7,7 +7,10 @@ import { newTextLayer } from '../src/engine/design/doc';
 import { createItem, saveItem } from '../src/engine/libraryVersions';
 import { loadFontFile } from '../src/engine/fontFiles';
 import { addFonts, removeFont } from '../src/engine/ownFonts';
-import { useStore } from '../src/store/store';
+import { attachFiles } from '../src/engine/actions';
+import { attachmentLines } from '../src/engine/agent/attachments';
+import { run } from '../src/engine/commands';
+import { createSession, useStore } from '../src/store/store';
 
 const woff = new Uint8Array(readFileSync('node_modules/@fontsource/inter/files/inter-latin-700-normal.woff'));
 const ttf = new Uint8Array(woffToSfnt(woff));
@@ -50,6 +53,31 @@ describe('own fonts', () => {
     removeFont(kit, 'Inter');
     expect(item().fonts).toEqual([]);
     await expect(addFonts(kit, [new File(['nope'], 'x.ttf')])).rejects.toThrow('not a TTF, OTF or WOFF');
+  });
+
+  it('a font attached to a message is used at once and goes to Library when asked', async () => {
+    const s1 = createSession('S1'), sid = s1.id, bytes = async () => loadFontFile('Inter', 700);
+    useStore.setState((s) => ({ sessions: { ...s.sessions, [sid]: s1 }, activeSessionId: sid }));
+    await attachFiles([new File([ttf], 'given.ttf')]);
+    const st = useStore.getState(), fonts = st.sessions[sid].fonts!, [font] = fonts;
+    expect(fonts).toMatchObject([{ family: 'Inter', weight: 700, name: 'given.ttf' }]);
+    expect(st.composer.attachments).toEqual([font.id]);
+    expect(attachmentLines([font.id], st.sessions[sid]).join()).toMatch(`${font.id} fontFamily="Inter" (weight 700) attached now`);
+    expect(attachmentLines([], st.sessions[sid]).join()).toContain(font.id);
+    expect(item().fonts).toBeUndefined();
+    expect(await bytes()).toEqual(ttf);
+    const add = (args: object) => run({ cmd: 'library.item.add', args: { id: kit, section: 'Fonts', ...args } }, { caller: 'agent' });
+    expect(await add({ fonts: [font.id] })).toMatchObject({ ok: true });
+    expect(item()).toMatchObject({ fonts: [font], tokens: { sea: { value: '#0a4d68' }, 'font.1': { type: 'fontFamily', value: 'Inter' } } });
+    expect(await add({ fonts: ['font_none'] })).toMatchObject({ ok: false });
+    expect(item().fonts).toHaveLength(1);
+    useStore.setState((s) => ({ sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], fonts: undefined } } }));
+    expect(await bytes()).toEqual(ttf);
+  });
+
+  it('fonts do not go in a moodboard', async () => {
+    const board = (await createItem({ name: 'M', kind: 'moodboard', space: 'library', by: 'user' })).subject.id;
+    await expect(addFonts(board, [new File([ttf], 'a.ttf')])).rejects.toThrow('brand kit or a design system');
   });
 
   it('a font the app does not bring is asked for by its name, safely', () => {

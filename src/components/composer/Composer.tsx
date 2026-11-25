@@ -23,6 +23,8 @@ import { ComposerOptions } from './ComposerOptions';
 import { DockSlot } from '../designer/ToolPalette';
 import { ScrollRail } from './ScrollRail';
 import { AgentSend } from './AgentSend';
+import { FONT_ACCEPT, fontById, isFontFile } from '../../engine/fontFiles';
+import { FontThumb } from '../ui/FontThumb';
 
 export { SendDirect };
 
@@ -33,9 +35,9 @@ export function AttachStrip({ ids }: { ids: string[] }) {
     <div className="composer-attachments" role="list" aria-label={`${ids.length} attached`}>
         {ids.map((id, index) => (
           <span key={id} className="attach-thumb" role="listitem">
-            <button type="button" className="attachment-preview-button" aria-label={`Preview attachment ${index + 1}`} onClick={() => setUi({ lightbox: { assetIds: ids, index } })}>
+            {fontById(id) ? <FontThumb font={fontById(id)!} /> : <button type="button" className="attachment-preview-button" aria-label={`Preview attachment ${index + 1}`} onClick={() => setUi({ lightbox: { assetIds: ids, index } })}>
               <AssetMedia assetId={id} hoverPlay={false} draggable={false} />
-            </button>
+            </button>}
             <AttachTiming id={id} />
             <button type="button" className="attachment-remove" aria-label="Remove attachment" onClick={() => remove(id)}>
               <X size={11} />
@@ -325,7 +327,7 @@ export function Composer({ chatNodeId }: { chatNodeId?: string } = {}) {
   // A text-only variant still takes images when its line has an image route: attaching switches to it (above).
   const lineTwin = !acceptsImages && (mode === 'image' || mode === 'video') && currentRef ? sentModelRef(currentRef, mode, true) : undefined;
   const takesImages = acceptsImages || Boolean(lineTwin && lineTwin !== currentRef);
-  const canSendAgent = !busy && (text.trim().length > 0 || liveAttachments.length > 0);
+  const canSendAgent = !busy && (text.trim().length > 0 || liveAttachments.length > 0 || attachments.some((id) => fontById(id)));
 
   const submit = () => {
     if (mode === 'agent') {
@@ -361,6 +363,10 @@ export function Composer({ chatNodeId }: { chatNodeId?: string } = {}) {
   const onFiles = (files: FileList | File[] | null) => {
     if (!files?.length) return;
     const list = [...files];
+    if (mode !== 'agent' && list.some(isFontFile)) {
+      toast('Fonts are for the agent, or for Fonts in a brand kit.', 'error');
+      return;
+    }
     const onlyAudio = list.every((f) => f.type.startsWith('audio/'));
     if (!takesImages && !(takesAudio && onlyAudio)) {
       toast('The selected model does not take input images.', 'error');
@@ -429,7 +435,7 @@ export function Composer({ chatNodeId }: { chatNodeId?: string } = {}) {
         <input
           ref={fileRef}
           type="file"
-          accept={['image/png,image/jpeg,image/webp', mode === 'agent' || videoRefs.videos ? 'video/mp4,video/webm' : '', takesAudio ? 'audio/*' : '', mode === 'model3d' ? '.glb,model/gltf-binary' : ''].filter(Boolean).join(',')}
+          accept={['image/png,image/jpeg,image/webp', mode === 'agent' || videoRefs.videos ? 'video/mp4,video/webm' : '', mode === 'agent' ? FONT_ACCEPT : '', takesAudio ? 'audio/*' : '', mode === 'model3d' ? '.glb,model/gltf-binary' : ''].filter(Boolean).join(',')}
           multiple={mode !== 'video' || videoRefs.multiple}
           hidden
           onChange={(e) => {
@@ -443,7 +449,7 @@ export function Composer({ chatNodeId }: { chatNodeId?: string } = {}) {
           <ComposerOptions label={optionsLabel} disabled={optionsDisabled} onAdd={() => fileRef.current?.click()} onAsset={(id) => addAssets([id])} />
           <ScrollRail className="composer-tools-rail" backLabel="Previous tools" onLabel="More tools"><DockSlot at="bar" /></ScrollRail><span className="tool-dock-eye-slot" />
         </div></> : <>
-        <AttachStrip ids={liveAttachments} />
+        <AttachStrip ids={mode === 'agent' ? attachments.filter((id) => assets[id] || fontById(id)) : liveAttachments} />
         <div className="composer-prompt-row is-compact">
           <ComposerOptions label={optionsLabel} disabled={optionsDisabled} onAdd={() => fileRef.current?.click()} onAsset={(id) => addAssets([id])} />
           <textarea

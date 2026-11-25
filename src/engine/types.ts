@@ -629,7 +629,7 @@ export interface AgentMetricsAggregate {
   findModels: number;
 }
 
-import type { KitKind, LibraryKitFields } from './libraryTypes';
+import type { KitFont, KitKind, LibraryKitFields } from './libraryTypes';
 /** A reusable character or object for Kling elements, kept per session and mentioned as @Name. */
 export type SubjectKind = 'character' | 'object' | 'product' | 'location' | 'style';
 
@@ -689,6 +689,8 @@ export interface Session {
   agentMetricsAggregate?: AgentMetricsAggregate;
   subjects?: Subject[];
   styles?: SavedStyle[];
+  /** Font files given in this session (attached to a message). */
+  fonts?: KitFont[];
   /** "Don't ask again": over-limit runs here no longer ask. */
   noAskOverLimit?: boolean;
 }

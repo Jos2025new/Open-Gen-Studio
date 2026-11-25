@@ -1,7 +1,9 @@
 import { currentViewImage, viewReferenceLabel } from './assetSearch';
 import { getAssetBlob } from '../../lib/idb';
 import { blobToDataUrl, canvasToBlob, createCanvas, ctx2d, fetchBlob, blobToCanvas, videoFrameSheet } from '../../lib/media';
-import type { Asset, LlmContentPart, LlmMessage } from '../types';
+import { fontById, fontLine } from '../fontFiles';
+import type { Asset, LlmContentPart, LlmMessage, Session } from '../types';
+import { assetShape } from './assetShape';
 import { useStore } from '../../store/store';
 import { agentChoice } from './runtimeShared';
 
@@ -16,8 +18,22 @@ import { agentChoice } from './runtimeShared';
 export const VISION_MAX_SIDE = 768;
 
 /** Stable, human-readable metadata for an attachment; quoted by callers before it enters model context. */
-export function assetContextName(asset: Pick<Asset, 'id' | 'kind' | 'name'>): string {
+function assetContextName(asset: Pick<Asset, 'id' | 'kind' | 'name'>): string {
   return asset.name?.trim() || `${asset.kind}-${asset.id.slice(-8)}`;
+}
+
+/** The attachments of a request and the fonts given in its session, as context lines. */
+export function attachmentLines(ids: readonly string[], session: Session): string[] {
+  const { assets } = useStore.getState();
+  const media = ids.flatMap((id) => {
+    const a = assets[id], view = a ? viewReferenceLabel(a, assets) : '';
+    return a ? [`asset:${id} name=${JSON.stringify(assetContextName(a))} (${assetShape(a)})${view ? ` — ${view}` : ''}`] : [];
+  });
+  const now = ids.filter((id) => fontById(id));
+  return [
+    ...(media.length ? [`attached by the user, @Image1 first: ${media.join(', ')}`] : []),
+    ...(session.fonts?.length ? [`font files the user gave in this session: ${session.fonts.map((f) => `${fontLine(f)}${now.includes(f.id) ? ' attached now' : ''}`).join(', ')}. Use one by its fontFamily in Designer text, at once; library.item.add with fonts (its id) keeps it in a brand kit or design system, when the user asks.`] : []),
+  ];
 }
 
 /** Whether the model of the chosen agent (else the global one) takes images. Unknown counts as yes (Settings already prefers vision models). */
