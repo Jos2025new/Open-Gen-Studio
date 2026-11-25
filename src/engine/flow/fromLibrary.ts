@@ -69,7 +69,7 @@ export async function nodesToLibrary(opts: {
     if (n.data.kind === 'text' || n.data.kind === 'part') return { id: n.id, position: { ...n.position }, data: structuredClone(n.data) };
     const out = nodeOutputAsset(n, st.generations);
     if (!out) throw new Error(`Node "${n.id}" (${n.data.kind}) cannot be saved to Library without a finished asset.`);
-    return { id: n.id, position: { ...n.position }, data: { kind: 'asset', title: n.data.title, assetId: out } };
+    return { id: n.id, position: { ...n.position }, data: { kind: 'asset', title: n.data.title, assetId: out, ...(n.data.section ? { section: n.data.section } : {}) } };
   });
   const kept = new Set(nodes.map((n) => n.id));
   const edges = session.graph.edges.filter((e) => kept.has(e.source) && kept.has(e.target)).map((e) => refEdge({ ...e, sourceHandle: 'out_ref', targetHandle: 'sys_ref', kind: 'ref' }, e.id, e.source, e.target));

@@ -16,10 +16,15 @@ export const newKitName = (kind: KitKind, library: readonly Subject[]): string =
 /** Create an empty Library entry and open it where the user is; one at a time. */
 export function useNewKit(sessionId: string, space: LibrarySpace, onDone?: () => void) {
   const [busy, setBusy] = useState(false), busyRef = useRef(false);
-  const create = async (kind: KitKind) => {
+  /** With `onPage` it opens there instead of in the space. */
+  const create = async (kind: KitKind, onPage?: (id: string) => void) => {
     if (busyRef.current) return;
     busyRef.current = true; setBusy(true);
-    try { await createItem({ name: newKitName(kind, useStore.getState().library), kind, space, by: 'user', sessionId }); onDone?.(); }
+    try {
+      const name = newKitName(kind, useStore.getState().library);
+      if (onPage) onPage((await createItem({ name, kind, space, by: 'user', sessionId, draft: false, open: false })).subject.id);
+      else { await createItem({ name, kind, space, by: 'user', sessionId }); onDone?.(); }
+    }
     catch (e) { toast((e as Error).message, 'error'); } finally { busyRef.current = false; setBusy(false); }
   };
   return { busy, create };

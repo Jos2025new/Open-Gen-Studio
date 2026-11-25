@@ -3,7 +3,7 @@ import type { Graph } from './graphTypes';
 /* Library item kinds (moodboard, design-system, brand-kit) and shared helpers. */
 export const KIT_KINDS = {
   moodboard: { tokens: false, kits: false, parts: ['color'] },
-  'design-system': { tokens: true, kits: false, parts: ['color', 'component', 'style'] },
+  'design-system': { tokens: true, kits: true, parts: ['color', 'component', 'style'] },
   'brand-kit': { tokens: true, kits: true, parts: ['color', 'component', 'style'] },
 } as const;
 export type KitKind = keyof typeof KIT_KINDS;
@@ -20,6 +20,8 @@ export interface KitVersionRef { id: string; at: number; by: KitActor; space: Li
 
 export interface LibraryKitFields {
   graph?: Graph; kits?: string[]; tokens?: KitTokens;
+  /** The categories the user made in its page; elements name theirs in `section`. */
+  sections?: string[];
   /** Immutable after creation. */
   origin?: KitOrigin; copiedFrom?: string; draft?: boolean;
   versionId?: string; docRev?: string; groupIds?: string[]; versions?: KitVersionRef[];

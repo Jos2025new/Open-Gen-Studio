@@ -17,7 +17,10 @@ export const activeKit = (st = get()): Subject | undefined => (st.composer.kitId
 /** The picked entry and the ones it contains. */
 function activeKitItems(st = get()): Subject[] {
   const kit = activeKit(st);
-  return kit ? [kit, ...kitDependencies(kit, st.library).kitIds.flatMap((id) => st.library.find((s) => s.id === id) ?? [])] : [];
+  if (!kit) return [];
+  const out = [kit];
+  for (const s of out) for (const id of kitDependencies(s, st.library).kitIds) { const inside = st.library.find((x) => x.id === id); if (inside && !out.includes(inside)) out.push(inside); }
+  return out;
 }
 
 /** Reads the documents of the picked entries, so the agent also gets their colors, fonts and components. */
@@ -31,7 +34,9 @@ export async function loadActiveKit(): Promise<void> {
 }
 
 export function activeKitImages(st = get()): string[] {
-  return [...new Set(activeKitItems(st).flatMap((s) => kitImageAssetIds(s, st.assets)))].slice(0, MAX_IMAGES);
+  const kits = activeKitItems(st);
+  const logos = kits.flatMap((s) => (s.graph?.nodes ?? []).flatMap((n) => (n.data.kind === 'asset' && n.data.section === 'Logos' && n.data.assetId && st.assets[n.data.assetId]?.kind === 'image' ? [n.data.assetId] : [])));
+  return [...new Set([...logos, ...kits.flatMap((s) => kitImageAssetIds(s, st.assets))])].slice(0, MAX_IMAGES);
 }
 
 export function activeKitLines(st = get()): string[] {

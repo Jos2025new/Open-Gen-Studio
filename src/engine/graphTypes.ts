@@ -104,7 +104,7 @@ export interface RefNodeData {
 }
 
 /** `v`: the descriptor version this node's data was last written at; absent = 1 (see nodecore/migrate.ts). */
-export type GraphNodeData = (TextNodeData | GenNodeData | ToolNodeData | AssetNodeData | RefNodeData | ExtraNodeKinds[keyof ExtraNodeKinds]) & { v?: number };
+export type GraphNodeData = (TextNodeData | GenNodeData | ToolNodeData | AssetNodeData | RefNodeData | ExtraNodeKinds[keyof ExtraNodeKinds]) & { v?: number; /** Library entry: which section of it this element is in. */ section?: string };
 
 export interface GraphNode {
   id: string;

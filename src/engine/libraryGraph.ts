@@ -108,8 +108,8 @@ export function formatLibraryItemIndex(subject: Subject, library: readonly Subje
   for (const [k, tok] of Object.entries(subject.tokens ?? {})) lines.push(`token ${k} (${tok.type}): ${shortText(String(tok.value), 80)}`);
   const nodes = subject.graph?.nodes ?? [], byNode = new Map(nodes.map((n) => [n.id, n]));
   for (const { id, data: d } of nodes) {
-    if (d.kind === 'asset') lines.push(`node ${id} [asset] "${shortText(d.title, 60)}" asset:${d.assetId ?? 'none'}${assetMeta(assets, d.assetId)}`);
-    else if (d.kind === 'text') lines.push(`node ${id} [text] "${shortText(d.title, 60)}": ${shortText(d.text, 120)}`);
+    if (d.kind === 'asset') lines.push(`node ${id} [asset] "${shortText(d.title, 60)}" asset:${d.assetId ?? 'none'}${assetMeta(assets, d.assetId)}${d.section ? ` in ${shortText(d.section, 40)}` : ''}`);
+    else if (d.kind === 'text') lines.push(`node ${id} [text] "${shortText(d.title, 60)}"${d.section ? ` in ${shortText(d.section, 40)}` : ''}: ${shortText(d.text, d.section ? 600 : 120)}`);
     else if (d.kind === 'part') lines.push(`node ${id} [${d.partKind}] "${shortText(d.title, 60)}"${d.color ? ` ${d.color}` : ''}${d.groupId ? ` group:${d.groupId}` : ''}${d.styleType ? ` ${d.styleType}` : ''}${dep.pieceTokens[id]?.length ? ` tokens:${dep.pieceTokens[id].join(',')}` : ''}`);
   }
   for (const gr of subject.graph?.groups ?? []) lines.push(`group ${gr.id} "${shortText(gr.title, 60)}" (${gr.nodeIds.length} nodes)`);

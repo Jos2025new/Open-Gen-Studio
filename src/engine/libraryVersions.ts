@@ -245,7 +245,7 @@ export function saveItem(opts: {
         docRev = prevSnap.docRev ?? cur.docRev ?? uid('drev');
       }
       const at = Date.now(), targetEntry: Subject = opts.mode === 'copy'
-        ? { id: targetId, name: copyName(opts.name?.trim() || cur.name), kind, refAssetIds: [], copiedFrom: cur.id, draft: opts.by === 'user' ? false : Boolean(cur.draft), origin: { space: opts.space, by: opts.by, at, ...(session ? { sessionId: session.id, sessionTitle: session.title } : {}) } }
+        ? { id: targetId, name: copyName(opts.name?.trim() || cur.name), kind, refAssetIds: [], ...(cur.sections ? { sections: cur.sections } : {}), copiedFrom: cur.id, draft: opts.by === 'user' ? false : Boolean(cur.draft), origin: { space: opts.space, by: opts.by, at, ...(session ? { sessionId: session.id, sessionTitle: session.title } : {}) } }
         : cur;
       const saved = await commitVersion(targetEntry, {
         mode: opts.mode === 'copy' ? 'create' : 'append', at, by: opts.by, space: opts.space, label: opts.label,

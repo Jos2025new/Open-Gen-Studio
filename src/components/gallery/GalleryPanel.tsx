@@ -14,6 +14,8 @@ import { kitImageAssetIds, libraryToNodes } from '../../engine/flow/fromLibrary'
 import { focusNodes } from '../../engine/flow/selection';
 import { KIT_META, newKitName, useNewKit } from './newKit';
 import { KitTokens } from './KitTokens';
+import { KitPage } from './KitPage';
+import { hasSections } from '../../engine/librarySections';
 import { setStudioBoard } from '../../lib/studioBoard';
 import { formatDateTime } from '../../lib/format';
 import { Button, IconButton } from '../ui/primitives';
@@ -68,26 +70,34 @@ export function GalleryPanel() {
   const [category, setCategory] = useState<Category>('all');
   const [stored, setStored] = usePref<ItemView>('ogs.libraryView', 'card');
   const view = asItemView(stored);
-  const [cols, setCols] = useState(3);
+  const [cols, setCols] = useState(3), [openKit, setOpenKit] = usePref<string | null>('ogs.libraryKit', null);
   const chrome = embedded ? null : <div className="pc-chrome">
     <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Expand'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
     <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />
   </div>;
-  const library = useStore((st) => st.library);
+  const library = useStore((st) => st.library), assets = useStore((st) => st.assets), sessionId = useStore((st) => st.activeSessionId), workspace = useStore((st) => st.ui.workspace);
   const counts = (k: LibraryKind) => library.filter((x) => itemKind(x) === k && !x.userHidden).length;
   const items = SOURCES.map((x) => (x.id === 'all' ? x : { ...x, count: counts(x.id as LibraryKind) }));
   const source = <SourceSelect items={items} value={category} onChange={setCategory} label="Library source" separatorAfter="all" allLabel="Library" />;
+  const page = openKit ? library.find((x) => x.id === openKit && hasSections(x)) : undefined;
+  if (page) {
+    const inSpace = (s: Subject, space: OpenSpace) => void openKitIn(sessionId, s.id, space).catch((e) => toast((e as Error).message, 'error'));
+    return <div className="gallery" role="region" aria-label="Library">
+      <KitPage key={page.id} item={page} chrome={chrome} menu={<CardMenu label={`More actions for ${page.name}`}>{(close) => <KitMenuBody item={page} close={close} />}</CardMenu>} cover={(s) => coverOf(s, assets)}
+        onBack={() => { setCategory(page.kind as KitKind); setOpenKit(null); }} onOpen={(s) => (hasSections(s) ? setOpenKit(s.id) : inSpace(s, spaceOf(workspace) === 'nodes' && !canOpenNodes(s, assets) ? 'designer' : spaceOf(workspace)))} onDesign={() => inSpace(page, 'designer')} />
+    </div>;
+  }
   return (
     <div className="gallery" role="region" aria-label="Library">
       {category === 'all'
         ? <GeneratedAssets source={source} chrome={chrome} view={view} setView={setStored} cols={cols} setCols={setCols} />
-        : <LibraryAssets source={source} chrome={chrome} kind={category} view={view} setView={setStored} cols={cols} setCols={setCols} />}
+        : <LibraryAssets onOpenKit={setOpenKit} source={source} chrome={chrome} kind={category} view={view} setView={setStored} cols={cols} setCols={setCols} />}
     </div>
   );
 }
 
-function LibraryAssets({ source, chrome, kind, view, setView, cols, setCols }: {
-  source: ReactNode; chrome: ReactNode; kind: LibraryKind; view: ItemView; setView: (v: ItemView) => void; cols: number; setCols: (c: number) => void;
+function LibraryAssets({ onOpenKit, source, chrome, kind, view, setView, cols, setCols }: {
+  onOpenKit: (id: string) => void; source: ReactNode; chrome: ReactNode; kind: LibraryKind; view: ItemView; setView: (v: ItemView) => void; cols: number; setCols: (c: number) => void;
 }) {
   const library = useStore((s) => s.library), assets = useStore((s) => s.assets);
   const sessionId = useStore((s) => s.activeSessionId), workspace = useStore((s) => s.ui.workspace);
@@ -104,7 +114,7 @@ function LibraryAssets({ source, chrome, kind, view, setView, cols, setCols }: {
     : kitKind ? 'No saved items yet.' : 'Save a result with Send to → Save to Library, or let the agent create references. Mention them as @Name in any prompt.';
   const gridItems = list.map((x) => {
     const a = assets[coverOf(x, assets) ?? ''];
-    return { id: x.id, ratio: a && a.width > 0 && a.height > 0 ? a.width / a.height : 1, node: <LibraryTile item={x} view={view} /> };
+    return { id: x.id, ratio: a && a.width > 0 && a.height > 0 ? a.width / a.height : 1, node: <LibraryTile item={x} view={view} onOpenKit={onOpenKit} /> };
   });
   return (
     <>
@@ -124,7 +134,7 @@ function LibraryAssets({ source, chrome, kind, view, setView, cols, setCols }: {
           </div>
         </div>
         <div className="pc-grp pc-right">
-          {kitKind ? <div className="pc-flags"><Button size="sm" icon={Plus} disabled={creating} onClick={() => void create(kind as KitKind)}>New</Button></div> : null}
+          {kitKind ? <div className="pc-flags"><Button size="sm" icon={Plus} disabled={creating} onClick={() => void create(kind as KitKind, hasSections({ kind }) ? onOpenKit : undefined)}>New</Button></div> : null}
           {chrome}
         </div>
       </div></div>
@@ -132,7 +142,7 @@ function LibraryAssets({ source, chrome, kind, view, setView, cols, setCols }: {
         {list.length ? (
           view === 'card'
             ? <JustifiedGrid className="gallery-grid library-layout-card" rowHeight={rowHeightFor((expanded ? 10 : 7) - cols + (embedded ? 1 : 0))} items={gridItems} />
-            : <div className={`gallery-grid library-layout-${view}`}>{list.map((x) => <LibraryTile key={x.id} item={x} view={view} />)}</div>
+            : <div className={`gallery-grid library-layout-${view}`}>{list.map((x) => <LibraryTile key={x.id} item={x} view={view} onOpenKit={onOpenKit} />)}</div>
         ) : <div className="empty-block"><p>{emptyMsg}</p></div>}
       </div></div></div>
     </>
@@ -212,11 +222,12 @@ function KitMenuBody({ item, close }: { item: Subject; close: () => void }) {
   </>;
 }
 
-function LibraryTile({ item, view }: { item: Subject; view: ItemView }) {
+function LibraryTile({ item, view, onOpenKit }: { item: Subject; view: ItemView; onOpenKit: (id: string) => void }) {
   const assets = useStore((s) => s.assets), sessionId = useStore((s) => s.activeSessionId), workspace = useStore((s) => s.ui.workspace);
   const kit = isKit(item), cover = coverOf(item, assets), title = kit ? item.name : `@${item.name}`;
   const open = () => {
-    if (kit) {
+    if (hasSections(item)) onOpenKit(item.id);
+    else if (kit) {
       const sp = spaceOf(workspace);
       void openKitIn(sessionId, item.id, sp === 'nodes' && !canOpenNodes(item, assets) ? 'designer' : sp).catch((e) => toast((e as Error).message, 'error'));
     } else if (cover) setUi({ lightbox: { assetIds: [cover, ...item.refAssetIds], index: 0 } });

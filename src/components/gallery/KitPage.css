@@ -1,0 +1,45 @@
+.kit-crumbs { gap: 0.375rem; min-width: 0; }
+.kit-crumbs strong, .kit-crumb { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kit-crumb { padding: 0; border: 0; background: none; color: var(--text-2); cursor: pointer; }
+.kit-crumb:hover { color: var(--text); }
+.gallery-scroll.is-busy { opacity: 0.7; }
+.kit-sections { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 0.875rem 0.75rem; padding: 0.75rem; }
+.side-panel.is-expanded .kit-sections { grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); }
+.kit-section { display: flex; flex-direction: column; gap: 0.75rem; min-height: 100%; padding: 0.75rem; box-sizing: border-box; }
+.kit-section > .kit-sections { padding: 0; }
+.kit-section.is-over { outline: 2px solid var(--accent); outline-offset: -0.25rem; }
+.kit-tile { display: flex; flex-direction: column; gap: 0.375rem; width: 100%; padding: 0; border: 0; background: none; color: var(--text); text-align: left; cursor: pointer; }
+.kit-tile:disabled { cursor: default; opacity: 0.6; }
+.kit-tile-art { display: grid; place-items: center; width: 100%; aspect-ratio: 3 / 2; overflow: hidden; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-3); box-sizing: border-box; }
+.kit-tile:hover:not(:disabled) .kit-tile-art, .kit-tile:focus-visible .kit-tile-art { border-color: var(--text-3); }
+.kit-tile.is-new .kit-tile-art { border-style: dashed; background: none; }
+.kit-tile.is-new input { width: 85%; min-width: 0; }
+.kit-tile-name { display: flex; align-items: center; justify-content: space-between; gap: 0.375rem; font-size: var(--fs-s); }
+.kit-tile-art.is-images { place-items: stretch; gap: 0.125rem; }
+.kit-tile-art.n2, .kit-tile-art.n3, .kit-tile-art.n4 { grid-template-columns: 1fr 1fr; }
+.kit-tile-art.n3, .kit-tile-art.n4 { grid-template-rows: 1fr 1fr; }
+.kit-tile-art.n3 > :first-child { grid-row: span 2; }
+.kit-tile-art.is-images > * { width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: cover; pointer-events: none; }
+.kit-tile-art:has(.kit-tile-color) { display: flex; }
+.kit-tile-color { flex: 1; align-self: stretch; }
+.kit-tile-font { font-size: 2.25rem; color: var(--text); }
+.kit-tile-quote { padding: 0.625rem; font-size: var(--fs-xs); color: var(--text-2); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; }
+.kit-add { display: flex; align-items: center; gap: 0.375rem; }
+.kit-images { display: grid; grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr)); gap: 0.5rem; }
+.kit-image { position: relative; min-width: 0; }
+.kit-image > .pc-more { position: absolute; top: 0.25rem; right: 0.25rem; }
+.kit-image-use { display: block; width: 100%; aspect-ratio: 1; padding: 0; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); cursor: pointer; }
+.kit-image-use:hover, .kit-image-use:focus-visible { border-color: var(--text-3); }
+.kit-image-use > * { width: 100%; height: 100%; object-fit: contain; }
+.kit-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(3.5rem, 1fr)); gap: 0.5rem; }
+.kit-swatch { aspect-ratio: 1; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.kit-section > .kit-tokens { padding: 0; }
+.kit-section .kit-tokens-rows { max-height: none; }
+.kit-text { display: flex; flex-direction: column; gap: 0.25rem; }
+.kit-text textarea { width: 100%; resize: vertical; box-sizing: border-box; }
+.kit-text-tools { display: flex; justify-content: flex-end; gap: 0.25rem; }
+.kit-pick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.375rem; max-height: 18rem; overflow-y: auto; padding: 0.25rem; }
+.kit-pick-item { aspect-ratio: 1; padding: 0; overflow: hidden; border: 2px solid transparent; border-radius: 8px; background: var(--surface-2); cursor: pointer; }
+.kit-pick-item.is-on { border-color: var(--accent); }
+.kit-pick-item > * { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.kit-empty { padding: 0.75rem; }

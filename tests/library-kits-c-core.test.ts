@@ -58,7 +58,7 @@ describe('Part 2: Graph model, KIT_KINDS table, trimmed tokens, shared approxLay
     expect(typeof (Doc as Record<string, unknown>).approxLayerBox).toBe('function');
     expect(Types.KIT_KINDS).toMatchObject({
       moodboard: { tokens: false, kits: false },
-      'design-system': { tokens: true, kits: false },
+      'design-system': { tokens: true, kits: true },
       'brand-kit': { tokens: true, kits: true },
     });
 

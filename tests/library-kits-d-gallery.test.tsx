@@ -257,6 +257,8 @@ describe('Lote D Parte 1: Library kit categories, cards, menu, versions, compone
       const st = useStore.getState();
       expect(st.library).toMatchObject([{ name: 'Brand kit 1', kind: 'brand-kit', origin: { space: 'nodes' } }]);
       expect(st.ui).toMatchObject({ panel: 'gallery', workspace: ui.workspace });
+      expect(host.querySelector('.kit-crumbs')?.textContent).toContain('Brand kit 1');
+      await click(host.querySelector<HTMLButtonElement>('button[aria-label="Back"]')!);
       await openSource('Moodboards');
     }
   });

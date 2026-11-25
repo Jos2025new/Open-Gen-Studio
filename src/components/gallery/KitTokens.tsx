@@ -30,7 +30,7 @@ function tokensOf(rows: readonly Row[]): Tokens {
 }
 
 /** The design tokens of a design system or brand kit: seen, edited, imported and exported. Save makes a version. */
-export function KitTokens({ item, onDone }: { item: Subject; onDone: () => void }) {
+export function KitTokens({ item, onDone, types = TOKEN_TYPES }: { item: Subject; onDone: () => void; /** Only these types show; the rest stay as they are. */ types?: readonly KitTokenType[] }) {
   const [rows, setRows] = useState(() => rowsOf(item.tokens)), [busy, setBusy] = useState(false), file = useRef<HTMLInputElement>(null);
   const patch = (i: number, p: Partial<Row>) => setRows((rs) => rs.map((r, k) => (k === i ? { ...r, ...p } : r)));
   const add = (type: KitTokenType) => setRows((rs) => {
@@ -60,7 +60,7 @@ export function KitTokens({ item, onDone }: { item: Subject; onDone: () => void 
   return (
     <form className="kit-tokens" onSubmit={(e) => { e.preventDefault(); void save(); }}>
       <div className="kit-tokens-rows">
-        {rows.map((r, i) => (
+        {rows.map((r, i) => types.includes(r.type) && (
           <div key={i} className="kit-token">
             {r.type === 'color'
               ? <input type="color" aria-label={`${r.name} color`} value={/^#[0-9a-f]{6}$/i.test(color(r)) ? color(r) : '#000000'} onChange={(e) => patch(i, { value: e.target.value })} />
@@ -71,7 +71,7 @@ export function KitTokens({ item, onDone }: { item: Subject; onDone: () => void 
           </div>
         ))}
       </div>
-      <div className="kit-tokens-add">{TOKEN_TYPES.map((t) => <Button key={t} size="sm" variant="ghost" icon={Plus} disabled={busy} onClick={() => add(t)}>{LABELS[t]}</Button>)}</div>
+      <div className="kit-tokens-add">{types.map((t) => <Button key={t} size="sm" variant="ghost" icon={Plus} disabled={busy} onClick={() => add(t)}>{LABELS[t]}</Button>)}</div>
       <input ref={file} type="file" accept=".json,application/json" hidden onChange={(e) => { void importFile(e.target.files?.[0]); e.target.value = ''; }} />
       <div className="confirm-pop-actions">
         <IconButton icon={Upload} size="sm" label="Import tokens" onClick={() => file.current?.click()} />
