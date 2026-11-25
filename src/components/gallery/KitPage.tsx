@@ -8,6 +8,8 @@ import { objectPicks } from '../../engine/design/objectSelection';
 import { familyPatch, tokenPatch, tokenValue } from '../../engine/design/tokenBind';
 import { rememberColor } from '../../engine/design/swatches';
 import { FONT_ACCEPT } from '../../engine/fontFiles';
+import { applyFont } from './FontTile';
+import { useDesign } from './useDesign';
 import { addFonts, removeFont } from '../../engine/ownFonts';
 import { insertComponent } from '../../engine/libraryInsert';
 import { addCategory, addToSection, kitSections, moveToSection, removeCategory, removeFromSection, sectionNodes, setSectionText, type KitSection } from '../../engine/librarySections';
@@ -28,17 +30,6 @@ const assetOf = (n: GraphNode) => (n.data.kind === 'asset' ? n.data.assetId ?? u
 const tokensOf = (s: Subject, sec: KitSection) => Object.entries(s.tokens ?? {}).filter(([, t]) => sec.tokens?.includes(t.type)).map(([name, t]) => ({ name, token: name as string | undefined, type: t.type, value: String(resolveToken(s.tokens!, name) ?? t.value) }));
 const colorsOf = (s: Subject, sec: KitSection) => [...tokensOf(s, sec), ...(s.graph?.nodes ?? []).flatMap((n) => (n.data.kind === 'part' && n.data.color ? [{ name: n.data.title, token: undefined, type: 'color' as const, value: n.data.color }] : []))];
 const insideOf = (s: Subject, sec: KitSection, library: readonly Subject[]) => (s.kits ?? []).flatMap((id) => library.find((x) => x.id === id && x.kind === sec.kit) ?? []);
-
-/** The Designer document the user is on, if any. */
-function useDesign() {
-  const sessionId = useStore((s) => s.activeSessionId);
-  const docId = useStore((s) => {
-    if (s.ui.workspace !== 'designer' || s.ui.home) return undefined;
-    const docs = s.sessions[s.activeSessionId]?.docs.filter((d) => d.view !== 'studio' && d.library?.view !== 'studio') ?? [];
-    return (docs.find((d) => d.id === s.sessions[s.activeSessionId].activeDocId) ?? docs[0])?.id;
-  });
-  return { sessionId, docId };
-}
 
 /** A brand kit or design system in Library: its sections, each filled and used in place. */
 export function KitPage({ item, chrome, menu, cover, onBack, onOpen, onDesign }: {
@@ -131,12 +122,7 @@ function Swatches({ item, section }: { item: Subject; section: KitSection }) {
 function Fonts({ item, busy, run }: SectionProps) {
   const { sessionId, docId } = useDesign(), file = useRef<HTMLInputElement>(null);
   const families = [...new Set((item.fonts ?? []).map((f) => f.family))];
-  const use = (family: string) => {
-    const patch = familyPatch(item, family);
-    const doc = docId ? getDoc(sessionId, docId) : undefined, layer = doc?.layers.find((l) => l.id === doc.activeLayerId);
-    if (doc && layer?.type === 'text' && !layer.locked) patchLayer(sessionId, doc.id, layer.id, patch);
-    else setUi((u) => ({ text: { ...u.text, ...patch } }));
-  };
+  const use = (family: string) => applyFont(sessionId, docId, familyPatch(item, family));
   return <>
     <div className="kit-add">
       <input ref={file} type="file" accept={FONT_ACCEPT} multiple hidden onChange={(e) => { const list = [...(e.target.files ?? [])]; e.target.value = ''; void run(async () => { const names = await addFonts(item.id, list); if (names.length) toast(`${names.join(', ')} added.`, 'success'); }); }} />

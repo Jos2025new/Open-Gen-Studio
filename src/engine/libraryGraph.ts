@@ -137,6 +137,8 @@ export function formatLibraryItemIndex(subject: Subject, library: readonly Subje
 export function libraryContextLines(library: readonly Subject[], _assets?: Record<string, unknown>): string[] {
   const out: string[] = [], named = mentionableSubjects(library).filter((s) => !s.capture || s.frontalAssetId);
   if (named.length) out.push(`library (mention as @Name; the app sends its image): ${named.map((s) => `@${s.name} (${s.kind ?? 'character'})${s.description ? ` — ${s.description}` : ''}`).join(', ')}`);
+  const fonts = library.filter((s) => s.kind === 'font').flatMap((s) => s.fonts ?? []);
+  if (fonts.length) out.push(`fonts in Library (use by fontFamily in Designer text): ${fonts.slice(0, 40).map((f) => `${f.id} ${JSON.stringify(f.family)} ${f.variable ? 'any weight' : f.weight}${f.italic ? ' italic' : ''}`).join(', ')}`);
   const kits = library.filter(isKit);
   if (kits.length) out.push(`library items: ${kits.length} (use library.item.list and library.item.read to inspect)`);
   return out;

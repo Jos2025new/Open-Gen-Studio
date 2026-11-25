@@ -1,4 +1,5 @@
 import { unzlibSync } from 'fflate';
+import { buildSfnt } from './sfnt';
 import type { TextLayer } from '../types';
 import type { Font } from 'opentype.js';
 
@@ -50,22 +51,7 @@ export function woffToSfnt(woff: Uint8Array, drop: string[] = []): Uint8Array {
     return { tag: woff.subarray(o, o + 4), data: compressed < original ? unzlibSync(raw) : raw, sum: v.getUint32(o + 16) };
   });
   const tables = all.filter((t) => !drop.includes(String.fromCharCode(...t.tag)));
-  const count = tables.length;
-  const head = 12 + count * 16;
-  const out = new Uint8Array(tables.reduce((size, t) => size + ((t.data.length + 3) & ~3), head));
-  const dv = new DataView(out.buffer);
-  dv.setUint32(0, v.getUint32(packed ? 4 : 0));
-  dv.setUint16(4, count);
-  const pow = 2 ** Math.floor(Math.log2(count));
-  dv.setUint16(6, pow * 16); dv.setUint16(8, Math.log2(pow)); dv.setUint16(10, count * 16 - pow * 16);
-  let at = head;
-  tables.forEach((t, i) => {
-    const o = 12 + i * 16;
-    out.set(t.tag, o); dv.setUint32(o + 4, t.sum); dv.setUint32(o + 8, at); dv.setUint32(o + 12, t.data.length);
-    out.set(t.data, at);
-    at += (t.data.length + 3) & ~3;
-  });
-  return out;
+  return buildSfnt(v.getUint32(packed ? 4 : 0), tables);
 }
 
 export function base64(bytes: Uint8Array): string {

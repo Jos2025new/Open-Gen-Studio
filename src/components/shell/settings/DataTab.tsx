@@ -1,17 +1,22 @@
 import { useRef, useState } from 'react';
-import { HardDrive, Keyboard, Trash, TriangleAlert } from '../../ui/icons';
+import { HardDrive, Images, Keyboard, Paperclip, Trash, TriangleAlert } from '../../ui/icons';
 import { shortcutGroups } from '../../../engine/shortcuts';
-import { wipeAllData } from '../../../store/store';
+import { setSettings, useStore, wipeAllData } from '../../../store/store';
 import { Popover } from '../../ui/Popover';
-import { Button } from '../../ui/primitives';
+import { Button, Toggle } from '../../ui/primitives';
 import { DataSummary } from '../DataSummary';
 import { SetGroup, SetRow } from './SettingsRows';
 
 /** Settings → Data: what is saved and where, and clearing everything (with its own confirmation). The remembered Drawing choice is in the register of notices (Settings → Budget). */
 export function DataTab() {
   const confirmRef = useRef<HTMLButtonElement>(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false), keep = useStore((s) => s.settings.keepAttachments !== false);
   return <>
+    <SetGroup icon={Images} title="Library">
+      <SetRow icon={Paperclip} label="Keep attachments" tip="What you attach to a message also stays in Library, even if its session is deleted.">
+        <Toggle checked={keep} onChange={(v) => setSettings({ keepAttachments: v })} label="Keep attachments in Library" />
+      </SetRow>
+    </SetGroup>
     <SetGroup icon={HardDrive} title="Storage"><DataSummary /></SetGroup>
     <SetGroup icon={TriangleAlert} title="Reset">
       <SetRow icon={Trash} label="Local data">

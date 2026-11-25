@@ -8,6 +8,7 @@ import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { createStoreV2 } from './store-v2.js';
 import { createSqliteStore, sqliteHead, stripSqliteKeys, validateSqliteCommit } from './store-sqlite.js';
+import { BROTLI_MAX_BYTES, handleUnbrotli } from './brotli.js';
 import { EPS_MAX_BYTES, handleEps } from './eps.js';
 import { PROVIDERS, createKeyStore, maskOf, sanitizeKeysInText } from './keys.js';
 import { handleProxy } from './provider-proxy.js';
@@ -254,6 +255,13 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
     if (path === '/eps' && req.method === 'POST') {
       if (Number(req.headers['content-length'] ?? 0) > EPS_MAX_BYTES) return send(413, 'EPS file too large');
       const r = await handleEps(await body(req));
+      return send(r.status, r.body, r.type);
+    }
+
+    // The Brotli part of a WOFF2 font (brotli.js). Behind the same checks.
+    if (path === '/unbrotli' && req.method === 'POST') {
+      if (Number(req.headers['content-length'] ?? 0) > BROTLI_MAX_BYTES) return send(413, 'font too large');
+      const r = await handleUnbrotli(await body(req));
       return send(r.status, r.body, r.type);
     }
 

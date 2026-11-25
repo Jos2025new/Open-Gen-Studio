@@ -46,6 +46,7 @@ function rememberNodeLibrary(name: string): void {
 export function saveSubject(subject: Subject): void {
   const previous = get().library.find(s => s.id === subject.id);
   if (previous && isKit(previous)) throw new Error(`Cannot overwrite kit "${subject.id}" with saveSubject; use kit commands instead.`);
+  if (previous?.kind === 'font') throw new Error(`"${previous.name}" is a font.`);
   if (isKit(subject)) throw new Error(`Cannot save kit "${subject.id}" with saveSubject; use kit commands instead.`);
   if (previous) rememberNodeLibrary(previous.name);
   useStore.setState((st) => ({

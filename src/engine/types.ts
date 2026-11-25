@@ -259,6 +259,8 @@ export interface Asset {
   height: number;
   duration?: number;
   sessionId: string;
+  /** Attached by the user and kept in Library: it outlives its session. */
+  kept?: boolean;
   generationId?: string;
   origin: 'generated' | 'upload' | 'design' | 'frame' | 'sketch' | 'mask' | 'view3d';
   place?: Place;
@@ -637,7 +639,7 @@ export interface Subject extends LibraryKitFields {
   id: string;
   name: string;
   /** Library tab; older subjects without one are characters. */
-  kind?: SubjectKind | KitKind;
+  kind?: SubjectKind | KitKind | 'font';
   description?: string;
   /** Main (frontal) image. */
   frontalAssetId?: string;

@@ -42,5 +42,5 @@ export interface KitGroupLink { subjectId: string; versionId?: string; corner?: 
 export const isKit = <T extends { kind?: string }>(subject: T | null | undefined): boolean =>
   Boolean(subject?.kind && Object.prototype.hasOwnProperty.call(KIT_KINDS, subject.kind));
 
-/** Subjects that can be mentioned as @Name or sent as provider references (never kits). */
-export const mentionableSubjects = <T extends { kind?: string }>(library: readonly T[]): T[] => library.filter((s) => !isKit(s));
+/** Subjects that can be mentioned as @Name or sent as provider references (never kits or fonts). */
+export const mentionableSubjects = <T extends { kind?: string }>(library: readonly T[]): T[] => library.filter((s) => !isKit(s) && s.kind !== 'font');

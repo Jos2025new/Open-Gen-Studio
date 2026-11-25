@@ -11,7 +11,7 @@ import { addAssets, setComposer, setUi, toast, useStore } from '../store/store';
 import { editCompound } from './nodecore/edit';
 import { clearGenerationPass } from './budget';
 import { libraryAssetOwners } from './libraryGraph';
-import { isFontFile, keepInSession, storeFonts } from './fontFiles';
+import { isFontFile, keepInLibrary, keepInSession, storeFonts } from './fontFiles';
 
 const get = useStore.getState;
 
@@ -153,14 +153,16 @@ export async function uploadFiles(files: File[]): Promise<string[]> {
 }
 
 export async function attachFiles(all: File[]): Promise<void> {
-  const files = all.filter((f) => !isFontFile(f)), fontFiles = all.filter(isFontFile), sessionId = get().activeSessionId;
+  const files = all.filter((f) => !isFontFile(f)), fontFiles = all.filter(isFontFile), sessionId = get().activeSessionId, keep = get().settings.keepAttachments !== false;
   if (fontFiles.length) try {
     const fonts = await storeFonts(fontFiles);
     keepInSession(sessionId, fonts);
+    if (keep) keepInLibrary(fonts);
     setComposer((c) => ({ attachments: [...c.attachments, ...fonts.map((f) => f.id)] }));
   } catch (err) { toast((err as Error).message, 'error'); }
   if (!files.length) return;
   const ids = await uploadFiles(files);
+  if (keep && ids.length) useStore.setState((st) => ({ assets: { ...st.assets, ...Object.fromEntries(ids.flatMap((id) => (st.assets[id] ? [[id, { ...st.assets[id], kept: true }]] : []))) } }));
   // A GLB is imported to the gallery (open it there); no model takes a 3D file as input.
   const models = ids.filter((id) => get().assets[id]?.kind === 'model3d');
   if (models.length) toast(`${models.length} 3D model${models.length > 1 ? 's' : ''} added to Library.`, 'info');

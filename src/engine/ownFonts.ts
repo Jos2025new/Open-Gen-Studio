@@ -1,5 +1,5 @@
 import { useStore } from '../store/store';
-import { fontById, showFonts, storeFonts } from './fontFiles';
+import { fontById, showFonts, storeFonts, withFonts } from './fontFiles';
 import type { KitActor, KitFont, KitTokens } from './libraryTypes';
 import { saveItem } from './libraryVersions';
 
@@ -23,9 +23,8 @@ export async function putFonts(subjectId: string, fonts: readonly KitFont[], by:
     while (tokens[`font.${n}`]) n++;
     tokens[`font.${n}`] = { type: 'fontFamily', value: family };
   }
-  const same = (a: KitFont, b: KitFont) => a.family === b.family && a.weight === b.weight && a.italic === b.italic;
   await saveItem({ subjectId, mode: 'overwrite', space: 'library', by, tokens });
-  useStore.setState((st) => ({ library: st.library.map((s) => (s.id === subjectId ? { ...s, fonts: [...(s.fonts ?? []).filter((f) => !fonts.some((r) => same(r, f))), ...fonts] } : s)) }));
+  useStore.setState((st) => ({ library: st.library.map((s) => (s.id === subjectId ? { ...s, fonts: withFonts(s.fonts, fonts) } : s)) }));
   showFonts();
   return families;
 }

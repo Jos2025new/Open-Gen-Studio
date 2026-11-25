@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from 'react';
 import {
   Box, ChevronLeft, Eye, EyeOff, Funnel, Grid2X2, History, Layers, LayoutGrid, Maximize2, MessageSquare,
-  Minimize2, Palette, Pencil, PenTool, Plus, Shapes, Sparkles, Tag, Trash, UserRound, Workflow, X, type LucideIcon,
+  Minimize2, Palette, Pencil, PenTool, Plus, Shapes, Sparkles, Tag, Trash, Type, UserRound, Workflow, X, type LucideIcon,
 } from '../ui/icons';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { setUserHidden } from '../../store/userHidden';
@@ -27,22 +27,24 @@ import { CardActions, Figures } from './GalleryTiles';
 import { SearchToggle, CardMenu, GridSizeSlider, LayoutSegmented, MenuConfirm, MenuItem, PanelPopover, SortSegmented, SourceSelect, ToggleRow, asItemView, useTapReveal, type ItemView, type RailItem, type SortState } from '../ui/PanelControls';
 import { JustifiedGrid } from '../ui/JustifiedGrid';
 import { rowHeightFor } from '../../lib/justifiedRows';
+import { FontTile, UploadFonts } from './FontTile';
 import { GeneratedAssets } from './GeneratedAssets';
 import './GalleryLayout.css';
 
-type LibraryKind = SubjectKind | KitKind;
+type LibraryKind = SubjectKind | KitKind | 'font';
 type Category = 'all' | LibraryKind;
 type OpenSpace = 'studio' | 'designer' | 'nodes';
 const SUBJECT_ICONS: Record<SubjectKind, LucideIcon> = { character: UserRound, object: Shapes, product: Tag, location: Box, style: Palette };
 /** All shows what was generated; each category shows the saved library items of that kind. */
 const ORDER: SubjectKind[] = ['character', 'location', 'product', 'object', 'style'];
 const isKitKind = (k: string): k is KitKind => Object.prototype.hasOwnProperty.call(KIT_KINDS, k);
-const itemKind = (x: Subject): LibraryKind => (isKit(x) ? (x.kind as KitKind) : ((x.kind as SubjectKind | undefined) ?? 'character'));
+const itemKind = (x: Subject): LibraryKind => (isKit(x) ? (x.kind as KitKind) : ((x.kind as SubjectKind | 'font' | undefined) ?? 'character'));
 const spaceOf = (w: Workspace): OpenSpace => (w === 'chat' ? 'studio' : w === 'node' ? 'nodes' : 'designer');
 const SOURCES: RailItem<Category>[] = [
   { id: 'all', label: 'All', icon: Grid2X2 },
   ...ORDER.map((k) => ({ id: k, label: SUBJECT_KINDS.find((x) => x.value === k)!.label, icon: SUBJECT_ICONS[k] })),
   ...KIT_KIND_LIST.map((k) => ({ id: k, label: KIT_META[k].label, icon: KIT_META[k].icon })),
+  { id: 'font', label: 'Fonts', icon: Type },
 ];
 function coverOf(item: Subject, assets: Record<string, Asset>): string | undefined {
   if (!isKit(item)) return item.frontalAssetId ?? item.videoAssetId;
@@ -111,10 +113,11 @@ function LibraryAssets({ onOpenKit, source, chrome, kind, view, setView, cols, s
   const space = omni ? 'nodes' : spaceOf(workspace);
   const { busy: creating, create } = useNewKit(sessionId, space, () => { if (space !== 'nodes') goSpace(space); });
   const emptyMsg = library.some((x) => itemKind(x) === kind) ? 'Nothing matches this search.'
-    : kitKind ? 'No saved items yet.' : 'Save a result with Send to → Save to Library, or let the agent create references. Mention them as @Name in any prompt.';
+    : kitKind || kind === 'font' ? 'No saved items yet.' : 'Save a result with Send to → Save to Library, or let the agent create references. Mention them as @Name in any prompt.';
+  const tile = (x: Subject) => (x.kind === 'font' ? <FontTile key={x.id} item={x} view={view} /> : <LibraryTile key={x.id} item={x} view={view} onOpenKit={onOpenKit} />);
   const gridItems = list.map((x) => {
     const a = assets[coverOf(x, assets) ?? ''];
-    return { id: x.id, ratio: a && a.width > 0 && a.height > 0 ? a.width / a.height : 1, node: <LibraryTile item={x} view={view} onOpenKit={onOpenKit} /> };
+    return { id: x.id, ratio: a && a.width > 0 && a.height > 0 ? a.width / a.height : 1, node: tile(x) };
   });
   return (
     <>
@@ -134,6 +137,7 @@ function LibraryAssets({ onOpenKit, source, chrome, kind, view, setView, cols, s
           </div>
         </div>
         <div className="pc-grp pc-right">
+          {kind === 'font' ? <UploadFonts /> : null}
           {kitKind ? <div className="pc-flags"><Button size="sm" icon={Plus} disabled={creating} onClick={() => void create(kind as KitKind, hasSections({ kind }) ? onOpenKit : undefined)}>New</Button></div> : null}
           {chrome}
         </div>
@@ -142,7 +146,7 @@ function LibraryAssets({ onOpenKit, source, chrome, kind, view, setView, cols, s
         {list.length ? (
           view === 'card'
             ? <JustifiedGrid className="gallery-grid library-layout-card" rowHeight={rowHeightFor((expanded ? 10 : 7) - cols + (embedded ? 1 : 0))} items={gridItems} />
-            : <div className={`gallery-grid library-layout-${view}`}>{list.map((x) => <LibraryTile key={x.id} item={x} view={view} onOpenKit={onOpenKit} />)}</div>
+            : <div className={`gallery-grid library-layout-${view}`}>{list.map(tile)}</div>
         ) : <div className="empty-block"><p>{emptyMsg}</p></div>}
       </div></div></div>
     </>

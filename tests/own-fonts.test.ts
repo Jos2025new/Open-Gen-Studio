@@ -7,9 +7,13 @@ import { newTextLayer } from '../src/engine/design/doc';
 import { createItem, saveItem } from '../src/engine/libraryVersions';
 import { loadFontFile } from '../src/engine/fontFiles';
 import { addFonts, removeFont } from '../src/engine/ownFonts';
-import { attachFiles } from '../src/engine/actions';
+import { handleUnbrotli } from '../server/brotli.js';
+import { attachFiles, deleteSession, deleteSubject, saveSubject } from '../src/engine/actions';
 import { attachmentLines } from '../src/engine/agent/attachments';
 import { run } from '../src/engine/commands';
+import { libraryContextLines } from '../src/engine/libraryGraph';
+import { mentionableSubjects } from '../src/engine/libraryTypes';
+import type { Asset } from '../src/engine/types';
 import { createSession, useStore } from '../src/store/store';
 
 const woff = new Uint8Array(readFileSync('node_modules/@fontsource/inter/files/inter-latin-700-normal.woff'));
@@ -65,6 +69,7 @@ describe('own fonts', () => {
     expect(attachmentLines([font.id], st.sessions[sid]).join()).toMatch(`${font.id} fontFamily="Inter" (weight 700) attached now`);
     expect(attachmentLines([], st.sessions[sid]).join()).toContain(font.id);
     expect(item().fonts).toBeUndefined();
+    expect(st.library.find((s) => s.kind === 'font')).toMatchObject({ name: 'Inter', fonts: [font] });
     expect(await bytes()).toEqual(ttf);
     const add = (args: object) => run({ cmd: 'library.item.add', args: { id: kit, section: 'Fonts', ...args } }, { caller: 'agent' });
     expect(await add({ fonts: [font.id] })).toMatchObject({ ok: true });
@@ -73,6 +78,36 @@ describe('own fonts', () => {
     expect(item().fonts).toHaveLength(1);
     useStore.setState((s) => ({ sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], fonts: undefined } } }));
     expect(await bytes()).toEqual(ttf);
+  });
+
+  it('what is attached stays in Library unless the setting is off', async () => {
+    const s1 = createSession('S1'), s2 = createSession('S2'), own = () => useStore.getState().library.filter((s) => s.kind === 'font');
+    const asset = (id: string, kept?: boolean) => ({ id, kind: 'image', mime: 'image/png', width: 1, height: 1, sessionId: s1.id, origin: 'upload', stored: true, favorite: false, createdAt: 1, ...(kept ? { kept } : {}) }) as Asset;
+    useStore.setState((s) => ({ sessions: { [s1.id]: s1, [s2.id]: s2 }, activeSessionId: s1.id, assets: { a: asset('a', true), b: asset('b') }, settings: { ...s.settings, keepAttachments: false } }));
+    await attachFiles([new File([ttf], 'given.ttf')]);
+    expect(own()).toEqual([]);
+    useStore.setState((s) => ({ settings: { ...s.settings, keepAttachments: undefined } }));
+    await attachFiles([new File([ttf], 'given.ttf')]);
+    await attachFiles([new File([ttf], 'again.ttf')]);
+    expect(own()).toMatchObject([{ name: 'Inter', fonts: [{ name: 'again.ttf' }] }]);
+    const library = useStore.getState().library;
+    expect(mentionableSubjects(library)).toEqual([]);
+    expect(libraryContextLines(library).join()).toContain('fonts in Library');
+    expect(() => saveSubject({ ...own()[0], kind: 'style' })).toThrow('is a font');
+    deleteSession(s1.id);
+    expect(Object.keys(useStore.getState().assets)).toEqual(['a']);
+    expect(await loadFontFile('Inter', 700)).toEqual(ttf);
+    deleteSubject(own()[0].id);
+    expect(own()).toEqual([]);
+  });
+
+  it('a WOFF2 is kept as TTF', async () => {
+    const packed = new Uint8Array(readFileSync('node_modules/@fontsource/inter/files/inter-latin-700-normal.woff2'));
+    vi.stubGlobal('fetch', async (_: string, init: { body: Uint8Array }) => { const r = await handleUnbrotli(init.body); return new Response(r.body as BodyInit, { status: r.status }); });
+    expect(await addFonts(kit, [new File([packed], 'inter.woff2')])).toEqual(['Inter']);
+    const data = (await loadFontFile('Inter', 700))!;
+    expect([fontInfo(data), canOutline(data)]).toEqual([{ family: 'Inter', weight: 700 }, true]);
+    await expect(addFonts(kit, [new File([packed.slice(0, 500)], 'x.woff2')])).rejects.toThrow('could not be read as a font');
   });
 
   it('fonts do not go in a moodboard', async () => {

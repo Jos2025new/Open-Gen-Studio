@@ -3,12 +3,13 @@ import { blobDb } from '../lib/idb';
 import { useStore } from '../store/store';
 import { loadBundledFont } from './design/exportFontFiles';
 import { fontInfo } from './design/exportText';
+import { isWoff2, woff2ToSfnt } from './design/woff2';
 import { withCleanup, writeVerified } from './librarySnapshot';
 import type { KitFont } from './libraryTypes';
 
 /* The user's font files (of Library entries and of sessions), for the page and for exports. */
 const MAX_BYTES = 12 * 1024 * 1024;
-export const FONT_ACCEPT = '.ttf,.otf,.woff,font/ttf,font/otf,font/woff';
+export const FONT_ACCEPT = '.ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2';
 export const isFontFile = (f: { name: string }) => /\.(ttf|otf|woff2?)$/i.test(f.name);
 const fontKey = (id: string) => `font:${id}`;
 const bytesOf = new Map<string, Promise<Uint8Array | null>>();
@@ -33,16 +34,26 @@ export const fontById = (id: string, st?: St): KitFont | undefined => (id.starts
 /** A font as the agent reads it. */
 export const fontLine = (f: KitFont): string => `${f.id} fontFamily=${JSON.stringify(f.family)} (${f.variable ? 'any weight' : `weight ${f.weight}`}${f.italic ? ', italic' : ''})`;
 
+async function unbrotli(packed: Uint8Array): Promise<Uint8Array> {
+  const res = await fetch('/x/store/unbrotli', { method: 'POST', headers: { 'X-OGS': '1', 'Content-Type': 'application/octet-stream' }, body: packed.slice() });
+  if (!res.ok) throw new Error('Could not unpack the font.');
+  return new Uint8Array(await res.arrayBuffer());
+}
+
 /** Reads and stores font files; all of them or none. */
 export async function storeFonts(files: readonly File[]): Promise<KitFont[]> {
   const ready: Array<{ font: KitFont; data: Uint8Array; type: string }> = [];
   for (const file of files) {
     if (file.size > MAX_BYTES) throw new Error(`"${file.name}" is larger than 12 MB.`);
-    const data = new Uint8Array(await file.arrayBuffer()), info = fontInfo(data);
+    let data = new Uint8Array(await file.arrayBuffer());
+    // Kept as TTF/OTF: exports read its outlines.
+    const packed = isWoff2(data);
+    if (packed) data = new Uint8Array(await woff2ToSfnt(data, unbrotli).catch(() => { throw new Error(`"${file.name}" could not be read as a font.`); }));
+    const info = fontInfo(data);
     if (!info) throw new Error(`"${file.name}" is not a TTF, OTF or WOFF font.`);
     const font: KitFont = { id: uid('font'), ...info, name: file.name };
     await face(font, data).load().catch(() => { throw new Error(`"${file.name}" could not be read as a font.`); });
-    ready.push({ font, data, type: file.type || 'font/ttf' });
+    ready.push({ font, data, type: packed ? 'font/ttf' : file.type || 'font/ttf' });
   }
   return withCleanup(async (written) => {
     for (const r of ready) await writeVerified(fontKey(r.font.id), new Blob([r.data.slice()], { type: r.type }), r.data, written);
@@ -57,6 +68,22 @@ export function keepInSession(sessionId: string, fonts: readonly KitFont[]): voi
     return s && add.length ? { sessions: { ...st.sessions, [sessionId]: { ...s, fonts: [...(s.fonts ?? []), ...add] } } } : st;
   });
   showFonts();
+}
+
+const sameFace = (a: KitFont, b: KitFont) => a.family === b.family && a.weight === b.weight && Boolean(a.italic) === Boolean(b.italic);
+/** A list of fonts with others added; the same face is replaced. */
+export const withFonts = (old: readonly KitFont[] | undefined, add: readonly KitFont[]): KitFont[] => [...(old ?? []).filter((f) => !add.some((r) => sameFace(r, f))), ...add];
+
+/** Fonts in Library on their own, one entry per family. */
+export function keepInLibrary(fonts: readonly KitFont[]): void {
+  useStore.setState((st) => {
+    let library = st.library;
+    for (const family of new Set(fonts.map((f) => f.family))) {
+      const add = fonts.filter((f) => f.family === family), old = library.find((s) => s.kind === 'font' && s.name === family);
+      library = old ? library.map((s) => (s === old ? { ...s, fonts: withFonts(s.fonts, add) } : s)) : [...library, { id: uid('sub'), name: family, kind: 'font', refAssetIds: [], fonts: add }];
+    }
+    return { library };
+  });
 }
 
 /** Makes the Library's font files available to the page; text that waited for one redraws by itself (a face made from bytes does not announce itself). */

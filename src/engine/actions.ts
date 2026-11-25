@@ -491,7 +491,7 @@ export function deleteSession(sessionId: string): void {
   const kept = libraryAssetSet(st.library);
   // Running generations are not canceled (the provider may charge anyway): they finish and jobs.purgeDiscarded removes them.
   const active = new Set(Object.values(st.generations).filter((g) => g.sessionId === sessionId && isRunning(g.id)).map((g) => g.id));
-  const assetIds = Object.values(st.assets).filter((a) => a.sessionId === sessionId && !kept.has(a.id) && !(a.generationId && active.has(a.generationId))).map((a) => a.id);
+  const assetIds = Object.values(st.assets).filter((a) => a.sessionId === sessionId && !a.kept && !kept.has(a.id) && !(a.generationId && active.has(a.generationId))).map((a) => a.id);
   const genIds = Object.values(st.generations).filter((g) => g.sessionId === sessionId && !active.has(g.id)).map((g) => g.id);
   const rasterIds = rasterBufferIds(s.docs.flatMap((d) => d.layers));
   useStore.setState((cur) => {
