@@ -7,7 +7,7 @@ import * as D from './design/doc';
 import { canRedo, canUndo, dropHistory } from './design/history';
 import { flushRaster, rasterBufferIds } from './design/raster';
 import { wouldCreateKitCycle } from './libraryGraph';
-import { assetRatio, boardNodes, bringGraph, graphFromDoc, loadBoardImages } from './libraryBoard';
+import { assetRatio, boardNodes, bringGraph, graphFromDoc, loadBoardImages, withoutGone } from './libraryBoard';
 import { NODE_WIDTH } from './flow/graph-layout';
 import { boardLayout, fromOrigin } from './libraryLayout';
 import { copyDocPixels, expectedRasterIds, readKitVersion, remapDoc, rKey, vKey, withCleanup, writeVerified, type KitVersionSnapshot } from './librarySnapshot';
@@ -168,7 +168,7 @@ function openInSpace(sessionId: string, subjectId: string, space: 'studio' | 'de
           return { ...(promote ? rest : d), name: subject.name, library: lib };
         });
       }
-      const prepared = await loadBoardImages(existing, subject.graph, subject.kind, true);
+      const prepared = await loadBoardImages(existing, subject.graph, subject.kind);
       bringGraph(sessionId, existing.id, subject.graph, subject.kind, prepared);
       setDoc(sessionId, existing.id, (d) => (d.library?.subjectId === subjectId && d.library.versionId !== curVer ? { ...d, library: { ...d.library, versionId: curVer } } : d));
       selectDoc(sessionId, existing.id);
@@ -235,12 +235,12 @@ export function saveItem(opts: {
       let storedDoc: DesignDoc | undefined, storedRasterIds: string[] | undefined, docRev: string | undefined;
       if (workDoc || (prevSnap?.doc && opts.mode === 'copy')) {
         if (workDoc) await flushRaster();
-        const src = workDoc ? { ...workDoc, ...(back?.board ? { board: back.board } : {}) } : prevSnap!.doc!;
+        const src = workDoc ? { ...workDoc, ...(back?.board ? { board: back.board } : {}) } : withoutGone(prevSnap!.doc!, graph);
         const copied = await copyDocPixels(src, workDoc && opts.mode === 'overwrite' ? prevSnap?.doc : null, workDoc ? undefined : expectedRasterIds(prevSnap!), written);
         storedDoc = remapDoc(src, copied.map, { newDocId: false }); storedRasterIds = copied.storedIds; docRev = uid('drev');
       } else if (prevSnap?.doc) {
         for (const rid of expectedRasterIds(prevSnap)) if (!(await blobDb.get(rKey(rid)))) throw new Error(`Missing expected pixel blob "${rKey(rid)}".`);
-        storedDoc = prevSnap.doc; storedRasterIds = prevSnap.storedRasterIds ?? rasterBufferIds(prevSnap.doc.layers); docRev = prevSnap.docRev ?? cur.docRev ?? uid('drev');
+        storedDoc = withoutGone(prevSnap.doc, graph); storedRasterIds = prevSnap.storedRasterIds ?? rasterBufferIds(prevSnap.doc.layers); docRev = prevSnap.docRev ?? cur.docRev ?? uid('drev');
       }
       const at = Date.now(), targetEntry: Subject = opts.mode === 'copy'
         ? { id: targetId, name: copyName(opts.name?.trim() || cur.name), kind, refAssetIds: [], copiedFrom: cur.id, draft: opts.by === 'user' ? false : Boolean(cur.draft), origin: { space: opts.space, by: opts.by, at, ...(session ? { sessionId: session.id, sessionTitle: session.title } : {}) } }
@@ -281,7 +281,9 @@ async function restoreGraphImages(snap: KitVersionSnapshot, written: string[]) {
     const copy = copies.get(n.data.assetId);
     return copy ? { ...n, data: { ...n.data, assetId: copy.id } } : n;
   }) } : snap.graph;
-  return { graph, liveRevs, copyAssets: copies.size ? Object.fromEntries([...copies.values()].map(a => [a.id, a])) : undefined };
+  // The layers of the document keep their pixels; they are the same images.
+  const doc = snap.doc && copies.size ? { ...snap.doc, layers: snap.doc.layers.map((l) => { const copy = l.type === 'raster' && l.sourceAssetId ? copies.get(l.sourceAssetId) : undefined; return copy ? { ...l, sourceAssetId: copy.id } : l; }) } : snap.doc;
+  return { graph, doc, liveRevs, copyAssets: copies.size ? Object.fromEntries([...copies.values()].map(a => [a.id, a])) : undefined };
 }
 
 export function restoreItemVersion(opts: { subjectId: string; versionId: string; space: LibrarySpace; by: KitActor; label?: string }): Promise<Subject> {
@@ -297,7 +299,7 @@ export function restoreItemVersion(opts: { subjectId: string; versionId: string;
         const restored = await restoreGraphImages(snap, images);
         return commitVersion(cur, {
           mode: 'append', at: Date.now(), by: opts.by, space: opts.space, label: opts.label ?? `Restore ${opts.versionId}`,
-          ...restored, kits: snap.kits, tokens: snap.tokens, doc: snap.doc,
+          ...restored, kits: snap.kits, tokens: snap.tokens,
           docRev: snap.doc ? (snap.docRev ?? uid('drev')) : undefined, storedRasterIds: snap.storedRasterIds, clearsDraft: opts.by === 'user',
         }, written);
       });

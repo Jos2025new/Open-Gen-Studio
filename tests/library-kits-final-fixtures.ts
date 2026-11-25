@@ -8,12 +8,14 @@ const hoisted = vi.hoisted(() => {
   const blobs = new Map<string, Blob>();
   const assetBlobs = new Map<string, Blob>();
   const dims = new Map<Blob, { w: number; h: number }>();
+  const pixelTags = new WeakMap<HTMLCanvasElement, number>();
   let onSetHook: ((key: string) => void | Promise<void>) | null = null;
   let onGetAssetHook: ((id: string) => void | Promise<void>) | null = null;
   return {
     blobs,
     assetBlobs,
     dims,
+    pixelTags,
     setOnSet: (fn: ((key: string) => void | Promise<void>) | null) => { onSetHook = fn; },
     setOnGetAsset: (fn: ((id: string) => void | Promise<void>) | null) => { onGetAssetHook = fn; },
     blobDb: {
@@ -40,20 +42,32 @@ vi.mock('../src/lib/idb', () => ({
 
 vi.mock('../src/lib/media', async () => {
   const actual = await vi.importActual<typeof import('../src/lib/media')>('../src/lib/media');
-  const fakeCanvas = (w: number, h: number) => ({
-    width: w,
-    height: h,
-    getContext: () => ({ drawImage: () => undefined, clearRect: () => undefined }),
-    toBlob: (cb: (b: Blob | null) => void) => cb(new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' })),
-  }) as unknown as HTMLCanvasElement;
+  const fakeCanvas = (w: number, h: number, tag = 0) => {
+    const canvas = {
+      width: w,
+      height: h,
+      getContext: () => ({
+        drawImage: (src: HTMLCanvasElement) => hoisted.pixelTags.set(canvas, hoisted.pixelTags.get(src) ?? 0),
+        clearRect: () => undefined,
+      }),
+      toBlob: (cb: BlobCallback) => cb(new Blob([new Uint32Array([0x504e47, w, h, hoisted.pixelTags.get(canvas) ?? 0])], { type: 'image/png' })),
+    } as unknown as HTMLCanvasElement;
+    hoisted.pixelTags.set(canvas, tag);
+    return canvas;
+  };
   return {
     ...actual,
     createCanvas: (w: number, h: number) => fakeCanvas(w, h),
     ctx2d: (c: HTMLCanvasElement) => c.getContext('2d'),
     blobToCanvas: async (blob: Blob) => {
       const d = hoisted.dims.get(blob);
-      if (!d) throw new Error('corrupt image blob');
-      return fakeCanvas(d.w, d.h);
+      if (d) return fakeCanvas(d.w, d.h);
+      const bytes = await blob.arrayBuffer();
+      if (bytes.byteLength === 16) {
+        const [format, w, h, tag] = new Uint32Array(bytes);
+        if (format === 0x504e47) return fakeCanvas(w, h, tag);
+      }
+      throw new Error('corrupt image blob');
     },
   };
 });

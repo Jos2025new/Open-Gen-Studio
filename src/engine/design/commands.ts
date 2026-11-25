@@ -246,7 +246,6 @@ export const DESIGNER_ACTIONS: Record<string, string> = {
   undoDoc: 'designer.doc.undo',
   redoDoc: 'designer.doc.redo',
   prunePicks: '- keeps picks consistent after a change; every write already runs it',
-  canvasToAsset: '- takes a canvas, not data; designer.layer.to_asset and designer.doc.save_to_gallery cover it',
   layerToAsset: 'designer.layer.to_asset',
   replaceLayerPixels: 'designer.layer.replace_pixels',
   placeAboveLayer: 'designer.layer.place_above',

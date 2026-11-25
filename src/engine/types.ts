@@ -462,6 +462,8 @@ export interface RasterLayer extends LayerBase {
   rev: number;
   /** Pixel revision of the last image refresh from a linked Library board. */
   libraryImageRev?: number;
+  /** Layers drawn into this one by a merge: their Library elements stay. */
+  merged?: string[];
   sourceAssetId?: string;
   /** Images are protected from brush/eraser unless the user allows painting on them. */
   allowPaint?: boolean;

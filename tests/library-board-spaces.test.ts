@@ -327,7 +327,7 @@ describe('one position per element, across Designer, Library and Nodes', () => {
     patchLayer(s.id, doc.id, t2.id, { text: 'After' });
     await saveItem({ subjectId: subject.id, mode: 'overwrite', space: 'library', by: 'user', graph: (g) => ({ ...g!, nodes: g!.nodes.filter((n) => n.id !== 't1').map((n) => (n.id === 't2' ? text('t2', 'Remote', 500, 500) : n)) }) });
     await libraryToDesigner(s.id, subject.id);
-    expect(getDoc(s.id, doc.id)!.layers.flatMap((l) => (l.type === 'text' ? [l.text] : []))).toEqual(['Same', 'After']);
+    expect(getDoc(s.id, doc.id)!.layers.flatMap((l) => (l.type === 'text' ? [l.text] : []))).toEqual(['After']);
     await saveDoc(s.id, subject.id, doc.id);
     expect(texts(entry(subject.id).graph)).toEqual(['After']);
   });

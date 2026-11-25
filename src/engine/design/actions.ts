@@ -322,6 +322,7 @@ export async function flattenLayers(sessionId: string, docId: string, ids: strin
   const shown = layers.some((l) => l.visible);
   drawDoc(ctx2d(c), { ...doc, background: null, layers: [{ ...base, visible: shown ? base.visible : true, blend: 'normal' } as Layer, ...rest.map((l) => (shown ? l : { ...l, visible: true }))] }, { resolution: 'document' });
   const out: RasterLayer = { ...D.newRasterLayer(name ?? base.name, { x: 0, y: 0, width: doc.width, height: doc.height }, { width: doc.width, height: doc.height }), opacity: 1, blend: base.blend, visible: shown, groupId: base.groupId };
+  out.merged = layers.flatMap((l) => (l.type === 'raster' ? [l.id, ...(l.merged ?? [])] : [l.id]));
   setBuffer(out.id, c);
   const gone = new Set(layers.map((l) => l.id));
   mutateDoc(sessionId, docId, (d) => ({ ...d, activeLayerId: out.id, layers: d.layers.flatMap((l) => (l.id === base.id ? [out] : gone.has(l.id) ? [] : [l])) }));

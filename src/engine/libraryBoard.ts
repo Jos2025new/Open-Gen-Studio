@@ -30,21 +30,35 @@ function linked(doc: DesignDoc, id: string) {
   return { at, layer, p, movedHere: Math.abs(p.x - home.x) > 0.5 || Math.abs(p.y - home.y) > 0.5 };
 }
 
+/** Layers the document still shows: its own and the ones merged into them. */
+const shownIds = (doc: DesignDoc) => new Set(doc.layers.flatMap((l) => (l.type === 'raster' ? [l.id, ...(l.merged ?? [])] : [l.id])));
+
+/** The document without the elements the graph no longer has. A merged layer stays; only its link goes. */
+export function withoutGone(doc: DesignDoc, graph: Graph | undefined): DesignDoc {
+  const ids = new Set(graph?.nodes.map((n) => n.id)), gone = Object.entries(doc.board?.at ?? {}).filter(([id]) => !ids.has(id));
+  if (!gone.length) return doc;
+  const next = gone.reduce((d, [, a]) => (d.layers.some((l) => l.id === a.layer) ? D.removeLayer(d, a.layer) : d), doc);
+  return { ...next, board: { ...doc.board!, at: Object.fromEntries(Object.entries(doc.board!.at).filter(([id]) => ids.has(id))) } };
+}
+
 /** The graph with what this document changed, and the document's board for it. On a moodboard its other images and texts join. */
 export function graphFromDoc(graph: Graph | undefined, doc: DesignDoc, joins: boolean): { graph?: Graph; board?: KitBoard } {
-  const known = new Set(Object.values(doc.board?.at ?? {}).map((a) => a.layer));
+  const known = new Map(Object.entries(doc.board?.at ?? {}).map(([id, a]) => [a.layer, id])), shown = shownIds(doc);
+  const gone = new Set([...known].flatMap(([layer, id]) => (shown.has(layer) ? [] : [id])));
   const fresh = joins ? doc.layers.filter((l) => !known.has(l.id) && ((l.type === 'raster' && isImageAsset(l.sourceAssetId)) || (l.type === 'text' && l.text.trim()))) : [];
   const image = fresh.find((l) => l.type === 'raster') as { width: number } | undefined, k = (image?.width ?? doc.width / 3) / NODE_WIDTH;
   const board = doc.board ?? (fresh.length ? { k, x: -100 * k, y: -100 * k, at: {} } : undefined);
   if (!board) return { graph };
   const spot = (p: { x: number; y: number }) => placedAt((p.x - board.x) / board.k, (p.y - board.y) / board.k), at = { ...board.at };
-  const nodes = (graph?.nodes ?? []).map((n): GraphNode => {
+  for (const id of gone) delete at[id];
+  const nodes = (graph?.nodes ?? []).filter((n) => !gone.has(n.id)).map((n): GraphNode => {
     const e = linked(doc, n.id);
     if (!e) return n;
     const text = e.layer.type === 'text' && e.layer.text !== e.at.text && e.layer.text.trim() ? e.layer.text : undefined;
     const position = e.movedHere ? spot(e.p) : unplaced(n.position) ? { x: e.at.x, y: e.at.y } : n.position;
     if (position !== n.position || text !== undefined) at[n.id] = { ...e.at, ...(position !== n.position ? position : {}), ...(text !== undefined ? { text } : {}) };
-    return { ...n, position, data: text !== undefined && n.data.kind === 'text' ? { ...n.data, text } : n.data };
+    const image = e.layer.type === 'raster' && isImageAsset(e.layer.sourceAssetId) ? e.layer.sourceAssetId : undefined;
+    return { ...n, position, data: text !== undefined && n.data.kind === 'text' ? { ...n.data, text } : image && n.data.kind === 'asset' && image !== n.data.assetId ? { ...n.data, assetId: image } : n.data };
   });
   for (const l of fresh) {
     const p = cornerOf(l), id = uid('nd');
@@ -53,12 +67,14 @@ export function graphFromDoc(graph: Graph | undefined, doc: DesignDoc, joins: bo
     nodes.push({ id, position, data: l.type === 'text' ? { kind: 'text', title: l.name, text: l.text } : { kind: 'asset', title: l.name, assetId: (l as { sourceAssetId: string }).sourceAssetId } });
     at[id] = { layer: l.id, ...position, ...(l.type === 'text' ? { text: l.text } : {}) };
   }
-  return { graph: { edges: [], ...graph, nodes }, board: { ...board, at } };
+  const edges = (graph?.edges ?? []).filter((e) => !gone.has(e.source) && !gone.has(e.target));
+  const groups = graph?.groups?.map((g) => ({ ...g, nodeIds: g.nodeIds.filter((id) => !gone.has(id)) }));
+  return { graph: { ...graph, nodes, edges, ...(groups ? { groups } : {}) }, board: { ...board, at } };
 }
 
-/** The document with what the graph changed. What was changed here and not saved stays; nothing is removed or added. */
-function syncDoc(doc: DesignDoc, graph: Graph | undefined): DesignDoc {
-  const b = doc.board;
+/** The document with what the graph changed: moves, texts and removals. What was moved or written here and not saved stays. */
+function syncDoc(opened: DesignDoc, graph: Graph | undefined): DesignDoc {
+  const doc = withoutGone(opened, graph), b = doc.board;
   if (!b) return doc;
   const layers = new Map(doc.layers.map((l) => [l.id, l])), at = { ...b.at };
   let changed = false;
@@ -89,21 +105,20 @@ const canRefresh = (layer: RasterLayer) => layer.sourceAssetId && layer.rev === 
 
 interface BoardImages {
   items: GraphNode[];
-  images: ReadonlyMap<string, HTMLCanvasElement | null>;
+  images: Map<string, HTMLCanvasElement>;
 }
 
 /** Resolve imports before opening the document's history group. Existing pixels must also be ready for undo. */
-export async function loadBoardImages(doc: DesignDoc, graph: Graph | undefined, kind: string | undefined, refreshLinked = false): Promise<BoardImages> {
-  const items = boardNodes(graph);
-  const images = new Map<string, HTMLCanvasElement | null>();
+export async function loadBoardImages(doc: DesignDoc, graph: Graph | undefined, kind: string | undefined): Promise<BoardImages> {
+  const items = boardNodes(graph), images: BoardImages['images'] = new Map();
+  const kept = new Set(withoutGone(doc, graph).layers.map((l) => l.id));
+  await ensureBuffers(doc.layers.filter((l) => l.type === 'raster' && !kept.has(l.id) && !getBuffer(l.id)));
   const taken = new Set(Object.values(doc.board?.at ?? {}).map(a => a.layer));
   for (const n of items) {
     if (n.data.kind !== 'asset' || !n.data.assetId) continue;
     const id = n.data.assetId, entry = linked(doc, n.id);
     if (doc.board?.at[n.id]) {
-      if (!refreshLinked || entry?.layer.type !== 'raster' || entry.layer.sourceAssetId === id) continue;
-      images.set(n.id, null);
-      if (!canRefresh(entry.layer)) continue;
+      if (entry?.layer.type !== 'raster' || entry.layer.sourceAssetId === id || !canRefresh(entry.layer)) continue;
       if (!getBuffer(entry.layer.id)) await ensureBuffers([entry.layer]);
     } else {
       const own = ownLayer(doc, n, taken, kind);
@@ -118,13 +133,14 @@ function missingImage(assetId: string, title: string | undefined) {
   toast(`Could not load image "${title?.trim() || get().assets[assetId]?.name || assetId}".`, 'error');
 }
 
-function placeNode(sessionId: string, docId: string, n: GraphNode, box: { x: number; y: number; width: number; height: number; fontSize: number }, images: ReadonlyMap<string, HTMLCanvasElement | null>): string | null {
+function placeNode(sessionId: string, docId: string, n: GraphNode, box: { x: number; y: number; width: number; height: number; fontSize: number }, images: BoardImages['images']): string | null {
   const d = n.data;
   if (d.kind === 'text') return addTextLayer(sessionId, docId, d.text, box, { fontSize: box.fontSize }, d.title || undefined);
   if (d.kind !== 'asset' || !d.assetId) return null;
   const canvas = isImageAsset(d.assetId) && images.get(n.id);
   if (!canvas) { missingImage(d.assetId, d.title); return null; }
   const id = placeAssetCanvas(sessionId, docId, d.assetId, canvas, 'new', d.title || undefined);
+  images.delete(n.id);
   if (id) {
     const fit = D.fitRect(box.width, box.height, canvas.width, canvas.height, 'contain');
     patchLayer(sessionId, docId, id, { width: fit.width, height: fit.height, x: box.x, y: box.y }, { record: false });
@@ -140,12 +156,12 @@ export function bringGraph(sessionId: string, docId: string, graph: Graph | unde
 
 function updateBoard(sessionId: string, docId: string, graph: Graph | undefined, kind: string | undefined, { items, images }: BoardImages): void {
   const was = getDoc(sessionId, docId), synced = was && syncDoc(was, graph);
-  if (was && synced && synced !== was) mutateDoc(sessionId, docId, () => synced, { record: synced.layers.some((l, i) => l !== was.layers[i]) });
+  if (was && synced && synced !== was) mutateDoc(sessionId, docId, () => synced, { record: synced.layers.length !== was.layers.length || synced.layers.some((l, i) => l !== was.layers[i]) });
   const doc = getDoc(sessionId, docId), news = items.filter((n) => !doc?.board?.at[n.id]);
   if (!doc) return;
   for (const n of items) {
     const d = n.data, e = linked(doc, n.id);
-    if (!images.has(n.id) || d.kind !== 'asset' || !d.assetId || e?.layer.type !== 'raster' || e.layer.sourceAssetId === d.assetId) continue;
+    if (d.kind !== 'asset' || !d.assetId || e?.layer.type !== 'raster' || e.layer.sourceAssetId === d.assetId) continue;
     if (!canRefresh(e.layer) || paintingLive() || !getBuffer(e.layer.id)) {
       toast(`Kept "${e.layer.name}" as it is.`, 'info');
       continue;
@@ -153,6 +169,7 @@ function updateBoard(sessionId: string, docId: string, graph: Graph | undefined,
     const canvas = isImageAsset(d.assetId) && images.get(n.id);
     if (!canvas) { missingImage(d.assetId, d.title); continue; }
     replaceLayerPixels(sessionId, docId, e.layer.id, d.assetId, canvas);
+    images.delete(n.id);
   }
   if (!news.length) return;
   const born = !doc.board;
