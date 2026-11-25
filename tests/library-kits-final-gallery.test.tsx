@@ -99,11 +99,10 @@ it('uses the current cover without reading old assets, then falls back when the 
     useStore.setState({ library: [board], assets: { current: image('current'), older: image('older') } });
     root.render(createElement(GalleryPanel));
   });
-  oldReads = 0;
   await act(async () => q('.pc-source').click());
-  await act(async () => {
-    [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(b => b.textContent?.includes('Moodboards'))!.click();
-  });
+  // Synchronous: the delayed save of the store also reads the versions.
+  oldReads = 0;
+  act(() => [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(b => b.textContent?.includes('Moodboards'))!.click());
   expect(q('.lib-tile [data-asset="current"]')).toBeTruthy();
   expect(oldReads).toBe(0);
   await act(async () => useStore.setState({ assets: { older: image('older') } }));

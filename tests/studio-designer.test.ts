@@ -357,7 +357,7 @@ describe('file menu', () => {
     act(() => item('Save to Library')!.click());
     expect(file.runDesignOutput).not.toHaveBeenCalled();
     await act(async () => { [...document.querySelectorAll<HTMLElement>('.popover button')].find((b) => b.textContent === 'Save')!.click(); });
-    expect(file.runDesignOutput).toHaveBeenLastCalledWith(sid, doc().id, true, undefined);
+    expect(file.runDesignOutput).toHaveBeenLastCalledWith(sid, doc().id, true);
     const input = q('input[type="file"]') as HTMLInputElement;
     const f = new File(['x'], 'a.png', { type: 'image/png' });
     Object.defineProperty(input, 'files', { value: [f], configurable: true });

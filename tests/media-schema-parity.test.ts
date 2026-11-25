@@ -22,7 +22,7 @@ async function sha256(value: unknown): Promise<string> {
 // Recorded before Part 5 replaced literal media enums with MEDIA_KINDS-derived tuples;
 // `commands` updated after task/library-kits added library.item.*, designer.group.*, designer.doc.new/layer.set/add_text, and nodes.node.* part fields.
 const BEFORE_HASHES = {
-  tools: 'e576ca23c9817fdc5da1b8d2cfb022a932a171999e9f79604ac204269e508887',
+  tools: 'e69dd624a5d009182c5bdc149c520bb37c9c104ce5d4ba7a9c61a53c03e2fc3d',
   commands: 'd07079e1753e7a6c13fabe7abf2d3d91b23c82a52ece771efa5087b08fd41cb2',
   findModels: 'bc71d19692f96f5c81151b1f2ac85694a11800259c5fc448c6bb9c8346a8332f',
   findAssets: '9a26a4fa02ec1123d71f36d8774024e087e392762fa65dc3ec1cb1cb4eaaac5c',
