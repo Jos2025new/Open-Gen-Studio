@@ -39,3 +39,44 @@ export function looksLost(prevText, nextText) {
   }
   return has < had / 2;
 }
+
+/**
+ * Library loss guard (2026-11-24, the user's authorization): fewer records of a collection lost than this is never a loss.
+ * A library entry is a document, like a session. Results come in batches, so deleting one batch must pass.
+ */
+const MIN_LOST = { library: 2, assets: 10, generations: 10 };
+export const RECORD_COLLS = ['generations', 'assets', 'library'];
+
+/** True when `lost` of the `had` records of a collection leave less than half of them. New records do not make up for lost ones. */
+export const mostLost = (coll, had, lost) => lost >= MIN_LOST[coll] && had - lost < had / 2;
+
+/** The hash both sides compute over the ids of a collection (any order). */
+export const idsHash = (ids) => sha256(JSON.stringify([...ids].sort()));
+
+/**
+ * The collections that lose most of their records between two states. `prev` and `next` map id to the session it belongs
+ * to. What goes away together with its session is not counted: the session rule already judges that removal.
+ * Returns [{ coll, lost: ids, diskHash, candidateHash }].
+ */
+export function recordLosses(prev, next, removedSessions = new Set()) {
+  const out = [];
+  for (const coll of RECORD_COLLS) {
+    const gone = [...prev[coll].keys()].filter((id) => !next[coll].has(id));
+    const lost = coll === 'library' ? gone : gone.filter((id) => !removedSessions.has(prev[coll].get(id)));
+    const had = prev[coll].size - (gone.length - lost.length);
+    if (mostLost(coll, had, lost.length)) out.push({ coll, lost, diskHash: idsHash(prev[coll].keys()), candidateHash: idsHash(next[coll].keys()) });
+  }
+  return out;
+}
+
+/** The losses `keep` ("Keep this version") does not approve: each collection is bound to the ids on disk and the ids sent. */
+export function unapprovedRecords(losses, keep) {
+  const approved = new Map((Array.isArray(keep?.records) ? keep.records : []).map((k) => [k?.coll, k]));
+  return losses.filter((l) => {
+    const k = approved.get(l.coll);
+    return !(k && k.diskHash === l.diskHash && k.candidateHash === l.candidateHash);
+  });
+}
+
+/** What the 409 says of each refused collection. */
+export const recordsBody = (losses) => losses.map(({ coll, lost, diskHash }) => ({ coll, lost: lost.length, diskHash }));

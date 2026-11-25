@@ -12,7 +12,7 @@ export interface V2Commit {
    * one approval refuses the whole commit again. The disk versions are copied to backups/kept-before-* first. Never
    * lifts a baseAt conflict.
    */
-  keep?: { sessions: Array<{ sessionId: string; diskHash: string; candidateHash: string }>; total?: { diskOrderHash: string; candidateOrderHash: string } };
+  keep?: { sessions: Array<{ sessionId: string; diskHash: string; candidateHash: string }>; total?: { diskOrderHash: string; candidateOrderHash: string }; records?: Array<{ coll: string; diskHash: string; candidateHash: string }> };
 }
 /** Result of a commit. 409 carries reason 'conflict' (baseAt) or 'possible-loss' (sessionId only for a single session). */
 export interface V2Result {
@@ -26,6 +26,8 @@ export interface V2Result {
   losses?: Array<{ sessionId: string; diskHash: string }>;
   /** The commit removes most sessions: sha256 of the disk's session order (JSON). */
   total?: { diskOrderHash: string };
+  /** Library guard: each collection that loses most of its records, with the hash of the ids on disk. */
+  records?: Array<{ coll: string; lost: number; diskHash: string }>;
   rejectedFile?: string;
 }
 export function assembleText(p: { savedAt: number; version: number; globals: string; order: string[]; sessions: Record<string, string> }): string;

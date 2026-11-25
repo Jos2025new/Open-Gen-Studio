@@ -6,6 +6,7 @@ import { holdsWriterLock } from './writerLock';
 import { forgetAssetUrl, loadAssetUrl as loadObjectUrl, replaceAssetUrl } from './assetUrls';
 import { clearCatalogCache } from './cacheDb';
 import type { StateJson } from '../store/persistJson';
+import { recordIndex } from '../../server/sqlite/delta-client.mjs';
 
 /**
  * IndexedDB stores:
@@ -211,7 +212,8 @@ async function sendCommit(key: string, rev: number, at: number, parts: V2Parts, 
 
 /**
  * "Keep this version": approves EVERY loss the server listed for this exact candidate (each shrinking session by the
- * hashes of the disk text and of the text sent, and a large removal of sessions by the hashes of both orders).
+ * hashes of the disk text and of the text sent, a large removal of sessions by the hashes of both orders, and a large
+ * removal of Library records by the hashes of both lists of ids).
  */
 async function approvalFor(parts: V2Parts): Promise<KeepVersion | undefined> {
   const p = guard.problem;
@@ -224,7 +226,12 @@ async function approvalFor(parts: V2Parts): Promise<KeepVersion | undefined> {
     sessions.push({ sessionId: l.sessionId, diskHash: l.diskHash ?? await sha256Hex(guard.acked.get(l.sessionId) ?? ''), candidateHash: await sha256Hex(text) });
   }
   const total = p.total ? { diskOrderHash: p.total.diskOrderHash, candidateOrderHash: await sha256Hex(JSON.stringify(parts.order)) } : undefined;
-  return sessions.length || total ? { sessions, ...(total ? { total } : {}) } : undefined;
+  const records: NonNullable<KeepVersion['records']> = [];
+  if (p.records?.length) {
+    const index = recordIndex(parts.globalsObj ?? JSON.parse(parts.globals));
+    for (const { coll, diskHash } of p.records) records.push({ coll, diskHash, candidateHash: await sha256Hex(JSON.stringify([...index[coll].keys()].sort())) });
+  }
+  return sessions.length || total || records.length ? { sessions, ...(total ? { total } : {}), ...(records.length ? { records } : {}) } : undefined;
 }
 
 export const stateDb = {

@@ -31,6 +31,9 @@ export interface GlobalsDelta {
   };
 }
 
+export type RecordColl = 'generations' | 'assets' | 'library';
+export function recordIndex(g: unknown): Record<RecordColl, Map<string, string | undefined>>;
+
 export function createDeltaClient(): {
   diff(g: Record<string, unknown>, sessionOrder?: string[], sessionUpKeys?: string[]): GlobalsDelta;
   ack(): void;

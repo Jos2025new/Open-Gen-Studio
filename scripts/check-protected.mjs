@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 // docs/persistencia-protegida.md: the tests behind the protected save. Each must exist, be linked from that doc and
 // carry no skip/only/todo mark. It does not see cases removed inside a file or weakened assertions: review does.
 export const PROTECTED_TESTS = [
-  'save-guard-review', 'save-guard-server', 'save-guard-client', 'save-guard-banner', 'save-now', 'raster-persist',
+  'save-guard-review', 'save-guard-server', 'save-guard-client', 'save-guard-banner', 'save-guard-library', 'save-now', 'raster-persist',
   'writer-lock', 'writer-lock-handoff', 'writer-lock-panel', 'writer-lock-raster', 'state-conflict', 'state-copies',
   'store-sqlite', 'store-sqlite-phases',
 ].map((name) => `tests/${name}.test.ts`);

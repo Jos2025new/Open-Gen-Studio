@@ -5,9 +5,12 @@ export default [
   ...spaceContracts,
   {
     id: 'save-guard-409',
-    what: 'Un 409 dice por qué: conflict (baseAt: la pestaña pasa a stale y no envía más al disco) o possible-loss (el servidor aparta la copia y devuelve TODAS las pérdidas del commit: losses [{sessionId, diskHash}] y, si se borran la mayoría de sesiones, total {diskOrderHash}; la pestaña NO es stale y reintenta). IndexedDB se escribe siempre. "Mantener esta versión" envía keep {sessions: [{sessionId, diskHash, candidateHash}], total?: {diskOrderHash, candidateOrderHash}} calculado al enviar sobre los textos exactos; debe aprobar todas las pérdidas o se rechaza entero; no salta baseAt.',
+    what: 'Un 409 dice por qué: conflict (baseAt: la pestaña pasa a stale y no envía más al disco) o possible-loss (el servidor aparta la copia y devuelve TODAS las pérdidas del commit: losses [{sessionId, diskHash}] y, si se borran la mayoría de sesiones, total {diskOrderHash}; si una colección de Library (library, assets, generations) pierde la mayoría, records [{coll, lost, diskHash}]; la pestaña NO es stale y reintenta). IndexedDB se escribe siempre. "Mantener esta versión" envía keep {sessions: [{sessionId, diskHash, candidateHash}], total?: {diskOrderHash, candidateOrderHash}, records?: [{coll, diskHash, candidateHash}]} calculado al enviar sobre los textos exactos; debe aprobar todas las pérdidas o se rechaza entero; no salta baseAt.',
     sides: [
-      ['server/store-v2.js', "losses: losses.map(({ sessionId, diskHash }) => ({ sessionId, diskHash }))"],
+      ['server/store-v2.js', "losses: listed.map(({ sessionId, diskHash }) => ({ sessionId, diskHash }))"],
+      ['server/save-guard.js', 'export function unapprovedRecords'],
+      ['server/sqlite/store-b.js', 'records: recordsBody(recLosses)'],
+      ['server/sqlite/delta-client.mjs', 'export function recordIndex'],
       ['server/store-v2.d.ts', 'diskHash?: string;'],
       ['server/local-store.js', 'const conflictBody = ({ reason'],
       ['src/lib/disk.ts', "if (body?.reason !== 'possible-loss') return 'conflict';"],
@@ -18,7 +21,7 @@ export default [
       ['src/store/saveRecovery.ts', 'export async function keepThisVersion'],
       ['src/components/shell/SaveGuardBanner.tsx', 'Keep this version'],
     ],
-    tests: ['tests/save-guard-server.test.ts', 'tests/save-guard-client.test.ts', 'tests/save-guard-banner.test.ts', 'tests/state-conflict.test.ts'],
+    tests: ['tests/save-guard-server.test.ts', 'tests/save-guard-client.test.ts', 'tests/save-guard-banner.test.ts', 'tests/save-guard-library.test.ts', 'tests/state-conflict.test.ts'],
   },
   {
     id: 'save-pending-revisions',

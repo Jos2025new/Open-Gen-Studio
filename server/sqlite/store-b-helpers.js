@@ -1,3 +1,4 @@
+import { mostLost, recordLosses } from '../save-guard.js';
 import { generateNKeysBetween } from './fractional-index.mjs';
 
 export const SCHEMA_VERSION = 1;
@@ -16,6 +17,31 @@ export const JOURNAL_ALLOW = {
     'estimated', 'generations', 'assets', 'library',
   ],
 };
+
+/**
+ * The collections this delta would leave with less than half of their records (save-guard.js recordLosses). An ordinary
+ * save costs nothing: rows are read only when more than half of a collection goes, whoever it belongs to (leaving out what
+ * a removed session takes with it can only make a loss smaller).
+ */
+export function libraryLosses(q, delta, removedSessions) {
+  const prev = {}, next = {};
+  let judge = false;
+  for (const coll of COLLS) {
+    prev[coll] = new Map();
+    next[coll] = new Map();
+    const up = delta.up?.[coll] ?? {}, del = new Set(delta.del?.[coll] ?? []);
+    if (!delta.full && !mostLost(coll, del.size, del.size)) continue; // too few to matter, whatever the total
+    const ids = delta.full ? q.recIds.all(coll).map((r) => r.id) : [...del].filter((id) => q.recFp.get(coll, id));
+    const goes = (id) => del.has(id) || (delta.full && !Object.hasOwn(up, id));
+    const gone = ids.filter(goes).length;
+    if (!gone || !mostLost(coll, q.recCount.get(coll).n, gone)) continue;
+    judge = true;
+    for (const { id, owner } of q.recOwners.all(coll)) prev[coll].set(id, owner ?? undefined);
+    for (const id of prev[coll].keys()) if (!goes(id)) next[coll].set(id);
+    for (const id of Object.keys(up)) if (!del.has(id)) next[coll].set(id);
+  }
+  return judge ? recordLosses(prev, next, removedSessions()) : [];
+}
 
 export function pickAllowedMeta(raw, keys) {
   let obj = raw;

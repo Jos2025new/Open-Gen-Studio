@@ -14,7 +14,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { createHash, randomUUID } from 'node:crypto';
 import { closeSync, fsyncSync, mkdirSync, openSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { looksLost, sha256 } from '../save-guard.js';
+import { looksLost, recordsBody, sha256, unapprovedRecords } from '../save-guard.js';
 import { assembleText } from '../store-v2.js';
 import { sanitizeKeysInText } from '../keys.js';
 import { computeOrderDiff, generateKeyBetween } from './fractional-index.mjs';
@@ -23,6 +23,7 @@ import {
   buildCandidateOrder,
   COLLS,
   JOURNAL_ALLOW,
+  libraryLosses,
   migrateSchema,
   pickAllowedMeta,
   SAFE_ID,
@@ -70,6 +71,7 @@ export function createStoreB(dir, opts = {}) {
     recMeta: db.prepare('SELECT meta FROM records WHERE coll = ? AND id = ?'),
     recMax: db.prepare('SELECT pos FROM records WHERE coll = ? ORDER BY pos DESC LIMIT 1'),
     recIds: db.prepare('SELECT id FROM records WHERE coll = ?'),
+    recOwners: db.prepare("SELECT id, json_extract(meta, '$.sessionId') AS owner FROM records WHERE coll = ?"),
     recIns: db.prepare('INSERT INTO records (coll, id, pos, meta, fp) VALUES (?, ?, ?, ?, ?)'),
     recUpd: db.prepare('UPDATE records SET meta = ?, fp = ? WHERE coll = ? AND id = ?'),
     recPos: db.prepare('UPDATE records SET pos = ? WHERE coll = ? AND id = ?'),
@@ -315,6 +317,11 @@ export function createStoreB(dir, opts = {}) {
       ? (hasOrder ? order : buildCandidateOrder(prevOrder, sessions, delList, Boolean(delta?.full), delta?.order?.sessions))
       : null;
     const totalOk = Boolean(total && keep?.total?.diskOrderHash === total.diskOrderHash && keep.total.candidateOrderHash === sha256(json(candidateOrder)));
+    const recLosses = head ? libraryLosses(q, delta ?? {}, () => {
+      const all = q.sessIds.all().map((r) => r.id), sent = (id) => Object.hasOwn(sessions, id);
+      return new Set(hasOrder ? all.filter((id) => !order.includes(id)) : delta?.full ? all.filter((id) => !sent(id)) : all.filter((id) => delSet.has(id) && !sent(id)));
+    }) : [];
+    const records = unapprovedRecords(recLosses, keep);
     const approved = new Map((Array.isArray(keep?.sessions) ? keep.sessions : []).map((k) => [k.sessionId, k]));
     const losses = [], kept = [];
     for (const [id, text] of Object.entries(sessions)) {
@@ -324,18 +331,21 @@ export function createStoreB(dir, opts = {}) {
       if (k && k.diskHash === diskHash && k.candidateHash === sha256(text)) kept.push([id, prev]);
       else losses.push({ sessionId: id, diskHash, text });
     }
-    if ((total && !totalOk) || losses.length) {
+    if ((total && !totalOk) || losses.length || records.length) {
+      // All of them, also those this send approved: the next approval is built from this list alone.
+      const listed = [...losses, ...kept.map(([sessionId, prev]) => ({ sessionId, diskHash: sha256(prev) }))];
       const first = losses[0];
       const rejectedFile = first ? keepCopy(`rejected-session-${first.sessionId}`, first.text) : keepCopy('rejected', json(body));
       for (const l of losses.slice(1)) keepCopy(`rejected-session-${l.sessionId}`, l.text);
       return {
         status: 409, reason: 'possible-loss', ...(first ? { sessionId: first.sessionId, diskHash: first.diskHash } : {}),
-        losses: losses.map(({ sessionId, diskHash }) => ({ sessionId, diskHash })), ...(total ? { total } : {}),
-        rejectedFile, savedAt: current,
+        losses: listed.map(({ sessionId, diskHash }) => ({ sessionId, diskHash })), ...(total ? { total } : {}),
+        ...(recLosses.length ? { records: recordsBody(recLosses) } : {}), rejectedFile, savedAt: current,
       };
     }
     if (totalOk) keepCopy('kept-before-order', json({ ...(head ?? {}), order: prevOrder }));
     for (const [id, prev] of kept) keepCopy(`kept-before-${id}`, prev);
+    if (recLosses.length) keepCopy('kept-before-records', json(Object.fromEntries(recLosses.map(({ coll, lost }) => [coll, Object.fromEntries(lost.map((id) => [id, q.recMeta.get(coll, id).meta]))]))));
 
     const sessionKeys = Object.keys(sessions);
     let maxSessPos = sessionKeys.length ? (q.sessMax.get()?.pos ?? null) : null;
@@ -390,6 +400,8 @@ export function createStoreB(dir, opts = {}) {
     }
     for (const coll of [...COLLS, 'sessions']) {
       if (coll !== 'sessions') {
+        const del = delta?.del?.[coll];
+        if (del != null && (!Array.isArray(del) || !del.every((id) => typeof id === 'string'))) return { status: 400, reason: `del.${coll} must be an array of ids` };
         for (const [id, text] of Object.entries(delta?.up?.[coll] ?? {})) {
           if (typeof text !== 'string' || !(text.startsWith('{') || text.startsWith('['))) return { status: 400, reason: `record ${coll}/${id} must be a JSON text` };
         }

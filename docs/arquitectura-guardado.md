@@ -9,7 +9,7 @@ Cómo está implementada la fase 1 de [ADR 0022](decisions/0022-guardado-local-f
 
 | Pieza | Responsabilidad |
 |---|---|
-| [server/save-guard.js](../server/save-guard.js) | `looksLost(prev, next)`: la regla de pérdida por sesión. `sha256`. |
+| [server/save-guard.js](../server/save-guard.js) | `looksLost(prev, next)`: la regla de pérdida por sesión. `recordLosses(prev, next)`: la de Library (biblioteca, imágenes y generaciones). `sha256`. |
 | [server/store-v2.js](../server/store-v2.js) `commit()` | Orden de comprobaciones: `baseAt` → pérdida total → pérdida por sesión (con `keep`). También las copias en `backups/` y la escritura. |
 | [server/local-store.js](../server/local-store.js) | HTTP. Envía el cuerpo del 409, también para el `PUT` antiguo (`commitLegacy`). |
 | [src/lib/disk.ts](../src/lib/disk.ts) | Peticiones al servidor. Traduce el 409: `conflict` marca `stale`; `possible-loss` devuelve `'rejected'` y lo guarda en `disk.rejection()`. |
@@ -35,7 +35,7 @@ Cómo está implementada la fase 1 de [ADR 0022](decisions/0022-guardado-local-f
 | Respuesta | Cliente | Usuario |
 |---|---|---|
 | 409 `conflict` (otra pestaña o copia guardó) | `stale = true`. Lo local se sigue guardando y no se envía nada más. Una copia `:conflict-<at>` por episodio. | Aviso «Another tab saved more recent changes»: descargar o volver a la del disco. |
-| 409 `possible-loss` | No marca `stale`. `problem` guarda `losses` (todas las sesiones que encogen, con su `diskHash`), `total` si se borran la mayoría de sesiones, y `rejectedFile`. Cada guardado siguiente reenvía todo lo que difiere de `acked`. | Aviso con el título de la sesión: descargar, mantener esta versión o volver. |
+| 409 `possible-loss` | No marca `stale`. `problem` guarda `losses` (todas las sesiones que encogen, con su `diskHash`), `total` si se borran la mayoría de sesiones, `records` si se pierde la mayoría de una colección de Library, y `rejectedFile`. Cada guardado siguiente reenvía todo lo que difiere de `acked`. | Aviso con el título de la sesión: descargar, mantener esta versión o volver. |
 | Fallo de red | Ni `acked` ni `pending` cambian; el siguiente guardado lo reenvía. | El indicador de guardado. |
 
 Mientras dura el rechazo, el servidor guarda como mucho una copia por minuto del intento (`rejected-session-<id>-<ts>.json`, la más reciente).
@@ -52,7 +52,8 @@ Mientras dura el rechazo, el servidor guarda como mucho una copia por minuto del
 ### «Mantener esta versión»
 `keepThisVersion` guarda con `keep: true`. Al enviar, `approvalFor` construye la aprobación de **todas** las pérdidas que listó el 409:
 - por sesión: `{ sessionId, diskHash, candidateHash }`. `diskHash` sale del 409 (si no, del texto en `acked`); `candidateHash` es el del texto exacto enviado;
-- si hay borrado masivo: `total: { diskOrderHash, candidateOrderHash }`, los hashes de los dos órdenes de sesiones.
+- si hay borrado masivo: `total: { diskOrderHash, candidateOrderHash }`, los hashes de los dos órdenes de sesiones;
+- por colección de Library: `records: [{ coll, diskHash, candidateHash }]`, los hashes de los ids ordenados en disco y enviados.
 
 El servidor exige que se aprueben todas las pérdidas. Si falta una, rechaza el commit entero. Guarda `backups/kept-before-<id>-<ts>.json` (y `kept-before-order-*`) antes de escribir y nunca salta un `baseAt`.
 
@@ -79,6 +80,7 @@ Pide confirmación en el propio aviso. Guarda en `:conflict-<at>` el estado en m
 - **Disco `backups/`:**
   - `rejected-session-<id>-<ts>.json`: intentos rechazados de una sesión;
   - `rejected-<ts>.json`: pérdida total;
+  - `kept-before-records-<ts>.json`: lo que había en Library antes de «Mantener»;
   - `kept-before-<id>-<ts>.json`: la versión del disco antes de «Mantener»;
   - `v2-*`: los snapshots de siempre.
 
@@ -89,6 +91,7 @@ Ninguno tiene retención todavía; es la fase 3.
 | Cambio en la app | Qué tocar | Si se olvida |
 |---|---|---|
 | Un tipo de contenido nuevo en la sesión (p. ej. `scenes`) | Contarlo en `measure()` de `server/save-guard.js` y añadir un caso a `tests/save-guard-server.test.ts`. | Ese contenido no cuenta para la guarda; solo lo cubren los snapshots. |
+| Una colección global nueva de datos del usuario | Añadirla a `RECORD_COLLS`, `MIN_LOST` y `recordIndex`, con un caso en `tests/save-guard-library.test.ts`. | El freno de Library no la cubre. |
 | Un campo nuevo que sea caché y encoja solo (como `agent`) | Excluirlo en `measure()`, con test. | Una limpieza legítima puede dar un `possible-loss` falso, aunque ya sin bloqueo permanente. |
 | Una ruta nueva que escriba en IndexedDB o en el disco | Pasar por `stateDb`, `blobDb` o `disk`, que ya comprueban `holdsWriterLock()`. Si no puede, comprobarlo explícitamente. | Una pestaña tapada podría pisar a la activa. |
 | Una acción nueva que gaste dinero o llame al proveedor | Empezar por `runGeneration` o por el agente, o comprobar `mayStartWork()`. | Se podría gastar desde una pestaña tapada o durante una entrega. |

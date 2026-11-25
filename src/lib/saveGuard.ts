@@ -17,6 +17,8 @@ export interface SaveProblem {
   losses?: Array<{ sessionId: string; diskHash?: string }>;
   /** The commit removes most sessions: the disk order's hash, approved together with the candidate order. */
   total?: { diskOrderHash: string };
+  /** Library collections that would lose most of their records, approved together with the ids sent. */
+  records?: Array<{ coll: 'generations' | 'assets' | 'library'; lost?: number; diskHash: string }>;
 }
 
 export const guard = {

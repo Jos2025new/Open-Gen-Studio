@@ -6,7 +6,8 @@
 // state.json (format 1) is never written again once format 2 exists: it is copied to backups/ first and stays readable.
 import { copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { looksLost, sha256 } from './save-guard.js';
+import { looksLost, recordLosses, recordsBody, sha256, unapprovedRecords } from './save-guard.js';
+import { recordIndex } from './sqlite/delta-client.mjs';
 
 export const SAFE_ID = /^[A-Za-z0-9_-]+$/;
 const SNAPSHOT_EVERY_MS = 10 * 60_000;
@@ -45,6 +46,7 @@ export function createStoreV2(dir) {
   const stateFile = join(dir, 'state.json');
   const backups = join(dir, 'backups');
   let lastSnapshot = 0;
+  let lastIndex = null; // the records and sessions of the last accepted commit, so a save does not parse the previous globals again
 
   const readHead = () => readFile(headFile, 'utf8').then((t) => JSON.parse(t), () => null);
 
@@ -94,6 +96,15 @@ export function createStoreV2(dir) {
     for (const f of kept.slice(0, -KEPT)) await rm(join(backups, f), { recursive: true, force: true });
   }
 
+  /** The records and sessions on disk before this commit. Globals that cannot be read have nothing to compare, as before the guard. */
+  async function previousState(head, legacy) {
+    try {
+      if (head) return { index: recordIndex(JSON.parse(await readFile(globalsFile, 'utf8'))), sessions: head.order };
+      const { state } = JSON.parse(legacy);
+      return { index: recordIndex(state), sessions: Object.keys(state?.sessions ?? {}) };
+    } catch { return null; }
+  }
+
   /**
    * Commit of changed parts. `body`: { savedAt, baseAt, version, globals (JSON object text), order (ids), sessions:
    * { id: JSON text } for the changed sessions only }. Returns { status, savedAt } (409 carries the current savedAt).
@@ -125,6 +136,11 @@ export function createStoreV2(dir) {
     const prevOrder = head ? head.order : [];
     const total = had >= 2 && has < had / 2 ? { diskOrderHash: sha256(json(prevOrder)) } : null;
     const totalOk = total && keep?.total?.diskOrderHash === total.diskOrderHash && keep.total.candidateOrderHash === sha256(json(order));
+    let nextIndex;
+    try { nextIndex = recordIndex(JSON.parse(globals)); } catch { return { status: 400, reason: 'globals must be a JSON text (a string), not an object' }; }
+    const prev = !current ? null : lastIndex?.savedAt === current ? lastIndex : await previousState(head, legacy);
+    const recLosses = prev ? recordLosses(prev.index, nextIndex, new Set(prev.sessions.filter((id) => !order.includes(id)))) : [];
+    const records = unapprovedRecords(recLosses, keep);
     const approved = new Map((Array.isArray(keep?.sessions) ? keep.sessions : []).map((k) => [k.sessionId, k]));
     const losses = [], kept = [];
     for (const [id, text] of Object.entries(sessions)) {
@@ -134,20 +150,23 @@ export function createStoreV2(dir) {
       if (k && k.diskHash === diskHash && k.candidateHash === sha256(text)) kept.push([id, prev]);
       else losses.push({ sessionId: id, diskHash, text });
     }
-    if ((total && !totalOk) || losses.length) {
+    if ((total && !totalOk) || losses.length || records.length) {
+      const listed = [...losses, ...kept.map(([sessionId, prev]) => ({ sessionId, diskHash: sha256(prev) }))]; // see store-b.js
       const first = losses[0];
       const rejectedFile = first ? await keepRejected(`rejected-session-${first.sessionId}`, first.text) : await keepRejected('rejected', json(body));
       for (const l of losses.slice(1)) await keepRejected(`rejected-session-${l.sessionId}`, l.text);
-      return { status: 409, reason: 'possible-loss', ...(first ? { sessionId: first.sessionId, diskHash: first.diskHash } : {}), losses: losses.map(({ sessionId, diskHash }) => ({ sessionId, diskHash })), ...(total ? { total } : {}), rejectedFile, savedAt: current };
+      return { status: 409, reason: 'possible-loss', ...(first ? { sessionId: first.sessionId, diskHash: first.diskHash } : {}), losses: listed.map(({ sessionId, diskHash }) => ({ sessionId, diskHash })), ...(total ? { total } : {}), ...(recLosses.length ? { records: recordsBody(recLosses) } : {}), rejectedFile, savedAt: current };
     }
     if (totalOk) await keepRejected('kept-before-order', json(head ?? {}));
     for (const [id, prev] of kept) await keepRejected(`kept-before-${id}`, prev);
+    if (recLosses.length) await keepRejected('kept-before-records', head ? await readFile(globalsFile, 'utf8') : legacy);
     await migrate();
     await mkdir(sessionsDir, { recursive: true });
     for (const [id, text] of Object.entries(sessions)) await writeAtomic(join(sessionsDir, `${id}.json`), text);
     await writeAtomic(globalsFile, globals);
     const next = { format: 2, savedAt, version, order };
     await writeAtomic(headFile, json(next));
+    lastIndex = { savedAt, index: nextIndex, sessions: order };
     // Sessions no longer referenced move to backups: nothing is deleted.
     const known = new Set(order);
     for (const f of await readdir(sessionsDir).catch(() => [])) {
