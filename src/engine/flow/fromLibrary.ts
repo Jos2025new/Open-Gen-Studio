@@ -4,6 +4,7 @@ import { isKit, type KitActor, type KitGroupLink, type KitKind } from '../librar
 import { createItem, saveItem } from '../libraryVersions';
 import { editCompound, editPresentation } from '../nodecore/edit';
 import type { Asset, Graph, GraphEdge, GraphGroup, GraphNode, Subject } from '../types';
+import { groupSubtree } from './groupTree';
 import { NODE_WIDTH, nodeOutputAsset } from './graph';
 import { assetRatio } from '../libraryBoard';
 import { placedAt, placeNodes } from '../libraryLayout';
@@ -40,13 +41,21 @@ export function libraryToNodes(sessionId: string, subjectId: string): { added: G
   const baseX = Number.isFinite(right) ? right + 200 : 0, baseY = Number.isFinite(top) ? top : 0;
   const placed = placeNodes(nodes, assetRatio), minX = Math.min(...placed.map((r) => r.x)), minY = Math.min(...placed.map((r) => r.y));
   nodes.forEach((n, i) => { n.position = { x: placed[i].x - minX + baseX, y: placed[i].y - minY + baseY }; });
-  const srcGrp = src?.groups?.[0];
+  // One frame for the entry; the groups inside it keep their place. Several loose groups go inside a frame with its name.
+  const saved = src?.groups ?? [], outer = saved.filter((g) => !saved.some((o) => o.id === g.parentId && o !== g)), srcGrp = outer.length === 1 ? outer[0] : undefined;
+  const rootId = uid('grp'), gids = new Map(saved.map((g) => [g.id, g === srcGrp ? rootId : uid('grp')])), taken = new Set<string>();
+  const inner: GraphGroup[] = saved.filter((g) => g !== srcGrp).map((g) => ({
+    id: gids.get(g.id)!, title: g.title, parentId: gids.get(g.parentId ?? '') ?? rootId, ...(g.color ? { color: g.color } : {}),
+    ...(g.bounds ? { bounds: { ...g.bounds, x: g.bounds.x - minX + baseX, y: g.bounds.y - minY + baseY } } : {}),
+    nodeIds: g.nodeIds.flatMap((id) => { const to = idMap.get(id); if (!to || taken.has(to)) return []; taken.add(to); return [to]; }),
+  }));
+  for (const g of saved) elementOf.set(gids.get(g.id)!, g.id);
   const link: KitGroupLink = { subjectId, ...(subject.versionId ? { versionId: subject.versionId } : {}), corner: { x: minX, y: minY }, ids: Object.fromEntries(elementOf) };
   const group: GraphGroup = {
-    id: uid('grp'), title: srcGrp?.title || subject.name, nodeIds: nodes.map((n) => n.id),
+    id: rootId, title: srcGrp?.title || subject.name, nodeIds: nodes.map((n) => n.id).filter((id) => !taken.has(id)),
     ...(srcGrp?.color ? { color: srcGrp.color } : {}), library: link,
   };
-  const err = editCompound(sessionId, 'from-library', (g) => ({ ...g, nodes: [...g.nodes, ...nodes], edges: [...g.edges, ...edges], groups: [...(g.groups ?? []), group] }));
+  const err = editCompound(sessionId, 'from-library', (g) => ({ ...g, nodes: [...g.nodes, ...nodes], edges: [...g.edges, ...edges], groups: [...(g.groups ?? []), group, ...inner] }));
   if (err) throw new Error(err);
   return { added: nodes, edges, groupId: group.id };
 }
@@ -59,7 +68,8 @@ export async function nodesToLibrary(opts: {
   if (!session) throw new Error(`No session "${opts.sessionId}".`);
   const srcGrp = opts.groupId ? session.graph.groups?.find((g) => g.id === opts.groupId) : undefined;
   if (opts.groupId && !srcGrp) throw new Error(`No group "${opts.groupId}" in this session.`);
-  const rawIds = srcGrp ? srcGrp.nodeIds : opts.nodeIds ?? [];
+  const all = session.graph.groups ?? [], tree = srcGrp ? groupSubtree(all, srcGrp.id) : undefined;
+  const rawIds = tree ? [...tree.nodeIds] : opts.nodeIds ?? [];
   if (!rawIds.length) throw new Error('Select nodes or a group to save to Library.');
 
   const byId = new Map(session.graph.nodes.map((n) => [n.id, n]));
@@ -76,11 +86,15 @@ export async function nodesToLibrary(opts: {
   const title = opts.name?.trim() || srcGrp?.title;
   // Saving replaces the entry with this group. Where the group sits on the canvas is not part of it.
   const link = srcGrp?.library?.subjectId === opts.subjectId && opts.mode !== 'new' ? srcGrp?.library : undefined, here = cornerOf(nodes), corner = link?.corner ?? here;
-  const ids = Object.fromEntries(nodes.map((n) => [n.id, link?.ids?.[n.id] ?? n.id]));
+  const inner = all.filter((g) => g !== srcGrp && tree?.groupIds.has(g.id)), moved = (p: { x: number; y: number }) => placedAt(p.x - here.x + corner.x, p.y - here.y + corner.y);
+  const ids = Object.fromEntries([...nodes, ...(srcGrp ? [srcGrp] : []), ...inner].map((n) => [n.id, link?.ids?.[n.id] ?? n.id]));
   const graph: Graph = {
-    nodes: nodes.map((n) => ({ ...n, id: ids[n.id], position: placedAt(n.position.x - here.x + corner.x, n.position.y - here.y + corner.y) })),
+    nodes: nodes.map((n) => ({ ...n, id: ids[n.id], position: moved(n.position) })),
     edges: edges.map((e) => ({ ...e, source: ids[e.source], target: ids[e.target] })),
-    ...(title ? { groups: [{ id: srcGrp?.id ?? uid('grp'), title, nodeIds: nodes.map((n) => ids[n.id]), ...(srcGrp?.color ? { color: srcGrp.color } : {}) }] } : {}),
+    ...(title ? { groups: [
+      { id: srcGrp ? ids[srcGrp.id] : uid('grp'), title, nodeIds: (srcGrp?.nodeIds ?? nodes.map((n) => n.id)).flatMap((id) => ids[id] ?? []), ...(srcGrp?.color ? { color: srcGrp.color } : {}) },
+      ...inner.map((g) => ({ id: ids[g.id], title: g.title, nodeIds: g.nodeIds.flatMap((id) => ids[id] ?? []), parentId: ids[g.parentId!], ...(g.color ? { color: g.color } : {}), ...(g.bounds ? { bounds: { ...g.bounds, ...moved(g.bounds) } } : {}) })),
+    ] } : {}),
   };
   const by = opts.by ?? 'user';
   let saved: Subject;

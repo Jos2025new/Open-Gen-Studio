@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { NodeChange } from '@xyflow/react';
 import { editPresentation } from '../../engine/nodecore/edit';
-import { groupBounds } from '../../engine/flow/arrange';
+import { DEFAULT_GROUP_BOUNDS, groupFrameBounds, isEmptyGroup } from '../../engine/flow/arrange';
+import { groupSubtree } from '../../engine/flow/groupTree';
 import { asNudge } from '../../engine/flow/history';
 import type { Graph } from '../../engine/types';
 import { useStore } from '../../store/store';
@@ -31,18 +32,28 @@ const samePointer = (a: Pointer, b: Pointer) => a.touch === b.touch && (!a.touch
 const isArrowBatch = () => typeof window !== 'undefined' && window.event?.type === 'keydown';
 const liveIds = (g: Graph | undefined) => new Set([...(g?.nodes ?? []), ...(g?.groups ?? [])].map((x) => x.id));
 
-/** Positions a flight gives to the live graph: dragged nodes as reported; a dragged frame shifts its live members by its own offset. */
+/** Positions a flight gives to the live graph: dragged nodes as reported; a dragged frame shifts its subtree by its own offset. */
 function project(f: Flight | null, graph: Graph | undefined): Map<string, Pt> {
   if (!f || !graph) return EMPTY;
   const byId = new Map(graph.nodes.map((n) => [n.id, n]));
+  const byGrp = new Map((graph.groups ?? []).map((g) => [g.id, g]));
   const out = new Map<string, Pt>();
   for (const [id, p] of f.pos) if (byId.has(id)) out.set(id, p);
   for (const g of graph.groups ?? []) {
     const p = f.pos.get(g.id), s = f.start.get(g.id);
     if (!p || !s) continue;
-    for (const id of g.nodeIds) {
+    const dx = p.x - s.x, dy = p.y - s.y;
+    const sub = groupSubtree(graph.groups, g.id);
+    for (const id of sub.nodeIds) {
       const n = byId.get(id);
-      if (n && !out.has(id)) out.set(id, { x: n.position.x + p.x - s.x, y: n.position.y + p.y - s.y });
+      if (n && !out.has(id)) out.set(id, { x: n.position.x + dx, y: n.position.y + dy });
+    }
+    for (const gid of sub.groupIds) {
+      const sg = byGrp.get(gid);
+      if (sg && isEmptyGroup(graph.groups, sg) && !out.has(gid)) {
+        const b = sg.bounds ?? DEFAULT_GROUP_BOUNDS;
+        out.set(gid, { x: b.x + dx, y: b.y + dy });
+      }
     }
   }
   return out.size ? out : EMPTY;
@@ -101,8 +112,7 @@ export function useNodeDrag(sessionId: string, measuredRef: RefObject<Sizes>) {
     const g = graphOf(sessionId), f = newFlight();
     for (const c of changes) {
       if (c.type !== 'position' || !c.position) continue;
-      const group = g?.groups?.find((gr) => gr.id === c.id), members = new Set(group?.nodeIds);
-      const b = group && groupBounds(g!.nodes.filter((n) => members.has(n.id)), measuredRef.current);
+      const b = g?.groups?.some((gr) => gr.id === c.id) ? groupFrameBounds(g, c.id, measuredRef.current) : null;
       f.start.set(c.id, b ? { x: b.x, y: b.y } : c.position);
     }
     track(f, changes);
@@ -111,13 +121,22 @@ export function useNodeDrag(sessionId: string, measuredRef: RefObject<Sizes>) {
 
   /** Writes a flight onto the live graph as one step, only for live IDs with net movement. */
   const commit = useCallback((f: Flight) => {
-    const moves = project(f, graphOf(sessionId));
+    const cur = graphOf(sessionId);
+    const moves = project(f, cur);
     const moved = (n: { id: string; position: Pt }) => {
       const p = moves.get(n.id);
       return p !== undefined && (p.x !== n.position.x || p.y !== n.position.y);
     };
-    if (!graphOf(sessionId)?.nodes.some(moved)) return;
-    editPresentation(sessionId, (g) => ({ ...g, nodes: g.nodes.map((n) => (moved(n) ? { ...n, position: moves.get(n.id)! } : n)) }));
+    const movedGrp = (gr: NonNullable<Graph['groups']>[number]) => {
+      const p = moves.get(gr.id), b = gr.bounds ?? DEFAULT_GROUP_BOUNDS;
+      return isEmptyGroup(cur?.groups, gr) && p !== undefined && (p.x !== b.x || p.y !== b.y);
+    };
+    if (!cur?.nodes.some(moved) && !cur?.groups?.some(movedGrp)) return;
+    editPresentation(sessionId, (g) => ({
+      ...g,
+      nodes: g.nodes.map((n) => (moved(n) ? { ...n, position: moves.get(n.id)! } : n)),
+      ...(g.groups?.some(movedGrp) ? { groups: g.groups.map((gr) => (movedGrp(gr) ? { ...gr, bounds: { ...(gr.bounds ?? DEFAULT_GROUP_BOUNDS), ...moves.get(gr.id)! } } : gr)) } : {}),
+    }));
   }, [sessionId]);
 
   /** Ends the open flight: on its own stop (same pointer), or with no event from a fallback end. */

@@ -19,7 +19,7 @@ it('the top bar keeps only Run all; Add node, Auto layout and Fit view live in t
   const top = ws.slice(ws.indexOf('<TopbarActions>'), ws.indexOf('</TopbarActions>'));
   expect(top).toContain('<RunAll');
   expect(top).not.toMatch(/AddNodeMenu|Auto layout|Fit view/);
-  expect(ws).toMatch(/add=\{<AddNodeMenu onAdd=\{addAtCenter\} onImport=\{importAtCenter\} omni=\{omniEntries\} \/>\}/);
+  expect(ws).toMatch(/add=\{<AddNodeMenu onAdd=\{addAtCenter\} onImport=\{importAtCenter\} onGroup=\{\(\) => addGroup\(\)\} omni=\{omniEntries\} \/>\}/);
   expect(parts).toMatch(/<IconButton ref=\{pop\.ref\} icon=\{Plus\} label="Add node…"/);
 });
 

@@ -1,3 +1,4 @@
+import { groupChain, groupSubtree } from './groupTree';
 import { uid } from '../../lib/id';
 import type { Graph, GraphEdge, GraphGroup, GraphNode, GenNodeData } from '../types';
 import { toast, useStore } from '../../store/store';
@@ -65,28 +66,112 @@ export function alignNodes(sessionId: string, ids: string[], mode: AlignMode, to
   if (pos.size) editPresentation(sessionId, (g) => ({ ...g, nodes: g.nodes.map((n) => (pos.has(n.id) ? { ...n, position: pos.get(n.id)! } : n)) }));
 }
 
-/** The group every one of `ids` is in, when they are exactly one whole group. */
+export type GroupRect = { x: number; y: number; width: number; height: number };
+export const DEFAULT_GROUP_BOUNDS: GroupRect = { x: 0, y: 0, width: 320, height: 220 };
+
+export const isEmptyGroup = (groups: readonly GraphGroup[] | undefined, g: GraphGroup): boolean =>
+  !g.nodeIds.length && !(groups ?? []).some((c) => c.parentId === g.id && c.id !== g.id);
+
+export const isSpecialGroup = (g: GraphGroup): boolean =>
+  'detachedOutputs' in g || g.id.startsWith('grp_sys_') || g.id.startsWith('sys_grp_');
+
+/** The outermost group whose nodes, with those of the groups inside it, are exactly `ids`. */
 export function wholeGroup(graph: Graph, ids: string[]): GraphGroup | undefined {
-  const g = graph.groups?.find((x) => x.nodeIds.includes(ids[0]));
-  return g && g.nodeIds.length === ids.length && ids.every((id) => g.nodeIds.includes(id)) ? g : undefined;
+  const direct = graph.groups?.find((x) => x.nodeIds.includes(ids[0]));
+  return groupChain(graph.groups, direct?.id).reverse().find((g) => {
+    const all = groupSubtree(graph.groups, g.id).nodeIds;
+    return all.size === ids.length && ids.every((id) => all.has(id));
+  });
 }
 
-/** Group the nodes (they leave any group they were in). Returns the group id. */
-export function groupNodes(sessionId: string, ids: string[], title?: string): string | null {
+/** Group nodes and/or whole groups (they leave any group they were in). Optional `parentId` nests it; cycles rejected. */
+export function groupNodes(sessionId: string, ids: string[], title?: string, parentId?: string): string | null {
   const graph = get().sessions[sessionId]?.graph;
-  if (!graph || ids.length < 2) return null;
-  if (ids.some(id => detachedOutputGroup(graph, id))) { toast('Reattach these outputs before changing their group.', 'error'); return null; }
-  const id = uid('grp');
-  const n = (graph.groups?.length ?? 0) + 1;
-  const kept = (graph.groups ?? []).map((g) => ({ ...g, nodeIds: g.nodeIds.filter((x) => !ids.includes(x)) })).filter((g) => g.nodeIds.length > 1 || (g.nodeIds.length > 0 && 'detachedOutputs' in g));
-  editPresentation(sessionId, (g) => ({ ...g, groups: [...kept, { id, title: title ?? `Group ${n}`, nodeIds: [...ids] }] }));
+  if (!graph) return null;
+  const groupSet = new Set((graph.groups ?? []).map((g) => g.id));
+  const rawGids = ids.filter((id) => groupSet.has(id));
+  const topGids = rawGids.filter((gid) => !groupChain(graph.groups, gid).slice(1).some((a) => rawGids.includes(a.id)));
+  const covered = new Set(topGids.flatMap((gid) => [...groupSubtree(graph.groups, gid).nodeIds]));
+  const looseNids = ids.filter((id) => !groupSet.has(id) && !covered.has(id) && graph.nodes.some((n) => n.id === id));
+  if (topGids.length + looseNids.length < 2) return null;
+  if (looseNids.some((id) => detachedOutputGroup(graph, id)) || topGids.some((gid) => 'detachedOutputs' in (graph.groups!.find((g) => g.id === gid) ?? {}))) {
+    toast('Reattach these outputs before changing their group.', 'error');
+    return null;
+  }
+  const parent = parentId && groupSet.has(parentId) ? parentId : undefined;
+  if (parent && topGids.some((gid) => groupChain(graph.groups, parent).some((a) => a.id === gid))) return null;
+  const id = uid('grp'), n = (graph.groups?.length ?? 0) + 1;
+  const topSet = new Set(topGids);
+  const kept = (graph.groups ?? [])
+    .map((g) => (topSet.has(g.id) ? { ...g, parentId: id } : { ...g, nodeIds: g.nodeIds.filter((x) => !looseNids.includes(x)) }))
+    .filter((g) => !('detachedOutputs' in g) || g.nodeIds.length > 0);
+  editPresentation(sessionId, (g) => ({ ...g, groups: [...kept, { id, title: title ?? `Group ${n}`, nodeIds: [...looseNids], ...(parent ? { parentId: parent } : {}) }] }));
   return id;
 }
 
+/** Nest `groupId` inside `parentId` (or move to root when absent/unknown). Rejects cycles. */
+export function reparentGroup(sessionId: string, groupId: string, parentId?: string): boolean {
+  const graph = get().sessions[sessionId]?.graph;
+  const g = graph?.groups?.find((x) => x.id === groupId);
+  if (!graph || !g || 'detachedOutputs' in g) return false;
+  const nextParent = parentId && graph.groups?.some((x) => x.id === parentId) ? parentId : undefined;
+  if (nextParent && groupChain(graph.groups, nextParent).some((x) => x.id === groupId)) return false;
+  if (g.parentId === nextParent) return true;
+  editPresentation(sessionId, (cur) => ({
+    ...cur,
+    groups: (cur.groups ?? []).map((x) => {
+      if (x.id !== groupId) return x;
+      const { parentId: _, ...rest } = x;
+      return nextParent ? { ...rest, parentId: nextParent } : rest;
+    }),
+  }));
+  return true;
+}
+
+/** Create an empty group frame at `at` (survives empty, moves, resizes and deletes without prompt). */
+export function createEmptyGroup(sessionId: string, at?: { x: number; y: number }, title?: string, parentId?: string): string | null {
+  const graph = get().sessions[sessionId]?.graph;
+  if (!graph) return null;
+  const id = uid('grp'), n = (graph.groups?.length ?? 0) + 1;
+  const bounds: GroupRect = { x: Math.round(at?.x ?? 0), y: Math.round(at?.y ?? 0), width: DEFAULT_GROUP_BOUNDS.width, height: DEFAULT_GROUP_BOUNDS.height };
+  const parent = parentId && graph.groups?.some((g) => g.id === parentId) ? parentId : undefined;
+  editPresentation(sessionId, (g) => ({ ...g, groups: [...(g.groups ?? []), { id, title: title ?? `Group ${n}`, nodeIds: [], bounds, ...(parent ? { parentId: parent } : {}) }] }));
+  return id;
+}
+
+export function resizeGroup(sessionId: string, groupId: string, bounds: GroupRect): void {
+  const next: GroupRect = { x: Math.round(bounds.x), y: Math.round(bounds.y), width: Math.max(160, Math.round(bounds.width)), height: Math.max(100, Math.round(bounds.height)) };
+  editPresentation(sessionId, (g) => ({ ...g, groups: (g.groups ?? []).map((x) => (x.id === groupId ? { ...x, bounds: next } : x)) }));
+}
+
+/** Remove a group frame; its direct nodes and subgroups move up to its parent (or root). Detached outputs reattach. */
 export function ungroup(sessionId: string, groupId: string): void {
   const graph = get().sessions[sessionId]?.graph;
-  if (graph?.groups?.some(g => g.id === groupId && 'detachedOutputs' in g)) { reattachOutputs(sessionId, groupId); return; }
-  editPresentation(sessionId, (g) => ({ ...g, groups: (g.groups ?? []).filter((x) => x.id !== groupId) }));
+  if (graph?.groups?.some((g) => g.id === groupId && 'detachedOutputs' in g)) { reattachOutputs(sessionId, groupId); return; }
+  editPresentation(sessionId, (g) => {
+    const target = g.groups?.find((x) => x.id === groupId);
+    if (!target) return g;
+    const parentId = target.parentId && g.groups?.some((x) => x.id === target.parentId && x.id !== groupId) ? target.parentId : undefined;
+    const groups = (g.groups ?? []).flatMap((x) => {
+      if (x.id === groupId) return [];
+      if (parentId && x.id === parentId) return [{ ...x, nodeIds: [...new Set([...x.nodeIds, ...target.nodeIds])] }];
+      if (x.parentId !== groupId) return [x];
+      const { parentId: _, ...rest } = x;
+      return [parentId ? { ...rest, parentId } : rest];
+    });
+    return { ...g, groups };
+  });
+}
+
+/** Delete a group and its whole subtree (descendant groups, nodes and their cables) in one undo step. */
+export function deleteGroupWithContents(sessionId: string, groupId: string): string | null {
+  const graph = get().sessions[sessionId]?.graph;
+  const target = graph?.groups?.find((g) => g.id === groupId);
+  if (!graph || !target) return `No such group: ${groupId}.`;
+  if (isSpecialGroup(target)) { ungroup(sessionId, groupId); return null; }
+  const sub = groupSubtree(graph.groups, groupId);
+  const live = new Set(graph.nodes.map((n) => n.id));
+  return deleteNodes(sessionId, [...sub.nodeIds].filter((id) => live.has(id)), [...sub.groupIds]);
 }
 
 export function renameGroup(sessionId: string, groupId: string, title: string): void {
@@ -98,48 +183,97 @@ export function setGroupColor(sessionId: string, groupId: string, color: string 
   editPresentation(sessionId, (g) => ({ ...g, groups: (g.groups ?? []).map((x) => (x.id === groupId ? { ...x, color } : x)) }));
 }
 
-/** The frame around a group's nodes (flow coordinates), from their real sizes: it follows them as they move. */
-export function groupBounds(members: GraphNode[], sizes: Sizes, pad = 28): { x: number; y: number; width: number; height: number } | null {
-  if (!members.length) return null;
-  let left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;
-  for (const node of members) {
-    const { x, y } = node.position;
-    const { width, height } = sizeOf(node, sizes);
-    left = Math.min(left, x);
-    top = Math.min(top, y);
-    right = Math.max(right, x + width);
-    bottom = Math.max(bottom, y + height);
-  }
-  return { x: left - pad, y: top - pad - 18, width: right - left + pad * 2, height: bottom - top + pad * 2 + 18 };
+function wrapRects(rects: GroupRect[], pad = 28): GroupRect | null {
+  if (!rects.length) return null;
+  const l = Math.min(...rects.map((r) => r.x)), t = Math.min(...rects.map((r) => r.y));
+  const r = Math.max(...rects.map((x) => x.x + x.width)), b = Math.max(...rects.map((x) => x.y + x.height));
+  return { x: l - pad, y: t - pad - 18, width: r - l + pad * 2, height: b - t + pad * 2 + 18 };
 }
 
-/** Move every node of a group by (dx, dy). */
+/** The frame around a group's nodes and the frames inside it (flow coordinates), from their real sizes: it follows them as they move. */
+export function groupBounds(members: GraphNode[], sizes: Sizes, pad = 28, inner: readonly GroupRect[] = []): GroupRect | null {
+  return wrapRects([...members.map((n) => ({ ...n.position, ...sizeOf(n, sizes) })), ...inner], pad);
+}
+
+/** Frame rectangle for a group (wraps direct nodes and child frames; falls back to stored bounds when empty). */
+export function groupFrameBounds(
+  graph: Graph, groupId: string, sizes: Sizes,
+  posOf?: (id: string, fallback: { x: number; y: number }) => { x: number; y: number },
+  pad = 28, visiting = new Set<string>(),
+): GroupRect | null {
+  const g = graph.groups?.find((x) => x.id === groupId);
+  if (!g || visiting.has(groupId)) return null;
+  visiting.add(groupId);
+  const rects: GroupRect[] = [];
+  for (const nid of g.nodeIds) {
+    const n = graph.nodes.find((x) => x.id === nid);
+    if (n) rects.push({ ...(posOf ? posOf(nid, n.position) : n.position), ...sizeOf(n, sizes) });
+  }
+  for (const c of graph.groups ?? []) if (c.parentId === groupId && !visiting.has(c.id)) { const cb = groupFrameBounds(graph, c.id, sizes, posOf, pad, visiting); if (cb) rects.push(cb); }
+  visiting.delete(groupId);
+  if (rects.length) return wrapRects(rects, pad);
+  const base = g.bounds ?? DEFAULT_GROUP_BOUNDS;
+  return { ...base, ...(posOf ? posOf(g.id, base) : { x: base.x, y: base.y }) };
+}
+
+/** Move every descendant node and empty subgroup frame of a group by (dx, dy). */
 export function moveGroup(sessionId: string, groupId: string, dx: number, dy: number): void {
   editPresentation(sessionId, (g) => {
-    const members = new Set(g.groups?.find((x) => x.id === groupId)?.nodeIds ?? []);
-    return { ...g, nodes: g.nodes.map((n) => (members.has(n.id) ? { ...n, position: { x: n.position.x + dx, y: n.position.y + dy } } : n)) };
+    const sub = groupSubtree(g.groups, groupId);
+    const groups = g.groups?.map((gr) => {
+      if (!sub.groupIds.has(gr.id) || !isEmptyGroup(g.groups, gr)) return gr;
+      const b = gr.bounds ?? DEFAULT_GROUP_BOUNDS;
+      return { ...gr, bounds: { ...b, x: b.x + dx, y: b.y + dy } };
+    });
+    return {
+      ...g,
+      nodes: g.nodes.map((n) => (sub.nodeIds.has(n.id) ? { ...n, position: { x: n.position.x + dx, y: n.position.y + dy } } : n)),
+      ...(groups ? { groups } : {}),
+    };
   });
 }
 
 // ---------------------------------------------------------------------------
-// Clipboard (inside the app: nodes with their parameters, the links between them and the inputs from outside)
+// Clipboard (inside the app: nodes with their parameters, groups/subgroups, links between them and inputs from outside)
 
 interface Clip {
   nodes: GraphNode[];
   edges: GraphEdge[];
+  groups?: GraphGroup[];
 }
 let clip: Clip | null = null;
 
 export function hasNodeClipboard(): boolean {
-  return Boolean(clip?.nodes.length);
+  return Boolean(clip?.nodes.length || clip?.groups?.length);
 }
 
-export function copyNodes(sessionId: string, ids: string[]): number {
+function collectCopyGroups(graph: Graph, nodeSet: Set<string>, groupIds: string[] = []): GraphGroup[] {
+  const gSet = new Set<string>();
+  for (const gid of groupIds) {
+    const sub = groupSubtree(graph.groups, gid);
+    sub.groupIds.forEach((id) => gSet.add(id));
+    sub.nodeIds.forEach((id) => nodeSet.add(id));
+  }
+  if (!gSet.size && nodeSet.size) {
+    for (const gr of graph.groups ?? []) {
+      if ('detachedOutputs' in gr) continue;
+      const sub = groupSubtree(graph.groups, gr.id);
+      if (sub.nodeIds.size && [...sub.nodeIds].every((id) => nodeSet.has(id))) sub.groupIds.forEach((id) => gSet.add(id));
+    }
+  }
+  return (graph.groups ?? []).filter((g) => gSet.has(g.id) && !('detachedOutputs' in g)).map((g) => {
+    const { library: _, ...rest } = structuredClone(g);
+    return rest;
+  });
+}
+
+export function copyNodes(sessionId: string, ids: string[], groupIds: string[] = []): number {
   const graph = get().sessions[sessionId]?.graph;
   if (!graph) return 0;
   const set = new Set(ids);
-  clip = { nodes: structuredClone(graph.nodes.filter((n) => set.has(n.id))), edges: structuredClone(graph.edges.filter((e) => set.has(e.target))) };
-  return clip.nodes.length;
+  const groups = collectCopyGroups(graph, set, groupIds);
+  clip = { nodes: structuredClone(graph.nodes.filter((n) => set.has(n.id))), edges: structuredClone(graph.edges.filter((e) => set.has(e.target))), ...(groups.length ? { groups } : {}) };
+  return clip.nodes.length || groups.length;
 }
 
 export function cutNodes(sessionId: string, ids: string[]): number {
@@ -148,40 +282,63 @@ export function cutNodes(sessionId: string, ids: string[]): number {
   return n;
 }
 
-/**
- * Paste the clipboard: new ids, a little offset (or at `at`), the links between the pasted nodes, and the inputs
- * from nodes still on the canvas. A generation node comes without its result (it is a new node to run); an asset
- * node keeps its image. Returns the new ids.
- */
-export function pasteNodes(sessionId: string, at?: { x: number; y: number }): string[] {
-  const st = get();
-  const graph = st.sessions[sessionId]?.graph;
-  if (!graph || !clip?.nodes.length) return [];
-  const minX = Math.min(...clip.nodes.map((n) => n.position.x));
-  const minY = Math.min(...clip.nodes.map((n) => n.position.y));
-  const offset = at ? { x: at.x - minX, y: at.y - minY } : { x: 60, y: 60 };
-  const ids = new Map(clip.nodes.map((n) => [n.id, uid('nd')]));
-  const added: GraphNode[] = clip.nodes.map((n) => {
+function cloneClipInto(graph: Graph, assets: ReturnType<typeof get>['assets'], src: Clip, offset: { x: number; y: number }, keepRootParent = false) {
+  const ids = new Map(src.nodes.map((n) => [n.id, uid('nd')]));
+  const gids = new Map((src.groups ?? []).map((g) => [g.id, uid('grp')]));
+  const added: GraphNode[] = src.nodes.map((n) => {
     const data = structuredClone(n.data);
-    if (runsGeneration(data)) {
-      delete (data as GenNodeData).generationId;
-      delete (data as GenNodeData).sketchAssetId;
-      (data as GenNodeData).outputIndex = 0;
-    }
+    if (runsGeneration(data)) { delete (data as GenNodeData).generationId; delete (data as GenNodeData).sketchAssetId; (data as GenNodeData).outputIndex = 0; }
     return { id: ids.get(n.id)!, position: { x: n.position.x + offset.x, y: n.position.y + offset.y }, data };
   });
-  let next: Graph = { ...graph, nodes: [...graph.nodes, ...added] };
-  for (const e of clip.edges) {
+  const addedGroups: GraphGroup[] = (src.groups ?? []).map((g) => {
+    const { parentId, bounds, ...rest } = structuredClone(g);
+    const mappedParent = parentId ? (gids.get(parentId) ?? (keepRootParent && graph.groups?.some((x) => x.id === parentId) ? parentId : undefined)) : undefined;
+    return {
+      ...rest,
+      id: gids.get(g.id)!,
+      nodeIds: g.nodeIds.map((id) => ids.get(id)).filter((id): id is string => Boolean(id)),
+      ...(mappedParent ? { parentId: mappedParent } : {}),
+      ...(bounds ? { bounds: { ...bounds, x: bounds.x + offset.x, y: bounds.y + offset.y } } : {}),
+    };
+  });
+  let next: Graph = { ...graph, nodes: [...graph.nodes, ...added], ...(addedGroups.length ? { groups: [...(graph.groups ?? []), ...addedGroups] } : {}) };
+  for (const e of src.edges) {
     const source = ids.get(e.source) ?? (graph.nodes.some((n) => n.id === e.source) ? e.source : undefined);
     const target = ids.get(e.target);
     if (!source || !target) continue;
     const c = { source, target, targetHandle: e.targetHandle, sourceHandle: e.sourceHandle, kind: e.kind, both: e.both };
     const port = (e.kind ?? 'data') === 'data' ? inputPorts(added.find((n) => n.id === target)!.data).find((p) => p.id === e.targetHandle) : {};
     // The copy keeps the cable whole (kind, both, output, and the revision it was fixed to): a pasted invalid reference stays invalid.
-    if (port && !connectionError(next, st.assets, c)) next = { ...next, edges: [...next.edges, { ...e, id: uid('edge'), source, target }] };
+    if (port && !connectionError(next, assets, c)) next = { ...next, edges: [...next.edges, { ...e, id: uid('edge'), source, target }] };
   }
+  return { next, added, addedGroups, gids };
+}
+
+/**
+ * Paste the clipboard: new ids, a little offset (or at `at`), remapped groups/subgroups, links between pasted nodes,
+ * and inputs from nodes still on the canvas. Returns the new node ids (or new group ids when pasting empty groups).
+ */
+export function pasteNodes(sessionId: string, at?: { x: number; y: number }): string[] {
+  const st = get(), graph = st.sessions[sessionId]?.graph;
+  if (!graph || !hasNodeClipboard()) return [];
+  const emptyBounds = (clip!.groups ?? []).filter((g) => isEmptyGroup(clip!.groups, g) && g.bounds).map((g) => g.bounds!);
+  const xs = [...clip!.nodes.map((n) => n.position.x), ...emptyBounds.map((b) => b.x)];
+  const ys = [...clip!.nodes.map((n) => n.position.y), ...emptyBounds.map((b) => b.y)];
+  const offset = at && xs.length ? { x: at.x - Math.min(...xs), y: at.y - Math.min(...ys) } : { x: 60, y: 60 };
+  const { next, added, addedGroups } = cloneClipInto(graph, st.assets, clip!, offset);
   editCompound(sessionId, 'paste', () => next);
-  return added.map((n) => n.id);
+  return added.length ? added.map((n) => n.id) : addedGroups.map((g) => g.id);
+}
+
+/** Duplicate a group and its whole subtree (subgroups, nodes, internal links) with fresh ids in one undo step. */
+export function duplicateGroup(sessionId: string, groupId: string): string | null {
+  const st = get(), graph = st.sessions[sessionId]?.graph;
+  if (!graph || !graph.groups?.some((g) => g.id === groupId && !('detachedOutputs' in g))) return null;
+  const nodeSet = new Set<string>(), groups = collectCopyGroups(graph, nodeSet, [groupId]);
+  const src: Clip = { nodes: structuredClone(graph.nodes.filter((n) => nodeSet.has(n.id))), edges: structuredClone(graph.edges.filter((e) => nodeSet.has(e.target))), groups };
+  const { next, gids } = cloneClipInto(graph, st.assets, src, { x: 60, y: 60 }, true);
+  editCompound(sessionId, 'duplicate-group', () => next);
+  return gids.get(groupId) ?? null;
 }
 
 // Detached cards share their existing generation, while the selected card keeps the original node ID.
@@ -225,7 +382,7 @@ export function detachOutputs(sessionId: string, nodeId: string): string[] {
       hadGroups: graph.groups !== undefined, copiedInputIds: copied.map(e => e.id),
     },
   };
-  const groups = (graph.groups ?? []).map(g => g.nodeIds.includes(nodeId) ? { ...g, nodeIds: g.nodeIds.filter(id => id !== nodeId) } : g).filter(g => g.nodeIds.length > 1 || (g.nodeIds.length > 0 && 'detachedOutputs' in g));
+  const groups = (graph.groups ?? []).map(g => g.nodeIds.includes(nodeId) ? { ...g, nodeIds: g.nodeIds.filter(id => id !== nodeId) } : g).filter(g => !('detachedOutputs' in g) || g.nodeIds.length > 0);
   const next = { ...graph, nodes: graph.nodes.flatMap(n => n.id === nodeId ? cards : [n]), edges: [...graph.edges, ...copied], groups: [...groups, group] };
   const problem = graphEditProblem(sessionId, graph, next);
   if (problem) { toast(problem, 'error'); return []; }

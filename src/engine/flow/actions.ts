@@ -65,14 +65,14 @@ export function patchNodeData(sessionId: string, nodeId: string, patch: Partial<
   return editError(applyEdit({ session: sessionId, op: { op: 'set', node: nodeId, patch } }));
 }
 
-export function deleteNodes(sessionId: string, ids: string[]): string | null {
+export function deleteNodes(sessionId: string, ids: string[], dropGroups?: string[]): string | null {
   const graph = get().sessions[sessionId]?.graph;
   if (!graph) return 'No such session.';
   const missing = ids.find(id => !graph?.nodes.some(n => n.id === id));
   if (missing) return `No such node: ${missing}.`;
   const drop = new Set(ids);
   const deleted = { nodes: structuredClone(graph.nodes.filter(n => drop.has(n.id))), edges: structuredClone(graph.edges.filter(e => drop.has(e.source) || drop.has(e.target))) };
-  const error = editError(applyEdit({ session: sessionId, op: { op: 'delete', nodes: ids } }));
+  const error = editError(applyEdit({ session: sessionId, op: { op: 'delete', nodes: ids, ...(dropGroups?.length ? { groups: dropGroups } : {}) } }));
   const restorable = deleted.nodes.filter(n => n.data.kind !== 'ref' || (n.data.type === 'prompt' && n.data.ref !== 'composer'));
   if (!error && restorable.length) {
     const ids = new Set(restorable.map(n => n.id));

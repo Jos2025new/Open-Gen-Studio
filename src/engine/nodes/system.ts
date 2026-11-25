@@ -409,7 +409,7 @@ export function attachModelToNode(
     } else {
       groups = groups
         .map((gr) => (gr.id === groupId ? { ...gr, nodeIds: gr.nodeIds.filter((id) => id !== modelNodeId) } : gr))
-        .filter((gr) => gr.nodeIds.length > 1);
+        .filter((gr) => gr.id !== groupId || gr.nodeIds.length > 1);
     }
 
     // The cable this attach replaces: any other control cable from this model to this host.
@@ -456,7 +456,7 @@ export function detachModelFromNode(
     const edges = g.edges.filter((e) => !gone(e));
     const groups = (g.groups ?? [])
       .map((gr) => (modelNode ? { ...gr, nodeIds: gr.nodeIds.filter((id) => id !== modelNode.id) } : gr))
-      .filter((gr) => gr.nodeIds.length > 1);
+      .filter((gr) => gr.id !== `grp_sys_${hostId}` || gr.nodeIds.length > 1);
     return { graph: { ...g, nodes, edges, ...(groups.length ? { groups } : { groups: undefined }) }, dropped: g.edges.filter(gone).map((e) => e.id) };
   });
 

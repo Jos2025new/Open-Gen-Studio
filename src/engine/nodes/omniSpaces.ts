@@ -40,7 +40,7 @@ export const hiddenInOrdinary = omniOnly;
 export function ordinaryGraph(g: Graph): Graph {
   if (!g.nodes.some(hiddenInOrdinary)) return g;
   const hidden = new Set(g.nodes.filter(hiddenInOrdinary).map((n) => n.id));
-  const groups = g.groups?.map((gr) => ({ ...gr, nodeIds: gr.nodeIds.filter((id) => !hidden.has(id)) })).filter((gr) => gr.nodeIds.length > 1);
+  const groups = g.groups?.flatMap((gr) => { const nodeIds = gr.nodeIds.filter((id) => !hidden.has(id)); return !gr.nodeIds.length || nodeIds.length ? [{ ...gr, nodeIds }] : []; });
   return {
     ...g,
     nodes: g.nodes.filter((n) => !hidden.has(n.id)),

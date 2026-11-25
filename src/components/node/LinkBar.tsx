@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { Panel, type Edge } from '@xyflow/react';
 import { disconnectEdges, deleteNodes } from '../../engine/flow/actions';
-import { ungroup } from '../../engine/flow/arrange';
+import { isEmptyGroup, isSpecialGroup, ungroup } from '../../engine/flow/arrange';
+import { groupSubtree } from '../../engine/flow/groupTree';
 import { GONE_HANDLE, NO_RESULT, nodePorts, outputPort, resultHandle } from '../../engine/flow/graph';
 import { openHistoryGroup } from '../../engine/flow/history';
 import { setLinkBoth } from '../../engine/nodes/system';
@@ -69,10 +70,17 @@ export function LinkBar({ sessionId, graph, selected }: { sessionId: string; gra
 export const DeleteRequestContext = createContext<((nodeIds: string[], edgeIds?: string[], beforeDelete?: () => void) => void) | null>(null);
 export const useDeleteRequestContext = () => useContext(DeleteRequestContext);
 
-/** A system node is a pointer: removing it only takes it off the canvas. When it holds model links, ask first. */
+/** A system node is a pointer: removing it only takes it off the canvas. When it holds model links, ask first.
+ *  A non-empty ordinary group asks whether to ungroup or delete with contents; empty and special groups delete directly. */
 export function useDeleteRequest(sessionId: string, afterDelete: (nodes: string[], edges: string[]) => void) {
-  const [ask, setAsk] = useState<{ nodes: string[]; edges: string[]; beforeDelete?: () => void } | null>(null);
+  const [ask, setAsk] = useState<{ nodes: string[]; edges: string[]; groups?: string[]; beforeDelete?: () => void } | null>(null);
   const graph = useStore((s) => s.sessions[sessionId]?.graph);
+  const nonEmptyGroups = (ids: string[]) => {
+    const g = useStore.getState().sessions[sessionId]?.graph ?? graph;
+    if (!g?.groups?.length) return [];
+    const byId = new Map(g.groups.map((gr) => [gr.id, gr]));
+    return ids.filter((id) => { const gr = byId.get(id); return Boolean(gr && !isSpecialGroup(gr) && !isEmptyGroup(g.groups, gr)); });
+  };
   const needsConfirm = (ids: string[]) => {
     const g = useStore.getState().sessions[sessionId]?.graph ?? graph;
     if (!g) return false;
@@ -85,13 +93,24 @@ export function useDeleteRequest(sessionId: string, afterDelete: (nodes: string[
   const afterDeleteRef = useRef(afterDelete);
   afterDeleteRef.current = afterDelete;
   /** Deletes nodes (with their connected links), standalone links, and group frames as one atomic undo step. */
-  const runDelete = useCallback((nodeIds: string[], edgeIds: string[] = [], beforeDelete?: () => void) => {
+  const runDelete = useCallback((nodeIds: string[], edgeIds: string[] = [], beforeDelete?: () => void, groupMode: 'ungroup' | 'contents' = 'ungroup') => {
     const g = useStore.getState().sessions[sessionId]?.graph;
     if (!g) return;
-    const groupSet = new Set((g.groups ?? []).map((gr) => gr.id));
+    const byGroup = new Map((g.groups ?? []).map((gr) => [gr.id, gr]));
     const nodeSet = new Set(g.nodes.map((n) => n.id));
-    const groupIds = nodeIds.filter((id) => groupSet.has(id));
-    const realNodes = nodeIds.filter((id) => nodeSet.has(id));
+    const groupIds = nodeIds.filter((id) => byGroup.has(id));
+    const normalGroupIds = groupIds.filter((id) => !isSpecialGroup(byGroup.get(id)!));
+    const specialGroupIds = groupIds.filter((id) => isSpecialGroup(byGroup.get(id)!));
+    const subGroups = new Set<string>(), subNodes = new Set<string>();
+    for (const gid of normalGroupIds) {
+      const sub = groupSubtree(g.groups, gid);
+      sub.groupIds.forEach((id) => subGroups.add(id));
+      sub.nodeIds.forEach((id) => subNodes.add(id));
+    }
+    const realNodes = groupMode === 'contents'
+      ? [...new Set([...nodeIds.filter((id) => nodeSet.has(id)), ...[...subNodes].filter((id) => nodeSet.has(id))])]
+      : nodeIds.filter((id) => nodeSet.has(id) && !subNodes.has(id));
+    const dropGroups = groupMode === 'contents' ? [...subGroups] : [];
     const dropSet = new Set(realNodes);
     const edgeSet = new Set(g.edges.map((e) => e.id));
     const standaloneEdges = edgeIds.filter((id) => {
@@ -103,20 +122,41 @@ export function useDeleteRequest(sessionId: string, afterDelete: (nodes: string[
     beforeDelete?.();
     const h = openHistoryGroup(sessionId);
     try {
-      for (const gid of groupIds) ungroup(sessionId, gid);
-      if (realNodes.length) deleteNodes(sessionId, realNodes);
+      for (const gid of specialGroupIds) ungroup(sessionId, gid);
+      if (groupMode === 'contents') {
+        if (realNodes.length || dropGroups.length) deleteNodes(sessionId, realNodes, dropGroups);
+      } else {
+        for (const gid of normalGroupIds) ungroup(sessionId, gid);
+        if (realNodes.length) deleteNodes(sessionId, realNodes);
+      }
       if (standaloneEdges.length) void disconnectEdges(sessionId, standaloneEdges);
     } finally {
       h.close();
     }
-    afterDeleteRef.current(nodeIds, edgeIds);
+    afterDeleteRef.current([...groupIds, ...dropGroups, ...realNodes], edgeIds);
   }, [sessionId]);
-  const request = (nodeIds: string[], edgeIds: string[] = [], beforeDelete?: () => void) => {
-    if (needsConfirm(nodeIds)) setAsk({ nodes: nodeIds, edges: edgeIds, beforeDelete });
-    else runDelete(nodeIds, edgeIds, beforeDelete);
+  const askOrRun = (nodeIds: string[], edgeIds: string[] = [], beforeDelete?: () => void) => {
+    const groups = nonEmptyGroups(nodeIds);
+    if (groups.length) { setAsk({ nodes: nodeIds, edges: edgeIds, groups, beforeDelete }); return; }
+    if (needsConfirm(nodeIds)) { setAsk({ nodes: nodeIds, edges: edgeIds, beforeDelete }); return; }
+    runDelete(nodeIds, edgeIds, beforeDelete);
   };
+  const request = (nodeIds: string[], edgeIds: string[] = [], beforeDelete?: () => void) => askOrRun(nodeIds, edgeIds, beforeDelete);
   const card = useMemo(() => {
     if (!ask || !graph) return null;
+    if (ask.groups?.length) {
+      const names = ask.groups.map((id) => graph.groups?.find((gr) => gr.id === id)?.title ?? id).join(', ');
+      return (
+        <Panel position="top-center" className="link-bar confirm-pop" role="alertdialog" aria-label="Delete group">
+          <p>Delete <strong>{names}</strong>?</p>
+          <div className="spend-actions">
+            <Button variant="ghost" onClick={() => setAsk(null)}>Cancel</Button>
+            <Button variant="secondary" onClick={() => { runDelete(ask.nodes, ask.edges, ask.beforeDelete, 'ungroup'); setAsk(null); }}>Ungroup</Button>
+            <Button variant="danger" onClick={() => { runDelete(ask.nodes, ask.edges, ask.beforeDelete, 'contents'); setAsk(null); }}>Delete with contents</Button>
+          </div>
+        </Panel>
+      );
+    }
     const names = ask.nodes.map((id) => graph.nodes.find((n) => n.id === id)?.data.title ?? id).join(', ');
     const links = graph.edges.filter((e) => ask.nodes.includes(e.source) || ask.nodes.includes(e.target)).length;
     return (
@@ -134,8 +174,7 @@ export function useDeleteRequest(sessionId: string, afterDelete: (nodes: string[
     const nodeIds = nodes.map((n) => n.id);
     const edgeIds = edges.map((e) => e.id);
     if (!nodeIds.length && !edgeIds.length) return false;
-    if (needsConfirm(nodeIds)) { setAsk({ nodes: nodeIds, edges: edgeIds }); return false; }
-    runDelete(nodeIds, edgeIds);
+    askOrRun(nodeIds, edgeIds);
     return false;
   };
   return { request, card, before };

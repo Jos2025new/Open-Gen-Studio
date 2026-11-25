@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useStore } from '../../store/store';
-import { groupBounds, type Sizes } from '../../engine/flow/arrange';
+import { DEFAULT_GROUP_BOUNDS, groupBounds, isEmptyGroup, type GroupRect, type Sizes } from '../../engine/flow/arrange';
+import { groupChain, groupSubtree } from '../../engine/flow/groupTree';
 import { groupNotices, type NoticeSummary, type CableNotice, type GraphNotice, type PortNotice } from '../../engine/flow/notices';
 import { NODE_WIDTH, runsGeneration } from '../../engine/flow/graph';
 import type { Asset, Generation, Graph, GraphGroup, GraphNode } from '../../engine/types';
@@ -13,64 +14,88 @@ import type { GroupFlowNode } from './Operations';
 
 export function closedGroupNotices(groups: Graph['groups'], closed: ReadonlySet<string>, notices: GraphNotice[]) {
   return new Map((groups ?? []).filter(group => closed.has(group.id)).map(group =>
-    [group.id, groupNotices(notices, group.nodeIds)]));
+    [group.id, groupNotices(notices, [...groupSubtree(groups, group.id).nodeIds])]));
 }
 
+/** What a frame was worked out from: with the same positions, sizes and inner frames it is not worked out again. */
 interface GroupLayout {
   positions: Array<GraphNode['position'] | undefined>;
   sizes: Array<ReturnType<Sizes['get']>>;
-  bounds: ReturnType<typeof groupBounds>;
+  inner: Array<GroupRect | null>;
+  bounds: GroupRect;
   frame?: GroupFlowNode;
 }
 
-export function canvasGroups({ nodes, groups }: Graph, measured: Sizes, sessionId: string, closed: ReadonlySet<string>,
+export function canvasGroups(graph: Graph, measured: Sizes, sessionId: string, closed: ReadonlySet<string>,
   summaries: ReadonlyMap<string, NoticeSummary>, toggle: (groupId: string) => void,
-  cache = new WeakMap<GraphGroup, GroupLayout>(), dragPos?: ReadonlyMap<string, { x: number; y: number }>) {
+  cache = new WeakMap<GraphGroup, GroupLayout>(), dragPos?: ReadonlyMap<string, { x: number; y: number }>, selected?: ReadonlySet<string>) {
   const frames: GroupFlowNode[] = [];
   const hidden = new Set<string>();
+  const groups = graph.groups;
   if (!groups?.length) return { frames, hidden };
-  const byId = new Map<string, GraphNode>();
-  for (const node of nodes) byId.set(node.id, node);
+  const hiddenGroups = new Set<string>();
+  for (const g of groups) {
+    if (!closed.has(g.id)) continue;
+    const sub = groupSubtree(groups, g.id);
+    sub.nodeIds.forEach((id) => hidden.add(id));
+    sub.groupIds.forEach((id) => { if (id !== g.id) hiddenGroups.add(id); });
+  }
+  const byId = new Map<string, GraphNode>(), inside = new Map<string, GraphGroup[]>(), done = new Map<string, GroupLayout | null>();
+  for (const node of graph.nodes) byId.set(node.id, node);
+  for (const g of groups) if (g.parentId) inside.set(g.parentId, [...(inside.get(g.parentId) ?? []), g]);
   const posOf = (node: GraphNode | undefined) => (node ? (dragPos?.get(node.id) ?? node.position) : undefined);
-  for (const group of groups) {
-    const previous = cache.get(group);
+  const layoutOf = (group: GraphGroup): GroupLayout | null => {
+    if (done.has(group.id)) return done.get(group.id)!;
+    done.set(group.id, null); // A cycle in the data stops here.
+    const inner = (inside.get(group.id) ?? []).map((g) => layoutOf(g)?.bounds ?? null), previous = cache.get(group);
+    const alone = !inner.length && !group.nodeIds.length ? dragPos?.get(group.id) : undefined;
     let layout = previous;
-    if (!previous || group.nodeIds.some((id, i) => {
-      const pos = posOf(byId.get(id));
-      const prev = previous.positions[i];
+    if (!previous || alone || previous.positions.length > group.nodeIds.length || inner.length !== previous.inner.length || inner.some((r, i) => r !== previous.inner[i]) || group.nodeIds.some((id, i) => {
+      const pos = posOf(byId.get(id)), prev = previous.positions[i];
       return pos?.x !== prev?.x || pos?.y !== prev?.y || measured.get(id) !== previous.sizes[i];
     })) {
       const members: GraphNode[] = [];
-      const positions = group.nodeIds.map(id => {
-        const node = byId.get(id);
-        const pos = posOf(node);
+      const positions: GroupLayout['positions'] = group.nodeIds.map((id) => {
+        const node = byId.get(id), pos = posOf(node);
         if (node && pos) members.push(pos === node.position ? node : { ...node, position: pos });
         return pos;
       });
-      layout = { positions, sizes: group.nodeIds.map(id => measured.get(id)),
-        bounds: groupBounds(members, measured), frame: previous?.frame };
+      // The extra place tells a frame moved on its own: it is worked out again when it is let go.
+      if (alone) positions.push(alone);
+      const bounds = groupBounds(members, measured, undefined, inner.filter((r): r is GroupRect => r !== null)) ?? { ...(group.bounds ?? DEFAULT_GROUP_BOUNDS), ...alone };
+      layout = { positions, sizes: group.nodeIds.map((id) => measured.get(id)), inner, bounds, frame: previous?.frame };
       cache.set(group, layout);
     }
-    if (!layout?.bounds) continue;
+    done.set(group.id, layout!);
+    return layout!;
+  };
+  for (const group of groups) {
+    if (hiddenGroups.has(group.id)) continue;
+    const layout = layoutOf(group);
+    if (!layout) continue;
     const b = layout.bounds;
+    const empty = isEmptyGroup(groups, group);
     const collapsed = closed.has(group.id);
-    if (collapsed) group.nodeIds.forEach(id => hidden.add(id));
+    const depth = Math.min(groupChain(groups, group.id).length - 1, 49);
+    const zIndex = collapsed ? 1 : -50 + depth;
     const summary = summaries.get(group.id);
     const width = collapsed ? 200 : b.width;
     const height = collapsed ? 32 : b.height;
     const problems = summary?.count ?? 0;
     const hasErrors = summary?.hasErrors;
+    const sel = Boolean(selected?.has(group.id));
     const old = layout.frame;
     if (old && old.position.x === b.x && old.position.y === b.y && old.width === width && old.height === height &&
+        old.selected === sel && old.zIndex === zIndex && old.data.empty === empty &&
         old.data.sessionId === sessionId && old.data.collapsed === collapsed &&
         old.data.problems === problems && old.data.hasErrors === hasErrors && old.data.toggle === toggle) {
       frames.push(old);
     } else {
       const frame: GroupFlowNode = {
         id: group.id, type: 'group', position: { x: b.x, y: b.y },
-        data: { group, sessionId, collapsed, problems, hasErrors, toggle },
-        width, height, measured: { width, height },
-        zIndex: collapsed ? 1 : -1, draggable: true, selectable: !collapsed, connectable: false, style: { width, height },
+        data: { group, sessionId, collapsed, problems, hasErrors, empty, toggle },
+        selected: sel, width, height, measured: { width, height },
+        zIndex, draggable: true, selectable: !collapsed, connectable: false, style: { width, height },
       };
       layout.frame = frame;
       frames.push(frame);
@@ -81,10 +106,10 @@ export function canvasGroups({ nodes, groups }: Graph, measured: Sizes, sessionI
 
 export function useCanvasGroups(graph: Graph, measured: Sizes, sessionId: string, closed: ReadonlySet<string>,
   summaries: ReadonlyMap<string, NoticeSummary>, toggle: (groupId: string) => void,
-  dragPos?: ReadonlyMap<string, { x: number; y: number }>) {
+  dragPos?: ReadonlyMap<string, { x: number; y: number }>, selected?: ReadonlySet<string>) {
   const cache = useMemo(() => new WeakMap<GraphGroup, GroupLayout>(), []);
-  return useMemo(() => canvasGroups(graph, measured, sessionId, closed, summaries, toggle, cache, dragPos),
-    [graph, measured, sessionId, closed, summaries, toggle, cache, dragPos]);
+  return useMemo(() => canvasGroups(graph, measured, sessionId, closed, summaries, toggle, cache, dragPos, selected),
+    [graph, measured, sessionId, closed, summaries, toggle, cache, dragPos, selected]);
 }
 
 interface CanvasElements {
