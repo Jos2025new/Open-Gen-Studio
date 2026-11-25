@@ -9,6 +9,7 @@ import { MEDIA_KINDS, MODEL_MEDIA_KINDS, type GenSettings, type GraphEdge, type 
 import { budgetProblemForSteps } from '../budget';
 import { stepCapsFromMap } from '../money/storeBridge';
 import * as A from './actions';
+import { deleteGroupWithContents, groupSubtree, ungroup } from './arrange';
 import { applyEdit } from '../nodecore/edit';
 import { prepareAction, runAction } from '../nodecore/action';
 import { ownerRev } from '../nodecore/revision';
@@ -216,12 +217,28 @@ export const commands = [
   nodeCommand({
     id: 'nodes.node.delete',
     title: 'Delete nodes',
-    description: 'Deletes these nodes and their connections (undo brings them back). Returns {nodes}.',
-    args: z.object({ nodes: ids }).strict(),
+    description: 'Deletes these nodes and/or a group (contents: "ungroup" lifts direct children, "delete" removes the subtree) and their connections (undo brings them back). Returns {nodes}.',
+    args: z.object({ nodes: ids.optional(), group: nodeRef.optional(), contents: z.enum(['ungroup', 'delete']).optional() }).strict(),
     effect: 'write',
+    available: (ctx, args) => {
+      const ok = hasTarget(ctx, args);
+      if (ok !== true || !args) return ok;
+      if (!args.nodes?.length && !args.group) return 'Give nodes or a group.';
+      if (args.group && !graphOf(ctx.on).groups?.some((g) => g.id === args.group)) return `No such group: ${args.group}.`;
+      return true;
+    },
     run: (on, args) => {
-      throwIf(A.deleteNodes(on.session, args.nodes));
-      return { nodes: args.nodes };
+      let groupNodes: string[] = [];
+      if (args.group) {
+        if (args.contents === 'delete') {
+          const g = graphOf(on), live = new Set(g.nodes.map((n) => n.id));
+          groupNodes = [...groupSubtree(g.groups, args.group).nodeIds].filter((id) => live.has(id));
+          throwIf(deleteGroupWithContents(on.session, args.group));
+        } else ungroup(on.session, args.group);
+      }
+      const extra = (args.nodes ?? []).filter((id) => graphOf(on).nodes.some((n) => n.id === id));
+      if (extra.length) throwIf(A.deleteNodes(on.session, extra));
+      return { nodes: [...new Set([...groupNodes, ...extra])], ...(args.group ? { group: args.group } : {}) };
     },
   }),
   nodeCommand({

@@ -93,6 +93,9 @@ export function groupSubtree(groups: readonly GraphGroup[] | undefined, id: stri
 export const isEmptyGroup = (groups: readonly GraphGroup[] | undefined, g: GraphGroup): boolean =>
   !g.nodeIds.length && !(groups ?? []).some((c) => c.parentId === g.id && c.id !== g.id);
 
+export const isSpecialGroup = (g: GraphGroup): boolean =>
+  'detachedOutputs' in g || g.id.startsWith('grp_sys_') || g.id.startsWith('sys_grp_');
+
 /** The group every one of `ids` is in, when they are exactly one whole group. */
 export function wholeGroup(graph: Graph, ids: string[]): GraphGroup | undefined {
   const g = graph.groups?.find((x) => x.nodeIds.includes(ids[0]));
@@ -159,10 +162,34 @@ export function resizeGroup(sessionId: string, groupId: string, bounds: GroupRec
   editPresentation(sessionId, (g) => ({ ...g, groups: (g.groups ?? []).map((x) => (x.id === groupId ? { ...x, bounds: next } : x)) }));
 }
 
+/** Remove a group frame; its direct nodes and subgroups move up to its parent (or root). Detached outputs reattach. */
 export function ungroup(sessionId: string, groupId: string): void {
   const graph = get().sessions[sessionId]?.graph;
-  if (graph?.groups?.some(g => g.id === groupId && 'detachedOutputs' in g)) { reattachOutputs(sessionId, groupId); return; }
-  editPresentation(sessionId, (g) => ({ ...g, groups: (g.groups ?? []).filter((x) => x.id !== groupId) }));
+  if (graph?.groups?.some((g) => g.id === groupId && 'detachedOutputs' in g)) { reattachOutputs(sessionId, groupId); return; }
+  editPresentation(sessionId, (g) => {
+    const target = g.groups?.find((x) => x.id === groupId);
+    if (!target) return g;
+    const parentId = target.parentId && g.groups?.some((x) => x.id === target.parentId && x.id !== groupId) ? target.parentId : undefined;
+    const groups = (g.groups ?? []).flatMap((x) => {
+      if (x.id === groupId) return [];
+      if (parentId && x.id === parentId) return [{ ...x, nodeIds: [...new Set([...x.nodeIds, ...target.nodeIds])] }];
+      if (x.parentId !== groupId) return [x];
+      const { parentId: _, ...rest } = x;
+      return [parentId ? { ...rest, parentId } : rest];
+    });
+    return { ...g, groups };
+  });
+}
+
+/** Delete a group and its whole subtree (descendant groups, nodes and their cables) in one undo step. */
+export function deleteGroupWithContents(sessionId: string, groupId: string): string | null {
+  const graph = get().sessions[sessionId]?.graph;
+  const target = graph?.groups?.find((g) => g.id === groupId);
+  if (!graph || !target) return `No such group: ${groupId}.`;
+  if (isSpecialGroup(target)) { ungroup(sessionId, groupId); return null; }
+  const sub = groupSubtree(graph.groups, groupId);
+  const live = new Set(graph.nodes.map((n) => n.id));
+  return deleteNodes(sessionId, [...sub.nodeIds].filter((id) => live.has(id)), [...sub.groupIds]);
 }
 
 export function renameGroup(sessionId: string, groupId: string, title: string): void {
@@ -299,6 +326,7 @@ function cloneClipInto(graph: Graph, assets: ReturnType<typeof get>['assets'], s
     if (!source || !target) continue;
     const c = { source, target, targetHandle: e.targetHandle, sourceHandle: e.sourceHandle, kind: e.kind, both: e.both };
     const port = (e.kind ?? 'data') === 'data' ? inputPorts(added.find((n) => n.id === target)!.data).find((p) => p.id === e.targetHandle) : {};
+    // The copy keeps the cable whole (kind, both, output, and the revision it was fixed to): a pasted invalid reference stays invalid.
     if (port && !connectionError(next, assets, c)) next = { ...next, edges: [...next.edges, { ...e, id: uid('edge'), source, target }] };
   }
   return { next, added, addedGroups, gids };
@@ -311,8 +339,9 @@ function cloneClipInto(graph: Graph, assets: ReturnType<typeof get>['assets'], s
 export function pasteNodes(sessionId: string, at?: { x: number; y: number }): string[] {
   const st = get(), graph = st.sessions[sessionId]?.graph;
   if (!graph || !hasNodeClipboard()) return [];
-  const xs = [...clip!.nodes.map((n) => n.position.x), ...(clip!.groups ?? []).flatMap((g) => (g.bounds ? [g.bounds.x] : []))];
-  const ys = [...clip!.nodes.map((n) => n.position.y), ...(clip!.groups ?? []).flatMap((g) => (g.bounds ? [g.bounds.y] : []))];
+  const emptyBounds = (clip!.groups ?? []).filter((g) => isEmptyGroup(clip!.groups, g) && g.bounds).map((g) => g.bounds!);
+  const xs = [...clip!.nodes.map((n) => n.position.x), ...emptyBounds.map((b) => b.x)];
+  const ys = [...clip!.nodes.map((n) => n.position.y), ...emptyBounds.map((b) => b.y)];
   const offset = at && xs.length ? { x: at.x - Math.min(...xs), y: at.y - Math.min(...ys) } : { x: 60, y: 60 };
   const { next, added, addedGroups } = cloneClipInto(graph, st.assets, clip!, offset);
   editCompound(sessionId, 'paste', () => next);

@@ -25,7 +25,7 @@ export type EditOp =
   }
   | { op: 'disconnect'; edges: string[] }
   | { op: 'set'; node: string; patch: Partial<GraphNodeData>; strict?: boolean; }
-  | { op: 'delete'; nodes: string[] }
+  | { op: 'delete'; nodes: string[]; groups?: string[] }
   /**
    * A composed change (paste, restore, system parts, a model swap): the caller builds the next graph and the layer checks
    * what no composed change may do. No cable between two surviving nodes disappears unless it is named in `dropped`, a
@@ -121,8 +121,8 @@ function pruneBroken(g: Graph): Graph {
   return live.length === g.broken.length ? g : { ...g, broken: live.length ? live : undefined };
 }
 
-function planDelete(graph: Graph, ids: string[]): Graph {
-  const drop = new Set(ids);
+function planDelete(graph: Graph, ids: string[], dropGroups?: string[]): Graph {
+  const drop = new Set(ids), dropG = new Set(dropGroups ?? []);
   // Any link (data, ref or control) that lost its source stays as an invalid cable on the node that kept it. A cable whose owner is
   // deleted goes with it (the owner's cables are its own), and tombstones of a deleted owner are pruned.
   const kept = (graph.broken ?? []).filter((b) => !drop.has(b.edge.target));
@@ -130,9 +130,10 @@ function planDelete(graph: Graph, ids: string[]): Graph {
   const broken = [...kept, ...lost.map((edge) => ({ edge, missing: 'source' as const, reason: 'deleted' as const, at: Date.now() }))];
   // Deleted nodes leave their group; ordinary groups survive (keeping frame bounds when emptied), detached outputs drop at 0.
   const groups = graph.groups?.flatMap((gr) => {
+    if (dropG.has(gr.id)) return [];
     const nodeIds = gr.nodeIds.filter((id) => !drop.has(id));
     if ('detachedOutputs' in gr) return nodeIds.length ? [{ ...gr, nodeIds }] : [];
-    if (nodeIds.length || gr.bounds || !gr.nodeIds.length || graph.groups?.some((c) => c.parentId === gr.id)) return [{ ...gr, nodeIds }];
+    if (nodeIds.length || gr.bounds || !gr.nodeIds.length || graph.groups?.some((c) => c.parentId === gr.id && !dropG.has(c.id))) return [{ ...gr, nodeIds }];
     const ms = graph.nodes.filter((n) => gr.nodeIds.includes(n.id));
     if (!ms.length) return [{ ...gr, nodeIds }];
     const l = Math.min(...ms.map((n) => n.position.x)), t = Math.min(...ms.map((n) => n.position.y));
@@ -228,7 +229,7 @@ export function applyEdit(req: EditRequest): EditResult {
     case 'delete': {
       const missing = op.nodes.find((id) => !graph.nodes.some((n) => n.id === id));
       if (missing) return refuse(req, `No such node: ${missing}.`);
-      next = planDelete(graph, op.nodes);
+      next = planDelete(graph, op.nodes, op.groups);
       break;
     }
   }
