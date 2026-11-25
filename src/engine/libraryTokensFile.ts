@@ -166,13 +166,19 @@ export function tokensToFile(tokens: KitTokens, format: TokenFormat = 'w3c', set
   const clean = (n: string) => n.trim().replace(/[/$.]+/g, '-'), title = clean(set) || 'Tokens', modes = format === 'penpot' ? tokenModes(tokens) : [];
   const base = treeOf(tokensIn(tokens), format);
   let file: Json = base.tree;
+  const left = new Set(base.left);
   if (format === 'penpot') {
     const sets = modes.length ? ['Default', ...modes].map((m) => `${title}/${clean(m)}`) : [title];
-    file = Object.fromEntries(sets.map((s, i) => [s, i ? treeOf(tokensIn(tokens, modes[i - 1]), format, (n) => tokens[n].modes?.[modes[i - 1]] !== undefined).tree : base.tree]));
+    file = Object.fromEntries(sets.map((s, i) => {
+      if (!i) return [s, base.tree];
+      const own = treeOf(tokensIn(tokens, modes[i - 1]), format, (n) => tokens[n].modes?.[modes[i - 1]] !== undefined);
+      for (const n of own.left) if (!left.has(n)) left.add(`${n} (${modes[i - 1]})`);
+      return [s, own.tree];
+    }));
     file.$themes = modes.length ? sets.map((s, i) => ({ id: s, name: i ? modes[i - 1] : 'Default', group: title, description: '', isSource: false, selectedTokenSets: { [sets[0]]: 'enabled', [s]: 'enabled' } })) : [];
     file.$metadata = { tokenSetOrder: sets, activeThemes: modes.length ? [`${title}/Default`] : [], activeSets: [sets[0]] };
   }
-  return { text: `${JSON.stringify(file, null, 2)}\n`, left: base.left };
+  return { text: `${JSON.stringify(file, null, 2)}\n`, left: [...left] };
 }
 
 function treeOf(tokens: KitTokens, format: TokenFormat, only: (name: string) => boolean = () => true): { tree: Json; left: string[] } {
@@ -193,5 +199,5 @@ function treeOf(tokens: KitTokens, format: TokenFormat, only: (name: string) => 
     for (const part of path.slice(0, -1)) at = (at[part] ??= Object.create(null) as Json) as Json;
     at[path[path.length - 1]] = { $type: out!.$type, $value: alias === null ? out!.$value : `{${outName(alias)}}`, ...(t.description ? { $description: t.description } : {}) };
   }
-  return { tree, left: entries.filter((e) => !e.out).map((e) => e.name) };
+  return { tree, left: entries.filter((e) => !e.out && only(e.name)).map((e) => e.name) };
 }

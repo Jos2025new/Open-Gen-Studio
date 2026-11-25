@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { resetStore } from './library-kits-final-fixtures';
 import { addTextLayer, addVectorLayer, getDoc, mutateDoc, newBlankDoc, patchLayer, undoDoc } from '../src/engine/design/actions';
-import { docModes, installTokenSync, tokenChoices, tokenOf, tokenPatch } from '../src/engine/design/tokenBind';
+import { docModes, installTokenSync, tokenChoices, tokenOf, tokenPatch, tokenProblem } from '../src/engine/design/tokenBind';
+import { runCommandsTool } from '../src/engine/agent/commandCalls';
 import { createItem, saveItem } from '../src/engine/libraryVersions';
 import type { KitTokens } from '../src/engine/libraryTypes';
 import type { TextLayer, VectorLayer } from '../src/engine/types';
@@ -58,6 +59,20 @@ describe('tokens in the Designer', () => {
     expect(layer<TextLayer>(1).color).toBe('#000000');
     await save({ ...TOKENS, title: { type: 'fontFamily', value: 'Lora' } });
     expect(layer<TextLayer>(0).fontFamily).toBe('Lora');
+  });
+
+  it('the agent is told which token does not exist and which ones do', async () => {
+    const say = (args: object) => runCommandsTool(sid, { seq: [{ cmd: 'designer.layer.add_text', args: { text: 'Hi {name}', x: 0, y: 0, width: 0, ...args } }] });
+    const bad = await say({ style: { color: '{nope}', fontFamily: '{title}' } });
+    expect(bad).toMatchObject({ done: false });
+    expect(bad.text).toMatch(/no token "\{nope\}" in .*color: .*main.*Nothing ran/);
+    expect(getDoc(sid, doc)!.layers).toHaveLength(0);
+    expect((await say({ style: { color: '{main}', fontFamily: '{title}' } })).done).toBe(true);
+    expect(layer<TextLayer>(0)).toMatchObject({ text: 'Hi {name}', color: '#0a4d68' });
+    expect(tokenProblem({ shapes: [{ fill: '{title}', fillGradient: { stops: [{ color: '{gone}' }] } }] })).toMatch(/"\{title\}", "\{gone\}"/);
+    setComposer({ kitId: null });
+    expect(tokenProblem({ fill: '{main}' })).toMatch(/no brand is in use/);
+    expect(tokenProblem({ fill: '#fff', text: '{main}' })).toBeNull();
   });
 
   it('sizes are px, gradients follow, and a removed entry leaves the value', async () => {

@@ -61,6 +61,8 @@
 .pc-tile .pc-glyph-cover { display: grid; place-items: center; color: var(--text-3); background: var(--surface-3); }
 .font-sample { font-size: 2.25rem; line-height: 1.2; color: var(--text); }
 .pc-row .font-sample { font-size: 1.125rem; }
+.glyph-named { display: grid; justify-items: center; gap: 0.5rem; max-width: 90%; color: var(--text-3); }
+.glyph-named small { max-width: 100%; overflow: hidden; color: var(--text-2); font-size: var(--fs-s); text-overflow: ellipsis; white-space: nowrap; }
 .font-uses { max-height: 18rem; overflow: auto; }
 .font-use { display: grid; min-width: 0; }
 .font-use > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

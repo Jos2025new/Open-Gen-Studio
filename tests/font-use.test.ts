@@ -47,11 +47,20 @@ it('the agent reads which designs use each font, most used first; boards of kits
   const all = await run({ cmd: 'library.font.list', args: {} }, { caller: 'agent' });
   const fonts = (all.results![0] as { fonts: Array<{ family: string }> }).fonts;
   expect(fonts.map((f) => f.family)).toEqual(['Inter', 'Pebble', 'Kelp', 'Reed']);
-  expect(fonts[1]).toMatchObject({ family: 'Pebble', inLibrary: true, designs: 2, texts: 3, usedIn: [{ session: one, sessionTitle: 'Spring', doc: poster, name: 'Poster', texts: 2 }, { sessionTitle: 'Autumn', name: 'Menu', texts: 1 }] });
+  expect(fonts[1]).toEqual({ family: 'Pebble', inLibrary: true, designs: 2, texts: 3 });
   expect(fonts[0]).toMatchObject({ inLibrary: false, designs: 2 });
-  expect(fonts[3]).toMatchObject({ designs: 0, usedIn: [] });
-  const just = await run({ cmd: 'library.font.list', args: { family: 'Reed' } }, { caller: 'agent' });
-  expect(just.results![0]).toMatchObject({ total: 1 });
+  expect(fonts[3]).toMatchObject({ designs: 0 });
+  const just = await run({ cmd: 'library.font.list', args: { family: 'Pebble' } }, { caller: 'agent' });
+  expect(just.results![0]).toEqual({ family: 'Pebble', inLibrary: true, designs: 2, texts: 3, usedIn: [{ session: one, sessionTitle: 'Spring', doc: poster, name: 'Poster', texts: 2 }, { session: two, sessionTitle: 'Autumn', doc: expect.any(String), name: 'Menu', texts: 1 }] });
+  expect((await run({ cmd: 'library.font.list', args: { family: 'Reed' } }, { caller: 'agent' })).results![0]).toMatchObject({ designs: 0, usedIn: [] });
+});
+
+it('fits whole in what the agent reads, however many fonts and designs there are', async () => {
+  for (let i = 0; i < 60; i++) design(one, `A design with quite a long name, number ${i}`, [`A font family with a long name ${i}`, 'Reed']);
+  const all = await run({ cmd: 'library.font.list', args: {} }, { caller: 'agent' }), reed = await run({ cmd: 'library.font.list', args: { family: 'Reed' } }, { caller: 'agent' });
+  expect(all.results![0]).toMatchObject({ total: 64, more: 34 });
+  expect(reed.results![0]).toMatchObject({ designs: 60, more: 45 });
+  for (const r of [all, reed]) expect(JSON.stringify(r.results).length).toBeLessThan(4000);
 });
 
 it('Fonts shows how many designs use each; a click lists them and goes to one', () => {

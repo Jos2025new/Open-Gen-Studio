@@ -58,7 +58,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/studio` | 8 | 7 |
 | `src/components/ui` | 26 | 29 |
 | `src/engine` | 105 | 503 |
-| `src/engine/agent` | 71 | 185 |
+| `src/engine/agent` | 71 | 186 |
 | `src/engine/commands` | 7 | 50 |
 | `src/engine/design` | 167 | 244 |
 | `src/engine/flow` | 23 | 120 |

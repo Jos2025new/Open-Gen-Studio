@@ -1,5 +1,5 @@
 import { setDoc, useStore } from '../../store/store';
-import { activeKitItems } from '../activeKit';
+import { activeKit, activeKitItems } from '../activeKit';
 import { parseTokenAlias, resolveToken } from '../libraryTokens';
 import { colorHex } from '../libraryTokensColor';
 import type { KitTokenType, TokenRef } from '../libraryTypes';
@@ -45,6 +45,24 @@ export function tokenChoices(type: KitTokenType, mode?: string, st = useStore.ge
     const value = t.type === type ? tokenValue(s, token, mode) : undefined;
     return value === undefined ? [] : [{ ref: { kit: s.id, token, value }, label: token, kit: s.name }];
   }));
+}
+
+const WRITTEN: Record<string, Field> = { color: 'color', fill: 'fill', stroke: 'stroke', background: 'background', fontFamily: 'fontFamily', font_family: 'fontFamily' };
+/** What is wrong with the "{token}" values of what the agent writes: the ones the entry in use does not have, and the ones it does. */
+export function tokenProblem(written: unknown): string | null {
+  const bad = new Map<string, KitTokenType>();
+  const walk = (v: unknown): void => {
+    if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) {
+      const type = Object.hasOwn(WRITTEN, k) ? TYPE[WRITTEN[k]] : undefined, alias = type ? parseTokenAlias(x) : null;
+      if (alias !== null && !tokenChoices(type!).some((c) => c.ref.token === alias)) bad.set(alias, type!);
+      else walk(x);
+    }
+  };
+  walk(written);
+  if (!bad.size) return null;
+  const kit = activeKit(), has = [...new Set(bad.values())].map((t) => `${t}: ${[...new Set(tokenChoices(t).map((c) => c.label))].slice(0, 30).join(', ') || 'none'}`);
+  return `no token ${[...bad.keys()].map((n) => `"{${n}}"`).join(', ')}${kit ? ` in ${kit.name}; it has ${has.join('; ')}` : ': no brand is in use'}. Write one of its tokens or a plain value.`;
 }
 
 /** One object with its fields up to date; the same object when nothing changed. A value written as "{token}" becomes that token's. */

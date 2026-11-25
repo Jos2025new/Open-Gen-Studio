@@ -137,4 +137,9 @@ describe('colors', () => {
     expect(colorObject('tomato')).toBeUndefined();
     expect(colorObject('oklch(70% 0.1 200)')!.components[0]).toBeCloseTo(0.7);
   });
+
+  it('Penpot: a value only one mode has and the format cannot write is named', () => {
+    const r = tokensToFile({ ok: { type: 'color', value: '#112233' }, pad: { type: 'dimension', value: '4px', modes: { Dark: 'calc(1px + 2px)' } } } as never, 'penpot', 'S');
+    expect(r.left).toEqual(['pad (Dark)']);
+  });
 });

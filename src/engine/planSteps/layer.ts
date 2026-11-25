@@ -1,5 +1,6 @@
 import { parseTokenAlias } from '../libraryTokens';
 import { parsePath } from '../design/path';
+import { tokenProblem } from '../design/tokenBind';
 import type { LayerStep, LayerType, ShapeSpec, StrokeSpec, TextStyle } from '../types';
 import { num } from './shared';
 import type { RawStep, StepEnv } from './env';
@@ -115,6 +116,8 @@ export async function normalizeLayer(s: RawStep, env: StepEnv): Promise<void> {
     if (layerType === 'text' && !s.text?.trim()) errors.push(`${where}: text layers need "text".`);
     if (layerType === 'vector' && !s.shapes?.length && !drawing) errors.push(`${where}: vector layers need "shapes" or "strokes".`);
   }
+  const tokens = tokenProblem([s.style, s.shapes, s.strokes]);
+  if (tokens) errors.push(`${where}: ${tokens}`);
   const step: LayerStep = {
     id: s.id!,
     kind: 'layer',

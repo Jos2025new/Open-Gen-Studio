@@ -9,6 +9,7 @@ import type { DesignDoc, Subject } from './types';
 /* The moodboard, design system or brand kit the user picked to work with: what the agent and the color picker get from it. */
 const get = () => useStore.getState();
 const MAX_IMAGES = 6;
+const MAX_INSIDE = 4800;
 /** The document of each saved version read so far; a version never changes. */
 const docs = new Map<string, DesignDoc | undefined>();
 
@@ -44,10 +45,18 @@ export function activeKitLines(st = get()): string[] {
   if (!kit) return [];
   const index = (s: Subject, max: number) => formatLibraryItemIndex(s, st.library, st.assets, max, s.versionId ? docs.get(s.versionId) : undefined).text;
   const images = activeKitImages(st);
+  // One total for what it contains: each entry is paid again in every request.
+  let room = MAX_INSIDE;
+  const kept: string[] = [], rest: Subject[] = [];
+  for (const s of inside) {
+    const text = room > 200 ? index(s, Math.min(1200, room)) : '';
+    if (text) { kept.push(`inside it:\n${text}`); room -= text.length; } else rest.push(s);
+  }
   return [
     `active ${kit.kind!.replace('-', ' ')} (picked by the user; every piece follows it):\n${index(kit, 2500)}`,
     ...(Object.keys(kit.tokens ?? {}).length || inside.some((s) => s.tokens) ? ['in Designer text and shapes write a token as "{its.name}" for color, fill, stroke or fontFamily: the design then follows the token.'] : []),
-    ...inside.map((s) => `inside it:\n${index(s, 1200)}`),
+    ...kept,
+    ...(rest.length ? [`also inside it (library.item.read to inspect): ${rest.slice(0, 20).map((s) => `${s.id} ${JSON.stringify(s.name)}`).join(', ')}${rest.length > 20 ? ` and ${rest.length - 20} more` : ''}`] : []),
     ...(images.length ? [`its images (usable as refs): ${images.map((id) => `asset:${id}`).join(', ')}`] : []),
   ];
 }

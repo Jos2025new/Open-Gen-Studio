@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ModelSummary } from '../src/engine/types';
 
 vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener: () => undefined }, document: { addEventListener: () => undefined, visibilityState: 'visible' } }));
@@ -30,6 +30,10 @@ const setup = (atlasUsd: number, atlasBalance: number, autoSwitchProvider: 'ask'
 };
 
 beforeEach(() => vi.restoreAllMocks());
+// A slow network made these time out and spill into each other; none may use it.
+const net = vi.fn(async () => { throw new Error('no network in tests'); });
+vi.stubGlobal('fetch', net);
+afterEach(() => expect(net).not.toHaveBeenCalled());
 
 describe('no credit at the provider', () => {
   it('recognizes the failure', () => {
@@ -227,6 +231,8 @@ describe('the agent\u2019s own credit follows the same setting', () => {
       settings: { ...st.settings, autoSwitchProvider: mode, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'a' }, keys: { ...st.settings.keys, nanogpt: 'k', openrouter: 'k' } },
       catalog: { ...st.catalog, llm: { ...st.catalog.llm, nanogpt: [llm('a', 'Model A', priced ? 1 : undefined, priced ? 1 : undefined)], openrouter: [llm('b', 'Model A', priced ? 1 : undefined, priced ? 1 : undefined)] } },
     });
+    useStore.setState((s) => ({ catalog: { ...s.catalog, llmStatus: { ...s.catalog.llmStatus, atlas: 'ready', openrouter: 'ready' } } }));
+    for (const p of ['atlas', 'openrouter'] as const) vi.spyOn(ADAPTERS[p], 'balance').mockResolvedValue(5);
     useAlerts.setState({ alerts: [] });
     forgetBalances();
   };

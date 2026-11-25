@@ -35,6 +35,16 @@ describe('the brand the agent works with', () => {
     expect(activeKitLines()).toEqual([]);
   });
 
+  it('what it contains has one total, and the rest is named to be read by id', async () => {
+    const boards = [];
+    for (let i = 0; i < 9; i++) boards.push((await createItem({ name: `Board ${i}`, kind: 'design-system', description: 'x'.repeat(190), tokens: Object.fromEntries(Array.from({ length: 40 }, (_, n) => [`t${n}`, { type: 'color' as const, value: '#0a4d68' }])), space: 'library', by: 'user' })).subject.id);
+    setComposer({ kitId: (await createItem({ name: 'Marea', kind: 'brand-kit', kits: boards, space: 'library', by: 'user' })).subject.id });
+    const text = activeKitLines().join('\n');
+    expect(text.length).toBeLessThan(2500 + 4800 + 1200);
+    expect(text).toMatch(/also inside it \(library\.item\.read to inspect\): .*"Board 8"/);
+    expect(text).toContain('inside it:');
+  });
+
   it('a removed entry is simply no longer active', () => {
     setComposer({ kitId: 'gone' });
     expect(activeKitLines()).toEqual([]);

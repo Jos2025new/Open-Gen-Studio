@@ -63,14 +63,14 @@ export function KitTokens({ item, onDone, types = TOKEN_TYPES }: { item: Subject
   const exportFile = (format: TokenFormat) => {
     try {
       const tokens = tokensOf(rows), files = format === 'penpot' ? [{ name: '.penpot', tokens }] : [undefined, ...tokenModes(tokens)].map((m) => ({ name: m ? `.${m}` : '', tokens: tokensIn(tokens, m) }));
-      let left: string[] = [];
+      const left = new Set<string>();
       for (const f of files) {
         const r = tokensToFile(f.tokens, format, item.name);
-        left = r.left;
+        r.left.forEach((n) => left.add(n));
         downloadBlob(new Blob([r.text], { type: 'application/json' }), `${item.name}${f.name}.tokens.json`);
       }
       setExporting(false);
-      if (left.length) toast(`Left out, not in this format: ${names(left)}.`, 'info');
+      if (left.size) toast(`Left out, not in this format: ${names([...left])}.`, 'info');
     } catch (e) { toast((e as Error).message, 'error'); }
   };
   const save = async () => {

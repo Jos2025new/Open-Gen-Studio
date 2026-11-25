@@ -253,8 +253,9 @@ function LibraryTile({ item, view, cells, onOpenKit }: { item: Subject; view: It
   const openButton = (className?: string) => (
     <Button size="sm" variant="secondary" className={className} disabled={!kit && !cover} onClick={(e) => { e.stopPropagation(); open(); }}>Open</Button>
   );
-  const glyphStyle = !cover && kit && view !== 'tile' ? { display: 'grid', placeItems: 'center', color: 'var(--text-3)' } : undefined;
-  const thumb = cover ? <AssetMedia assetId={cover} hoverPlay={view !== 'list'} /> : kit ? <KindIcon size={view === 'list' ? 16 : 24} /> : null;
+  const glyphStyle = !cover && (kit || view === 'card') && view !== 'tile' ? { display: 'grid', placeItems: 'center', color: 'var(--text-3)' } : undefined;
+  // With no image to tell it by, its name shows without the pointer over it.
+  const thumb = cover ? <AssetMedia assetId={cover} hoverPlay={view !== 'list'} /> : view === 'card' ? <span className="glyph-named"><KindIcon size={24} /><small>{title}</small></span> : kit ? <KindIcon size={view === 'list' ? 16 : 24} /> : null;
   if (view === 'list') {
     return <div className={`g-tile lib-tile pc-row${item.userHidden ? ' is-hidden-item' : ''}`}>
       <button type="button" className="g-open pc-thumb" style={glyphStyle} aria-label={`Open ${title}`} onClick={open}>{thumb}</button>
