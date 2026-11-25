@@ -37,7 +37,7 @@ export function KitPage({ item, chrome, menu, cover, onBack, onOpen, onDesign }:
   item: Subject; chrome: ReactNode; menu: ReactNode; cover: (s: Subject) => string | undefined;
   onBack: () => void; onOpen: (s: Subject) => void; onDesign: () => void;
 }) {
-  const using = useStore((s) => s.composer.kitId === item.id);
+  const using = useStore((s) => s.composer.kitId === item.id), use = () => setComposer({ kitId: using ? null : item.id });
   const [title, setTitle] = useState<string | null>(null), [busy, setBusy] = useState(false), busyRef = useRef(false);
   const sections = kitSections(item), section = sections.find((x) => x.title === title);
   const run: Run = async (fn) => {
@@ -50,7 +50,7 @@ export function KitPage({ item, chrome, menu, cover, onBack, onOpen, onDesign }:
       <div className="pc-grp pc-left kit-crumbs">
         <IconButton icon={ChevronLeft} label="Back" size="sm" onClick={section ? () => setTitle(null) : onBack} />
         {section ? <><button type="button" className="kit-crumb" onClick={() => setTitle(null)}>{item.name}</button><span className="faint">/</span><strong>{section.title}</strong></> : <strong>{item.name}</strong>}
-        <div className="pc-icons"><Button size="sm" icon={Sparkles} variant={using ? 'primary' : 'secondary'} aria-pressed={using} data-tip="The agent and the Designer follow it" onClick={() => setComposer({ kitId: using ? null : item.id })}>{using ? 'In use' : 'Use'}</Button>{menu}</div>
+        <div className="pc-icons">{section ? <IconButton icon={Sparkles} label={using ? 'In use' : 'Use'} size="sm" active={using} aria-pressed={using} onClick={use} /> : <Button size="sm" icon={Sparkles} variant={using ? 'primary' : 'secondary'} aria-pressed={using} data-tip="The agent and the Designer follow it" onClick={use}>{using ? 'In use' : 'Use'}</Button>}{menu}</div>
       </div>
       <div className="pc-grp pc-right">{chrome}</div>
     </div></div>

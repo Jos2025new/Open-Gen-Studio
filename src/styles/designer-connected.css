@@ -51,6 +51,7 @@
 .layer-properties .field:has(select) > select, .layer-properties .property-grid .field > input { padding: 0.1875rem 0; background: transparent; }
 .layer-properties .field:has(.opt-color) .opt-color { justify-content: flex-start; width: 100%; padding: 0.5rem; border: 0; background: var(--field-bg); border-radius: var(--field-radius); }
 .layer-properties .field:has(.opt-color) > .field-label { display: none; }
+.form-stack.layer-properties > .opt { flex: none; }
 .color-plane-controls { display: grid; gap: 0.625rem; }
 .color-plane { position: relative; height: 10rem; border-radius: 8px; background-image: linear-gradient(to top,#000,transparent),linear-gradient(to right,#fff,transparent); touch-action: none; cursor: crosshair; }
 .color-plane-point { position: absolute; width: 0.75rem; height: 0.75rem; transform: translate(-50%,-50%); border: 2px solid #fff; border-radius: 50%; box-shadow: 0 0 0 1px #0005; pointer-events: none; }
