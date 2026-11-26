@@ -1,6 +1,7 @@
 import { alphaFromOpacity, opacityFromAlpha, parseHexAlpha } from '../../lib/color';
-import { setDoc, useStore } from '../../store/store';
-import { activeKitItems } from '../activeKit';
+import { setComposer, setDoc, setUi, useStore } from '../../store/store';
+import { activeKit, activeKitItems } from '../activeKit';
+import { isKit } from '../libraryTypes';
 import { parseTokenAlias, resolveToken } from '../libraryTokens';
 import { colorHex } from '../libraryTokensColor';
 import type { KitTokenType, TokenRef } from '../libraryTypes';
@@ -186,4 +187,46 @@ export function installTokenSync(): () => void {
       setDoc(session.id, doc.id, (d) => (d === doc ? next : syncTokens(d, st.library)));
     }
   });
+}
+
+/** What new texts and shapes start with: the first font and color tokens of the brand in use. */
+function brandStarts(st = useStore.getState()): { text: Partial<TextStyle>; fill: Bag } | null {
+  if (!activeKit(st)) return null;
+  const font = tokenChoices('fontFamily', undefined, undefined, st)[0]?.ref, color = tokenChoices('color', undefined, undefined, st)[0]?.ref;
+  if (!font && !color) return null;
+  return {
+    text: { ...(font ? tokenPatch('fontFamily', String(font.value), font) : {}), ...(color ? tokenPatch('color', String(color.value), color) : {}) },
+    fill: color ? tokenPatch('fill', String(color.value), color) : {},
+  };
+}
+
+/**
+ * The brand in use reaches the tools, as Canva's brand kit does: a brand kit or design system the user creates is the one in use
+ * when none is; when the brand in use or its first font or color changes, new texts and shapes start with them; and the tools'
+ * linked colors and fonts follow their tokens. A color or font the user picks by hand stays until the brand changes.
+ */
+export function installBrandStarts(): () => void {
+  const keyOf = (st = useStore.getState()) => { const k = activeKit(st), c = tokenChoices('color', undefined, undefined, st)[0]?.ref, f = tokenChoices('fontFamily', undefined, undefined, st)[0]?.ref; return k ? `${k.id}|${f?.kit}.${f?.token}|${c?.kit}.${c?.token}` : ''; };
+  let last = keyOf();
+  return useStore.subscribe((st, prev) => {
+    if (st.library === prev.library && st.composer.kitId === prev.composer.kitId) return;
+    const added = st.library.find((s) => isKit(s) && s.kind !== 'moodboard' && s.origin?.by === 'user' && !s.draft && !prev.library.some((p) => p.id === s.id));
+    if (added && !activeKit(st)) { setComposer({ kitId: added.id }); return; }
+    const key = keyOf(st), starts = key !== last ? brandStarts(st) : null;
+    last = key;
+    const session = st.sessions[st.activeSessionId], mode = session?.docs.find((d) => d.id === session.activeDocId)?.tokenMode;
+    const text = fresh({ ...st.ui.text, ...starts?.text }, ['color', 'fontFamily', 'fontSize'], st.library, mode);
+    const shape = fresh({ ...st.ui.shape, ...starts?.fill }, ['fill', 'stroke'], st.library, mode);
+    const lineart = fresh(st.ui.lineart, ['color'], st.library, mode);
+    if (starts || text.color !== st.ui.text.color || text.fontFamily !== st.ui.text.fontFamily || text.fontSize !== st.ui.text.fontSize || shape.fill !== st.ui.shape.fill || shape.stroke !== st.ui.shape.stroke || lineart !== st.ui.lineart) setUi({ text, shape, lineart });
+  });
+}
+
+/** "Use" on a brand: the texts of the open document that follow no token take its first font and color, in one undo step. */
+export function brandToDoc(doc: DesignDoc, patch: (layerId: string, p: Partial<TextStyle>) => void): number {
+  const starts = brandStarts();
+  if (!starts) return 0;
+  const texts = doc.layers.filter((l) => l.type === 'text' && !l.locked && !tokenOf(l, 'color') && !tokenOf(l, 'fontFamily'));
+  for (const l of texts) patch(l.id, starts.text);
+  return texts.length;
 }

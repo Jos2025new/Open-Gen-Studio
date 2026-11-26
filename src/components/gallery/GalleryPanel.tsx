@@ -71,7 +71,7 @@ async function openKitIn(sessionId: string, id: string, space: OpenSpace) {
 /** Assets: every generation and upload, and the library of saved characters, locations, products, objects, styles and kits. */
 export function GalleryPanel() {
   const { expanded, embedded } = usePanelExpanded();
-  const [category, setCategory] = useState<Category>('all');
+  const category = useStore((st) => (st.ui.libraryCategory ?? 'all') as Category), setCategory = (libraryCategory: Category) => setUi({ libraryCategory });
   const [stored, setStored] = usePref<ItemView>('ogs.libraryView', 'card');
   const view = asItemView(stored);
   const [cols, setCols] = useState(3), [openKit, setOpenKit] = usePref<string | null>('ogs.libraryKit', null);

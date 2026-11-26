@@ -64,6 +64,8 @@ export interface UiState extends PageUiPrefs {
   homeDrafts?: Record<string, string>;
   panel: 'gallery' | 'sessions' | 'spending' | null;
   panelExpanded: boolean;
+  /** Library's category (a kind, or 'all'); set from outside to open Library on it. */
+  libraryCategory?: string;
   /** `back`: the view to return to on close (a reference opened from inside the viewer). */
   lightbox: { assetIds: string[]; index: number; back?: { assetIds: string[]; index: number } } | null;
   /** Viewer details panel: closed by default, remembered for the current app session. */

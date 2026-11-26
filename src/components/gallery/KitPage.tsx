@@ -5,7 +5,8 @@ import { addTextLayer, getDoc, patchLayer, placeAsset } from '../../engine/desig
 import { fontStack } from '../../engine/design/doc';
 import { patchPickedShapes } from '../../engine/design/multiObjectOps';
 import { objectPicks } from '../../engine/design/objectSelection';
-import { brushColorPatch, familyPatch, tokenOf, tokenPatch, tokenValue } from '../../engine/design/tokenBind';
+import { openHistoryGroup } from '../../engine/design/history';
+import { brandToDoc, brushColorPatch, familyPatch, tokenOf, tokenPatch, tokenValue } from '../../engine/design/tokenBind';
 import { rememberColor } from '../../engine/design/swatches';
 import { FONT_ACCEPT } from '../../engine/fontFiles';
 import { applyFont } from './FontTile';
@@ -37,7 +38,14 @@ export function KitPage({ item, chrome, menu, cover, onBack, onOpen, onDesign }:
   item: Subject; chrome: ReactNode; menu: ReactNode; cover: (s: Subject) => string | undefined;
   onBack: () => void; onOpen: (s: Subject) => void; onDesign: () => void;
 }) {
-  const using = useStore((s) => s.composer.kitId === item.id), use = () => setComposer({ kitId: using ? null : item.id });
+  const using = useStore((s) => s.composer.kitId === item.id), { sessionId, docId } = useDesign();
+  const use = () => {
+    setComposer({ kitId: using ? null : item.id });
+    const doc = !using && docId ? getDoc(sessionId, docId) : undefined;
+    if (!doc) return;
+    const group = openHistoryGroup(doc.id);
+    try { brandToDoc(doc, (id, p) => patchLayer(sessionId, doc.id, id, p)); } finally { group.close(); }
+  };
   const [title, setTitle] = useState<string | null>(null), [busy, setBusy] = useState(false), busyRef = useRef(false);
   const sections = kitSections(item), section = sections.find((x) => x.title === title);
   const run: Run = async (fn) => {

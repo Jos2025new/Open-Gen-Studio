@@ -45,7 +45,7 @@ import './styles/node-notices.css';
 import { App } from './App';
 import { installDoneNotice } from './lib/doneNotice';
 import { installOwnFonts } from './engine/fontFiles';
-import { installTokenSync } from './engine/design/tokenBind';
+import { installBrandStarts, installTokenSync } from './engine/design/tokenBind';
 import { installActiveKit } from './engine/activeKit';
 import { installDoneSignal } from './lib/doneSignal';
 import { installBoardAutoOpen } from './lib/studioBoard';
@@ -59,6 +59,7 @@ installBoardAutoOpen();
 installDoneNotice();
 installDoneSignal();
 installTokenSync();
+installBrandStarts();
 installActiveKit();
 installOwnFonts();
 

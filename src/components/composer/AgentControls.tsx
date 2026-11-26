@@ -4,7 +4,7 @@ import { activeKit } from '../../engine/activeKit';
 import { isKit, type KitKind } from '../../engine/libraryTypes';
 import type { AgentStyle } from '../../engine/types';
 import { KIT_META } from '../gallery/newKit';
-import { setComposer, useStore } from '../../store/store';
+import { setComposer, setUi, useStore } from '../../store/store';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { Chip } from '../ui/primitives';
 
@@ -57,7 +57,7 @@ function KitChip({ onPicked }: { onPicked?: () => void }) {
   const kits = library.filter((s) => isKit(s) && (!s.userHidden || s.id === kit?.id));
   return (
     <>
-      <Chip ref={pop.ref} icon={SwatchBook} active={pop.open || Boolean(kit)} onClick={pop.toggle} data-tip="The agent works with the one you pick from Library">
+      <Chip ref={pop.ref} icon={SwatchBook} active={pop.open || Boolean(kit)} onClick={kits.length ? pop.toggle : () => setUi({ panel: 'gallery', libraryCategory: 'brand-kit' })} data-tip="The agent works with the one you pick from Library">
         {kit ? kit.name : 'Brand'}
       </Chip>
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={340} label="Brand" className="pop-scroll">
