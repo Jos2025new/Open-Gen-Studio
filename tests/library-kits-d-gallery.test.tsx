@@ -82,6 +82,15 @@ afterEach(async () => {
 });
 
 describe('Lote D Parte 1: Library kit categories, cards, menu, versions, components and New', () => {
+  it('opens once on the category asked from outside (Brand with no entries), then it is the user\'s', async () => {
+    act(() => { setUi({ libraryCategory: 'brand-kit' }); });
+    await act(async () => root.render(createElement(GalleryPanel)));
+    expect(q('.pc-source').textContent).toContain('Brand kits');
+    expect(useStore.getState().ui.libraryCategory).toBeUndefined();
+    await openSource('All');
+    expect(q('.pc-source').textContent).not.toContain('Brand kits');
+  });
+
   it('lists kit categories after Style with counts, isolates kits from Character, and shows empty state', async () => {
     const a1 = makeAsset('a1');
     const char: Subject = { id: 'c1', name: 'Hero', refAssetIds: [] };

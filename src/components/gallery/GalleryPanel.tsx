@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Box, ChevronLeft, Eye, EyeOff, Funnel, Grid2X2, History, Layers, LayoutGrid, Maximize2, MessageSquare,
   Minimize2, Palette, Pencil, PenTool, Plus, Shapes, Sparkles, Tag, Trash, Type, UserRound, Workflow, X, type LucideIcon,
@@ -71,7 +71,9 @@ async function openKitIn(sessionId: string, id: string, space: OpenSpace) {
 /** Assets: every generation and upload, and the library of saved characters, locations, products, objects, styles and kits. */
 export function GalleryPanel() {
   const { expanded, embedded } = usePanelExpanded();
-  const category = useStore((st) => (st.ui.libraryCategory ?? 'all') as Category), setCategory = (libraryCategory: Category) => setUi({ libraryCategory });
+  const [category, setCategory] = useState<Category>('all'), asked = useStore((st) => st.ui.libraryCategory as Category | undefined);
+  // Opened on a category from outside (Brand with no entries): taken once.
+  useEffect(() => { if (asked) { setCategory(asked); setUi({ libraryCategory: undefined }); } }, [asked]);
   const [stored, setStored] = usePref<ItemView>('ogs.libraryView', 'card');
   const view = asItemView(stored);
   const [cols, setCols] = useState(3), [openKit, setOpenKit] = usePref<string | null>('ogs.libraryKit', null);
