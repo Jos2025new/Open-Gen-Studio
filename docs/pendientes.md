@@ -10,6 +10,12 @@ Lista única de lo que sigue abierto, ordenada por prioridad y con la **fecha de
 
 El núcleo de nodos (ADR 0031) y el hilo por agente están en `main`. La sesión 2026-11-19/20 fusionó en `main` la rama menor de Grok, la fricción y los nombres de agentes, el gasto por una sola puerta, el descriptor y los avisos. La revisión SOLID de Opus (14 hallazgos) está en `main` (2026-11-20). La sesión maestra 4 (2026-11-21) fusionó el arrastre con 200 nodos y el registro durable de envíos; la 5, la posición al recargar y la vista por espacio; la 6 (2026-11-22), las listas cerradas, una vía de cableado y el núcleo del dinero; la 7, el dinero crítico y los checks de disciplina; la 8 (2026-11-22/23), los arreglos urgentes de dinero, el núcleo D+ (`f43b5352`: ticket por aprobación, puerta `paidSend` no rodeable, huella real, pase único por paso y recarga local visible con Retry gratis; absorbe y cierra **p9**) y **p10** (`e476225a`: rejilla espacial, paneles y zonas de clic). Lo pendiente tras la sesión 8 está resumido abajo y detallado en [076](history/076-2026-11-W47-master-dinero-dplus.md).
 
+### Abierto tras los kits de Library (2026-11-25)
+
+- **Agente con kits y un modelo real** (*pendiente de verificación*, 2026-11-24): `library.item.add`, `library.item.save`, `library.item.insert`, `library.font.list` y los tokens `{token}` solo se han probado con tests, nunca con un modelo de pago. Antes de probarlo, el usuario tiene que dar el modelo, el gasto máximo y su sí. Ficha: [biblioteca-kits](features/biblioteca-kits.md).
+- **Tokens que faltan** (*medio*, 2026-11-25): espaciado, radio, peso, colores de efectos y colores que no son hex aún no se enlazan. Tampoco se ha abierto un archivo exportado en Figma o Penpot reales.
+- **Piezas de kit que faltan** (*medio*, 2026-11-24): plantillas, miniaturas de componentes y «New style» a partir de referencias. Fonts no mira las versiones guardadas de un kit.
+
 ### Abierto tras la sesión maestra 8 (2026-11-23)
 
 - **Prueba real con proveedor de pago en sandbox** (*pendiente de verificación*, 2026-11-23): no hecha en la sesión 8; requiere clave del usuario en el sandbox (`5183`) y modelo + coste máximo aprobados explícitamente (ADR 0004). Comprobar precios exacto/estimado/desconocido, límite de gasto, Cancel y «Warn after a reload during a send».
