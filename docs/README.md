@@ -53,7 +53,7 @@
 - [agente: Auto, una tarjeta (ajustes dentro del plan, prompt adaptado al modelo)](features/agente-auto-tarjeta.md).
 - [agente: cambio de modelo (delicado)](features/agente-cambio-modelo.md).
 - [biblioteca](features/biblioteca.md).
-- [biblioteca: kits de marca, sistemas de diseño, moodboards, tokens y fuentes](features/biblioteca-kits.md).
+- [biblioteca: kits de marca, sistemas de diseño, moodboards, tokens y fuentes](features/biblioteca-kits.md) · [guía práctica y tutorial](guia-marca-y-tokens.md).
 - [canvas](features/canvas.md).
 - [apariencia: bases, resaltados y su selector en Ajustes](features/apariencia.md).
 - [home y barra lateral: vista Home (hero, Apps, Tools, barra superior), secciones Spaces/Create/Tools](features/home.md).
