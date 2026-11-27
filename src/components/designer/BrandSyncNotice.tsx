@@ -41,17 +41,17 @@ export function BrandSyncNotice({ sessionId }: { sessionId: string }) {
       <div className="brand-sync-notice" role="status" aria-live="polite">
         <div className="brand-sync-notice-head">
           <span className="brand-sync-notice-text">{notice.summary}</span>
-          <IconButton icon={X} label="Cerrar aviso" size="sm" onClick={dismissBrandSyncNotice} />
+          <IconButton icon={X} label="Dismiss notice" size="sm" onClick={dismissBrandSyncNotice} />
         </div>
         <div className="brand-sync-notice-actions">
           {notice.canRevert && (
-            <Button size="sm" variant="secondary" icon={Undo2} onClick={() => { if (revertBrandSyncNotice()) toast('Cambio de marca revertido.', 'info'); }}>
-              Volver al anterior
+            <Button size="sm" variant="secondary" icon={Undo2} onClick={() => { if (revertBrandSyncNotice()) toast('Brand update reverted.', 'info'); }}>
+              Revert
             </Button>
           )}
           {mode === 'auto' && (
-            <Button size="sm" variant="ghost" onClick={() => { setBrandSyncMode('manual'); toast('Sincronización de marca cambiada a bajo demanda.', 'info'); }}>
-              Bajo demanda
+            <Button size="sm" variant="ghost" onClick={() => { setBrandSyncMode('manual'); toast('Brand sync switched to on-demand.', 'info'); }}>
+              On demand
             </Button>
           )}
         </div>
@@ -60,7 +60,7 @@ export function BrandSyncNotice({ sessionId }: { sessionId: string }) {
   }
 
   if (mode === 'manual' && pending.total > 0) {
-    const label = pending.kits.length ? `Cambios en ${pending.kits.slice(0, 2).join(', ')} (${pending.total})` : `Cambios de marca pendientes (${pending.total})`;
+    const label = pending.kits.length ? `Updates in ${pending.kits.slice(0, 2).join(', ')} (${pending.total})` : `Pending brand updates (${pending.total})`;
     const apply = async () => {
       if (busy) return;
       setBusy(true);
@@ -75,10 +75,10 @@ export function BrandSyncNotice({ sessionId }: { sessionId: string }) {
         </div>
         <div className="brand-sync-notice-actions">
           <Button size="sm" variant="primary" icon={RefreshCw} disabled={busy} onClick={() => void apply()}>
-            Actualizar ahora
+            Update now
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setBrandSyncMode('auto')}>
-            Automático
+            Auto
           </Button>
         </div>
       </div>
@@ -90,21 +90,21 @@ export function BrandSyncNotice({ sessionId }: { sessionId: string }) {
     const linkAll = () => {
       try {
         const res = autoLinkDocToBrand(sessionId, activeDoc.id, linkPreview.kitId);
-        if (res.total > 0) toast(`Vinculado a ${res.kitName}: ${formatBrandLinkSummary(res)}.`, 'success');
+        if (res.total > 0) toast(`Linked to ${res.kitName}: ${formatBrandLinkSummary(res)}.`, 'success');
       } catch (e) { toast((e as Error).message, 'error'); }
     };
     const ambNote = linkPreview.ambiguous.length
-      ? ` (${linkPreview.ambiguous.length} ambiguo${linkPreview.ambiguous.length === 1 ? '' : 's'} omitido${linkPreview.ambiguous.length === 1 ? '' : 's'}: ${linkPreview.ambiguous.slice(0, 2).join(', ')})`
+      ? ` (${linkPreview.ambiguous.length} ambiguous skipped: ${linkPreview.ambiguous.slice(0, 2).join(', ')})`
       : '';
     return (
       <div className="brand-sync-notice is-suggest" role="status" aria-live="polite">
         <div className="brand-sync-notice-head">
-          <span className="brand-sync-notice-text">{`Coincide con «${linkPreview.kitName}»: ${formatBrandLinkSummary(linkPreview)}.${ambNote}`}</span>
-          <IconButton icon={X} label="Cerrar sugerencia" size="sm" onClick={() => setDismissedLinkKey(linkKey)} />
+          <span className="brand-sync-notice-text">{`Matches "${linkPreview.kitName}": ${formatBrandLinkSummary(linkPreview)}.${ambNote}`}</span>
+          <IconButton icon={X} label="Dismiss suggestion" size="sm" onClick={() => setDismissedLinkKey(linkKey)} />
         </div>
         <div className="brand-sync-notice-actions">
           <Button size="sm" variant="primary" icon={Sparkles} onClick={linkAll}>
-            Vincular todo
+            Link all
           </Button>
         </div>
       </div>

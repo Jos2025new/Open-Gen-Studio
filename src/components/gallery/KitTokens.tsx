@@ -63,6 +63,7 @@ export function KitTokens({ item, onDone, types = TOKEN_TYPES }: { item: Subject
   });
   const importFiles = async (files: File[]) => {
     if (!files.length) return;
+    setBusy(true);
     try {
       // Several files are the modes of one set of tokens (Figma writes one per mode): the light or shortest one is the base.
       const stem = (f: File) => f.name.replace(/(\.tokens)?\.json$/i, '');
@@ -74,10 +75,21 @@ export function KitTokens({ item, onDone, types = TOKEN_TYPES }: { item: Subject
         skipped.push(...r.skipped.filter((n) => !skipped.includes(n)));
         tokens = withMode(tokens, (stem(f).startsWith(`${stem(main)}.`) ? stem(f).slice(stem(main).length + 1) : stem(f)) || 'Mode', r.tokens);
       }
+      const importedCount = Object.keys(tokens).length;
+      if (!importedCount) {
+        toast(`No supported tokens found in ${main.name}${skipped.length ? ` (not supported: ${names(skipped)})` : ''}.`, 'error');
+        return;
+      }
+      const nextRows = [...edits.current.filter((r) => !tokens[r.name]), ...rowsOf(tokens)];
+      edits.current = nextRows;
       setModes((ms) => [...new Set([...ms, ...tokenModes(tokens)])]);
-      setRows((rs) => [...rs.filter((r) => !tokens[r.name]), ...rowsOf(tokens)]);
-      toast(`${Object.keys(tokens).length} tokens imported${skipped.length ? `. Not supported: ${names(skipped)}` : ''}${off.length ? `. Sets not in use: ${names(off)}` : ''}.`, skipped.length || off.length ? 'info' : 'success');
-    } catch (e) { toast((e as Error).message, 'error'); }
+      setRows(nextRows);
+      // Persist immediately so swatches, section tiles, and Designer auto-link update right away.
+      try {
+        base.current = (await store()).tokens;
+      } catch { /* keep local rows if another row is mid-edit */ }
+      toast(`${importedCount} ${importedCount === 1 ? 'token' : 'tokens'} imported${skipped.length ? `. Not supported: ${names(skipped)}` : ''}${off.length ? `. Sets not in use: ${names(off)}` : ''}.`, skipped.length || off.length ? 'info' : 'success');
+    } catch (e) { toast((e as Error).message, 'error'); } finally { setBusy(false); }
   };
   const exportFile = (format: TokenFormat) => {
     try {
@@ -98,8 +110,16 @@ export function KitTokens({ item, onDone, types = TOKEN_TYPES }: { item: Subject
   };
   const color = (r: Row, mode?: string) => { const t = Object.fromEntries(rows.map((x) => [x.name, { type: x.type, value: x.value, modes: Object.fromEntries(Object.entries(x.modes ?? {}).filter(([, v]) => v.trim())) }])) as Tokens; return String(resolveToken(t, r.name, mode) ?? r.value); };
   const swatch = (name: string, shown: string, value: string, set: (v: string) => void) => <input type="color" aria-label={`${name} color`} value={/^#[0-9a-f]{6}/i.exec(shown)?.[0].toLowerCase() ?? '#000000'} onChange={(e) => set(e.target.value + (/^#[0-9a-f]{6}([0-9a-f]{2})$/i.exec(value)?.[1] ?? ''))} />;
+  const visibleCount = rows.filter((r) => types.includes(r.type)).length;
+  const emptyNoun = types.length === 1 ? `${LABELS[types[0]].toLowerCase()}s` : 'tokens';
   return (
     <form className="kit-tokens" onSubmit={(e) => { e.preventDefault(); void save(); }}>
+      {visibleCount === 0 ? (
+        <div className="kit-tokens-empty">
+          <p className="faint">{`No ${emptyNoun} yet. Add one below or import a tokens.json file.`}</p>
+          <Button size="sm" variant="secondary" icon={Upload} disabled={busy} onClick={() => file.current?.click()}>Import tokens.json</Button>
+        </div>
+      ) : null}
       <div className="kit-tokens-rows">
         {rows.map((r, i) => types.includes(r.type) && (
           <div key={i} className="kit-token">
@@ -117,9 +137,9 @@ export function KitTokens({ item, onDone, types = TOKEN_TYPES }: { item: Subject
         ))}
       </div>
       <div className="kit-tokens-add">{types.map((t) => <Button key={t} size="sm" variant="ghost" icon={Plus} disabled={busy} onClick={() => add(t)}>{LABELS[t]}</Button>)}{!modes.length && rows.length > 0 && types.includes('color') && <Button size="sm" variant="ghost" icon={Plus} disabled={busy} onClick={() => setModes(['Dark'])}>Dark mode</Button>}</div>
-      <input ref={file} type="file" accept=".json,application/json" multiple hidden onChange={(e) => { void importFiles([...(e.target.files ?? [])]); e.target.value = ''; }} />
+      <input ref={file} type="file" aria-label="Import tokens JSON" accept=".json,application/json" multiple hidden onChange={(e) => { void importFiles([...(e.target.files ?? [])]); e.target.value = ''; }} />
       <div className="confirm-pop-actions">
-        <IconButton icon={Upload} size="sm" label="Import tokens" onClick={() => file.current?.click()} />
+        <IconButton icon={Upload} size="sm" label="Import tokens" disabled={busy} onClick={() => file.current?.click()} />
         <IconButton icon={Download} size="sm" label="Export tokens" active={exporting} disabled={!rows.length} onClick={() => setExporting((v) => !v)} />
         {exporting && <>
           <Button size="sm" variant="ghost" onClick={() => exportFile('w3c')}>W3C / Figma</Button>

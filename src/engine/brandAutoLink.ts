@@ -240,16 +240,16 @@ export function autoLinkDocToBrand(sessionId: string, docId: string, kitId?: str
   return summary;
 }
 
-/** Human-readable summary of matched/linked items (e.g. "4 colores, 1 fuente y 1 logo"). */
+/** Human-readable summary of matched/linked items (e.g. "4 colors, 1 font and 1 logo"). */
 export function formatBrandLinkSummary(s: BrandLinkSummary): string {
   const parts: string[] = [];
   const add = (n: number, one: string, many: string) => { if (n > 0) parts.push(`${n} ${n === 1 ? one : many}`); };
-  add(s.colors, 'color', 'colores');
-  add(s.fonts, 'fuente', 'fuentes');
-  add(s.sizes, 'tamaño', 'tamaños');
-  add(s.radii, 'radio', 'radios');
-  add(s.widths, 'ancho', 'anchos');
+  add(s.colors, 'color', 'colors');
+  add(s.fonts, 'font', 'fonts');
+  add(s.sizes, 'size', 'sizes');
+  add(s.radii, 'radius', 'radii');
+  add(s.widths, 'width', 'widths');
   add(s.logos, 'logo', 'logos');
   if (parts.length <= 1) return parts[0] ?? '';
-  return `${parts.slice(0, -1).join(', ')} y ${parts[parts.length - 1]}`;
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
 }

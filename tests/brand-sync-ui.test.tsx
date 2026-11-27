@@ -78,23 +78,23 @@ describe('BrandSyncNotice UI', () => {
     });
 
     expect(host.textContent).toContain('firma.radio');
-    expect(host.textContent).toContain('Volver al anterior');
-    expect(host.textContent).toContain('Bajo demanda');
+    expect(host.textContent).toContain('Revert');
+    expect(host.textContent).toContain('On demand');
 
-    // Clicking "Volver al anterior" reverts the shape radius to 12.
-    const revertBtn = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('Volver al anterior'))!;
+    // Clicking "Revert" reverts the shape radius to 12.
+    const revertBtn = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('Revert'))!;
     act(() => revertBtn.click());
     expect((getDoc(sid, docId)!.layers[0] as VectorLayer).shapes[0].radius).toBe(12);
 
-    // Switch to manual mode and update token again: notice shows "Actualizar ahora".
+    // Switch to manual mode and update token again: notice shows "Update now".
     act(() => setBrandSyncMode('manual'));
     await act(async () => {
       await saveItem({ subjectId: kitId, mode: 'overwrite', space: 'library', by: 'user', tokens: { 'firma.radio': { type: 'dimension', value: '36px' } } });
     });
     expect((getDoc(sid, docId)!.layers[0] as VectorLayer).shapes[0].radius).toBe(12);
-    expect(host.textContent).toContain('Actualizar ahora');
+    expect(host.textContent).toContain('Update now');
 
-    const applyBtn = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('Actualizar ahora'))!;
+    const applyBtn = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('Update now'))!;
     await act(async () => { applyBtn.click(); });
     expect((getDoc(sid, docId)!.layers[0] as VectorLayer).shapes[0].radius).toBe(36);
   });

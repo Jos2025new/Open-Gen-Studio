@@ -8,3 +8,5 @@
 .kit-tokens-add { display: flex; flex-wrap: wrap; gap: 0.125rem; }
 .kit-token-mode { grid-column: 1 / -2; display: grid; grid-template-columns: 2.5rem 1fr 1fr; gap: 0.375rem; align-items: center; }
 .kit-token-mode .faint { font-size: 0.75rem; text-align: end; }
+.kit-tokens-empty { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 1.25rem 0.75rem; border: 1px dashed var(--border); border-radius: 0.625rem; background: color-mix(in srgb, var(--surface-2) 60%, transparent); text-align: center; }
+.kit-tokens-empty p { margin: 0; font-size: var(--fs-xs); }

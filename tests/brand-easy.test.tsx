@@ -38,6 +38,7 @@ vi.mock('../src/engine/actions', async (orig) => {
 });
 
 import { BrandSyncNotice } from '../src/components/designer/BrandSyncNotice';
+import { KitTokens as KitTokensEditor } from '../src/components/gallery/KitTokens';
 import { autoLinkDocToBrand, formatBrandLinkSummary, previewBrandLink } from '../src/engine/brandAutoLink';
 import { formatBulkImportSummary, importBrandFiles } from '../src/engine/brandBulkImport';
 import { dismissBrandSyncNotice, installBrandSync } from '../src/engine/brandSync';
@@ -133,7 +134,7 @@ describe('Canva-simple Brand Kit: bulk drop import & 1-click auto-link', () => {
 
     const preview = previewBrandLink(getDoc(sid, docId)!, kitId);
     expect(preview).toMatchObject({ colors: 3, fonts: 1, sizes: 1, radii: 1, widths: 2, logos: 1, total: 9 });
-    expect(formatBrandLinkSummary(preview)).toContain('3 colores');
+    expect(formatBrandLinkSummary(preview)).toContain('3 colors');
     expect(formatBrandLinkSummary(preview)).toContain('1 logo');
 
     // Run via 1-click autoLinkDocToBrand (or command library.item.auto_link).
@@ -166,13 +167,13 @@ describe('Canva-simple Brand Kit: bulk drop import & 1-click auto-link', () => {
     expect((undone.layers[2] as RasterLayer).libraryAsset).toBeUndefined();
   });
 
-  it('shows 1-click "Vincular todo" corner suggestion in BrandSyncNotice and supports library.item.auto_link command', async () => {
+  it('shows 1-click "Link all" corner suggestion in BrandSyncNotice and supports library.item.auto_link command', async () => {
     addVectorLayer(sid, docId, [{ type: 'rect', x: 0, y: 0, w: 320, h: 40, fill: '#ffffff', stroke: null, strokeWidth: 0, radius: 12, rx: 12, ry: 12 }]);
     act(() => root.render(createElement(BrandSyncNotice, { sessionId: sid })));
-    expect(host.textContent).toContain('Coincide con «Marca Verde»');
-    expect(host.textContent).toContain('Vincular todo');
+    expect(host.textContent).toContain('Matches "Marca Verde"');
+    expect(host.textContent).toContain('Link all');
 
-    const btn = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('Vincular todo'))!;
+    const btn = [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('Link all'))!;
     act(() => btn.click());
     expect(previewBrandLink(getDoc(sid, docId)!, kitId).total).toBe(0);
 
@@ -182,5 +183,37 @@ describe('Canva-simple Brand Kit: bulk drop import & 1-click auto-link', () => {
     const res = await run({ cmd: 'library.item.auto_link', on: { session: sid, doc: doc2 }, args: {} }, { caller: 'agent' });
     expect(res.ok).toBe(true);
     expect(res.results[0]).toMatchObject({ total: 3, colors: 1, fonts: 1, sizes: 1 });
+  });
+
+  it('KitTokens shows empty state, auto-saves imported W3C tokens.json immediately, and notifies on empty JSON', async () => {
+    const emptyKit = (await createItem({ name: 'Luna Kit', kind: 'brand-kit', space: 'library', by: 'user', draft: false, open: false })).subject;
+    act(() => root.render(createElement(KitTokensEditor, { item: emptyKit, types: ['color'] })));
+    expect(host.textContent).toContain('No colors yet');
+    expect(host.textContent).toContain('Import tokens.json');
+
+    const input = host.querySelector('input[type="file"][aria-label="Import tokens JSON"]') as HTMLInputElement;
+    expect(input).toBeTruthy();
+
+    const w3cFile = new File(
+      [JSON.stringify({
+        $schema: 'https://design-tokens.github.io/community-group/format/',
+        color: { ink: { $type: 'color', $value: '#1c2a1ccc' }, accent: { $type: 'color', $value: '#e85d3f' } },
+        font: { body: { $type: 'fontFamily', $value: 'Inter' } },
+        dimension: { radius: { $type: 'dimension', $value: '12px' } },
+      })],
+      'tokens.json',
+      { type: 'application/json' },
+    );
+    Object.defineProperty(input, 'files', { value: [w3cFile], configurable: true });
+    await act(async () => {
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 20));
+    });
+
+    const saved = useStore.getState().library.find((s) => s.id === emptyKit.id);
+    expect(saved?.tokens?.['color.ink']?.value).toBe('#1c2a1ccc');
+    expect(saved?.tokens?.['color.accent']?.value).toBe('#e85d3f');
+    expect(saved?.tokens?.['font.body']?.value).toBe('Inter');
+    expect(saved?.tokens?.['dimension.radius']?.value).toBe('12px');
   });
 });

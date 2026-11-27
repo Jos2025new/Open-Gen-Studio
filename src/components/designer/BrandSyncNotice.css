@@ -1,9 +1,9 @@
 .brand-sync-notice {
   position: absolute;
-  right: 1rem;
-  bottom: 1rem;
-  z-index: 30;
-  max-width: 22rem;
+  right: calc(var(--layers-w, 0px) + 1rem);
+  bottom: 4.75rem;
+  z-index: 32;
+  max-width: min(22rem, calc(100% - var(--layers-w, 0px) - 2rem));
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -11,7 +11,7 @@
   border-radius: 0.625rem;
   background: var(--surface-2, var(--bg-2));
   border: 1px solid var(--border);
-  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.35);
   color: var(--text-1);
   font-size: 0.8125rem;
 }

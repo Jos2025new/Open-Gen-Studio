@@ -57,7 +57,7 @@ export function KitPage({ item, chrome, menu, cover, onBack, onOpen, onDesign }:
     if (!docId) return;
     try {
       const res = autoLinkDocToBrand(sessionId, docId, item.id);
-      if (res.total > 0) toast(`Vinculado a ${item.name}: ${formatBrandLinkSummary(res)}.`, 'success');
+      if (res.total > 0) toast(`Linked to ${item.name}: ${formatBrandLinkSummary(res)}.`, 'success');
     } catch (e) { toast((e as Error).message, 'error'); }
   };
   const [title, setTitle] = useState<string | null>(null), [busy, setBusy] = useState(false), busyRef = useRef(false);
@@ -72,7 +72,11 @@ export function KitPage({ item, chrome, menu, cover, onBack, onOpen, onDesign }:
     if (!list.length) return;
     void run(async () => {
       const res = await importBrandFiles(item.id, list);
-      toast(`Importado a ${item.name}: ${formatBulkImportSummary(res)}.`, 'success');
+      const count = res.tokens + res.fonts.length + res.logos + res.images;
+      toast(
+        count > 0 ? `Imported into ${item.name}: ${formatBulkImportSummary(res)}.` : `Nothing imported into ${item.name}: ${formatBulkImportSummary(res)}.`,
+        count > 0 ? 'success' : 'error',
+      );
     });
   };
   return <>
@@ -82,10 +86,10 @@ export function KitPage({ item, chrome, menu, cover, onBack, onOpen, onDesign }:
         {section ? <><button type="button" className="kit-crumb" onClick={() => setTitle(null)}>{item.name}</button><span className="faint">/</span><strong>{section.title}</strong></> : <strong>{item.name}</strong>}
         <div className="pc-icons">
           {section ? <IconButton icon={Sparkles} label={using ? 'In use' : 'Use'} size="sm" active={using} aria-pressed={using} onClick={use} /> : <Button size="sm" icon={Sparkles} variant={using ? 'primary' : 'secondary'} aria-pressed={using} data-tip="The agent and the Designer follow it" onClick={use}>{using ? 'In use' : 'Use'}</Button>}
-          {!section && linkCount > 0 ? <Button size="sm" variant="secondary" disabled={busy} data-tip="Enlaza colores, fuentes, radios, anchos y logos del diseño actual en 1 clic" onClick={linkDoc}>{`Vincular (${linkCount})`}</Button> : null}
+          {!section && linkCount > 0 ? <Button size="sm" variant="secondary" disabled={busy} data-tip="Link matching colors, fonts, radii, widths, and logos in one click" onClick={linkDoc}>{`Link (${linkCount})`}</Button> : null}
           {!section ? <>
             <input ref={bulkFile} type="file" aria-label="Import brand files" accept={BRAND_IMPORT_ACCEPT} multiple hidden onChange={(e) => { importAll(e.target.files); e.target.value = ''; }} />
-            <Button size="sm" icon={Upload} variant="ghost" disabled={busy} data-tip="Importa tokens.json, fuentes y logos de una sola vez" onClick={() => bulkFile.current?.click()}>Importar</Button>
+            <Button size="sm" icon={Upload} variant="ghost" disabled={busy} data-tip="Import tokens.json, fonts, logos, and images at once" onClick={() => bulkFile.current?.click()}>Import</Button>
           </> : null}
           {menu}
         </div>
@@ -93,15 +97,21 @@ export function KitPage({ item, chrome, menu, cover, onBack, onOpen, onDesign }:
       <div className="pc-grp pc-right">{chrome}</div>
     </div></div>
     <div className="pc-split"><div className="pc-main"><div className={`gallery-scroll${busy ? ' is-busy' : ''}${dropOver ? ' is-over' : ''}`} aria-busy={busy}
-      onDragOver={(e) => { if (!section && e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDropOver(true); } }}
+      onDragOver={(e) => { if (!section && e.dataTransfer.types.includes('Files')) { e.preventDefault(); e.stopPropagation(); setDropOver(true); } }}
       onDragLeave={() => setDropOver(false)}
-      onDrop={(e) => { setDropOver(false); if (!section && e.dataTransfer.files?.length) { e.preventDefault(); importAll(e.dataTransfer.files); } }}>
+      onDrop={(e) => { setDropOver(false); if (!section && e.dataTransfer.files?.length) { e.preventDefault(); e.stopPropagation(); importAll(e.dataTransfer.files); } }}>
       {section
         ? <Section key={section.title} item={item} section={section} sections={sections} busy={busy} run={run} cover={cover} onOpen={onOpen} onDesign={onDesign} onGone={() => setTitle(null)} />
-        : <div className="kit-sections">
-          {sections.map((s) => <SectionTile key={s.title} item={item} section={s} cover={cover} onOpen={() => setTitle(s.title)} />)}
-          <NewCategory onAdd={(name) => run(() => setTitle(addCategory(item.id, name)))} />
-        </div>}
+        : <>
+          <button type="button" className={`kit-dropzone${dropOver ? ' is-over' : ''}`} disabled={busy} onClick={() => bulkFile.current?.click()}>
+            <Upload size={16} />
+            <span>Drop <code>tokens.json</code>, fonts, logos, or photos — or click to import</span>
+          </button>
+          <div className="kit-sections">
+            {sections.map((s) => <SectionTile key={s.title} item={item} section={s} cover={cover} onOpen={() => setTitle(s.title)} />)}
+            <NewCategory onAdd={(name) => run(() => setTitle(addCategory(item.id, name)))} />
+          </div>
+        </>}
     </div></div></div>
   </>;
 }
@@ -168,7 +178,7 @@ function Fonts({ item, busy, run }: SectionProps) {
   const use = (family: string) => applyFont(sessionId, docId, familyPatch(item, family));
   return <>
     <div className="kit-add">
-      <input ref={file} type="file" accept={FONT_ACCEPT} multiple hidden onChange={(e) => { const list = [...(e.target.files ?? [])]; e.target.value = ''; void run(async () => { const names = await addFonts(item.id, list); if (names.length) toast(`${names.join(', ')} added.`, 'success'); }); }} />
+      <input ref={file} type="file" aria-label="Upload font files" accept={FONT_ACCEPT} multiple hidden onChange={(e) => { const list = [...(e.target.files ?? [])]; e.target.value = ''; void run(async () => { const names = await addFonts(item.id, list); if (names.length) toast(`${names.join(', ')} added.`, 'success'); }); }} />
       <Button size="sm" icon={Upload} disabled={busy} onClick={() => file.current?.click()}>Upload font</Button>
     </div>
     {families.map((f) => <div key={f} className="kit-font">
@@ -182,14 +192,26 @@ function Items({ item, section, sections, busy, run, onGone }: SectionProps) {
   const { sessionId, docId } = useDesign(), workspace = useStore((s) => s.ui.workspace);
   const nodes = sectionNodes(item, section), file = useRef<HTMLInputElement>(null), replaceFile = useRef<HTMLInputElement>(null), replaceNode = useRef<string | null>(null), [over, setOver] = useState(false);
   const add = (assetIds: string[]) => run(async () => { if (assetIds.length) await addToSection(item.id, section.title, { assetIds }); });
-  const upload = (files: FileList | null) => { const list = [...(files ?? [])].filter((f) => f.type.startsWith('image/') || isSvg(f)); if (list.length) void run(async () => { const ids = await uploadFiles(list); if (ids.length) await addToSection(item.id, section.title, { assetIds: ids }); }); };
+  const upload = (files: FileList | null) => {
+    const raw = [...(files ?? [])];
+    if (!raw.length) return;
+    const list = raw.filter((f) => f.type.startsWith('image/') || isSvg(f));
+    if (!list.length) { toast('No supported image or SVG files selected.', 'error'); return; }
+    void run(async () => {
+      const ids = await uploadFiles(list);
+      if (ids.length) {
+        await addToSection(item.id, section.title, { assetIds: ids });
+        toast(`Added ${ids.length} ${ids.length === 1 ? 'file' : 'files'} to ${section.title}.`, 'success');
+      }
+    });
+  };
   const uploadReplacement = (files: FileList | null) => {
     const nodeId = replaceNode.current, f = [...(files ?? [])].find((x) => x.type.startsWith('image/') || isSvg(x));
     replaceNode.current = null;
     if (!nodeId || !f) return;
     void run(async () => {
       const ids = await uploadFiles([f]);
-      if (ids[0]) { await replaceSectionAsset(item.id, nodeId, ids[0]); toast('Imagen reemplazada en el kit.', 'success'); }
+      if (ids[0]) { await replaceSectionAsset(item.id, nodeId, ids[0]); toast('Image replaced in kit.', 'success'); }
     });
   };
   const use = (nodeId: string, assetId: string) => {
@@ -199,19 +221,25 @@ function Items({ item, section, sections, busy, run, onGone }: SectionProps) {
   };
   const syncFolder = () => void run(async () => {
     const res = await syncBrandExportFolder(item.id);
-    toast(`Carpeta Inkscape sincronizada (${res.files.length} archivos → vigente/).`, 'success');
+    toast(`Inkscape folder synced (${res.files.length} files → vigente/).`, 'success');
   });
   const accepts = (e: React.DragEvent) => e.dataTransfer.types.includes('Files') || e.dataTransfer.types.includes('application/x-ogs-asset');
-  return <div className={`kit-section${over ? ' is-over' : ''}`} onDragOver={(e) => { if (accepts(e)) { e.preventDefault(); setOver(true); } }} onDragLeave={() => setOver(false)}
-    onDrop={(e) => { setOver(false); if (!accepts(e)) return; e.preventDefault(); const id = e.dataTransfer.getData('application/x-ogs-asset'); if (id) void add([id]); else upload(e.dataTransfer.files); }}>
+  return <div className={`kit-section${over ? ' is-over' : ''}`} onDragOver={(e) => { if (accepts(e)) { e.preventDefault(); e.stopPropagation(); setOver(true); } }} onDragLeave={() => setOver(false)}
+    onDrop={(e) => { setOver(false); if (!accepts(e)) return; e.preventDefault(); e.stopPropagation(); const id = e.dataTransfer.getData('application/x-ogs-asset'); if (id) void add([id]); else upload(e.dataTransfer.files); }}>
     <div className="kit-add">
-      <input ref={file} type="file" accept={`${PICTURE_ACCEPT},image/gif`} multiple hidden onChange={(e) => { upload(e.target.files); e.target.value = ''; }} />
-      <input ref={replaceFile} type="file" accept={`${PICTURE_ACCEPT},image/gif`} hidden onChange={(e) => { uploadReplacement(e.target.files); e.target.value = ''; }} />
+      <input ref={file} type="file" aria-label={`Upload ${section.title}`} accept={`${PICTURE_ACCEPT},image/gif`} multiple hidden onChange={(e) => { upload(e.target.files); e.target.value = ''; }} />
+      <input ref={replaceFile} type="file" aria-label={`Replace image in ${section.title}`} accept={`${PICTURE_ACCEPT},image/gif`} hidden onChange={(e) => { uploadReplacement(e.target.files); e.target.value = ''; }} />
       <Button size="sm" icon={Upload} disabled={busy} onClick={() => file.current?.click()}>Upload</Button>
       <FromLibrary disabled={busy} taken={new Set(nodes.flatMap((n) => assetOf(n) ?? []))} onAdd={(ids) => void add(ids)} />
-      {nodes.some((n) => assetOf(n)) ? <Button size="sm" variant="ghost" disabled={busy} data-tip="Exporta assets y actualiza el symlink vigente/ para SVGs en Inkscape" onClick={syncFolder}>Sync Inkscape</Button> : null}
+      {nodes.some((n) => assetOf(n)) ? <Button size="sm" variant="ghost" disabled={busy} data-tip="Export assets and update vigente/ symlink for linked Inkscape SVGs" onClick={syncFolder}>Sync Inkscape</Button> : null}
       {section.custom && !nodes.length ? <IconButton icon={Trash} label={`Remove ${section.title}`} size="sm" onClick={() => { removeCategory(item.id, section.title); onGone(); }} /> : null}
     </div>
+    {!nodes.some((n) => assetOf(n)) ? (
+      <button type="button" className="kit-dropzone is-section" disabled={busy} onClick={() => file.current?.click()}>
+        <Upload size={18} />
+        <span>{`No ${section.title.toLowerCase()} yet. Drop images or SVGs here, or click to upload.`}</span>
+      </button>
+    ) : null}
     <div className="kit-images">
       {nodes.map((n) => { const id = assetOf(n); return id ? <div key={n.id} className="kit-image">
         <button type="button" className="kit-image-use" aria-label={`Use ${n.data.title}`} onClick={() => use(n.id, id)}><AssetMedia assetId={id} /></button>

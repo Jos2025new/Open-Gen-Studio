@@ -123,10 +123,10 @@ export async function importBrandFiles(subjectId: string, files: readonly File[]
 export function formatBulkImportSummary(r: BrandBulkImportResult): string {
   const parts: string[] = [];
   if (r.tokens) parts.push(`${r.tokens} ${r.tokens === 1 ? 'token' : 'tokens'}`);
-  if (r.fonts.length) parts.push(`${r.fonts.length} ${r.fonts.length === 1 ? 'fuente' : 'fuentes'}`);
+  if (r.fonts.length) parts.push(`${r.fonts.length} ${r.fonts.length === 1 ? 'font' : 'fonts'}`);
   if (r.logos) parts.push(`${r.logos} ${r.logos === 1 ? 'logo' : 'logos'}`);
-  if (r.images) parts.push(`${r.images} ${r.images === 1 ? 'imagen' : 'imágenes'}`);
-  if (r.skipped.length) parts.push(`${r.skipped.length} omitido${r.skipped.length === 1 ? '' : 's'}`);
-  if (r.skippedTokens.length) parts.push(`${r.skippedTokens.length} token${r.skippedTokens.length === 1 ? '' : 's'} no soportado${r.skippedTokens.length === 1 ? '' : 's'}`);
-  return parts.length ? parts.join(', ') : 'sin elementos reconocibles';
+  if (r.images) parts.push(`${r.images} ${r.images === 1 ? 'image' : 'images'}`);
+  if (r.skipped.length) parts.push(`${r.skipped.length} skipped`);
+  if (r.skippedTokens.length) parts.push(`${r.skippedTokens.length} unsupported ${r.skippedTokens.length === 1 ? 'token' : 'tokens'}`);
+  return parts.length ? parts.join(', ') : 'no supported files';
 }
