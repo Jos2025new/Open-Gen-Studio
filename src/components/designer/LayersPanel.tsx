@@ -22,7 +22,7 @@ import { toast, useStore } from '../../store/store';
 import { LayerGeometry } from './LayerGeometry';
 import { LayerUnreadable } from './LayerUnreadable';
 import { EditOps, ToolSettings } from './ToolSettings';
-import { ShapeLookFields } from './ShapeLookFields';
+import { ShapeLookFields, ShapeSizeFields } from './ShapeLookFields';
 import { tokenPatch, tokenOf } from '../../engine/design/tokenBind';
 import { TextLayerFields, TokenModeField } from './TokenFields';
 import { InlineColor, InlineSlider, InlineToggle } from './InlineControls';
@@ -296,6 +296,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
             <InlineColor label="Fill" value={s.fill ?? '#d4f25a'} token={tokenOf(s, 'fill')} showValue onChange={(c, t, p) => set(s.id, tokenPatch('fill', c, t, p))} alpha={{ value: paintOpacity(s, 'fill'), onChange: (o) => set(s.id, paintOpacityPatch('fill', o)) }} />
             <InlineColor label="Stroke" value={s.stroke ?? '#ffffff'} token={tokenOf(s, 'stroke')} showValue onChange={(c, t, p) => set(s.id, tokenPatch('stroke', c, t, p))} alpha={{ value: paintOpacity(s, 'stroke'), onChange: (o) => set(s.id, paintOpacityPatch('stroke', o)) }} />
             <InlineSlider label="Stroke width" unit="px" min={0} max={40} allowManualOverflow value={s.strokeWidth} onChange={(strokeWidth) => set(s.id, { strokeWidth })} />
+            <ShapeSizeFields sessionId={sessionId} docId={doc.id} layerId={layer.id} shape={s} />
             <ShapeLookFields value={s} corners={s.type === 'rect'} smoothing blur onChange={(p) => set(s.id, p)} /></div>)}</>;
         })()}
       </fieldset>

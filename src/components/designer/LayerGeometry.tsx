@@ -5,6 +5,7 @@ import { layerBox } from '../../engine/design/render';
 import { scaleLayer, translateLayer } from '../../engine/design/doc';
 import { getDoc, mutateDoc, rebasePaintLayer } from '../../engine/design/actions';
 import { IconButton } from '../ui/primitives';
+import { RasterWidthTokenField } from './TokenFields';
 
 type Key = 'x' | 'y' | 'w' | 'h';
 const TIPS: Record<Key, string> = {
@@ -104,5 +105,11 @@ export function LayerGeometry({ sessionId, doc, layer }: { sessionId: string; do
       <IconButton className="geometry-lock" icon={lock ? Link2 : Link2Off} label={lock ? 'Width and height keep their ratio' : 'Width and height change separately'} size="sm" active={lock} onClick={() => setLock(!lock)} />
       {cell('h')}
     </div>
+    {layer.type === 'raster' && (
+      <RasterWidthTokenField
+        layer={layer}
+        onChange={(p) => mutateDoc(sessionId, doc.id, (d) => ({ ...d, updatedAt: Date.now(), layers: d.layers.map((l) => (l.id === layer.id && l.type === 'raster' ? { ...l, ...p } : l)) }))}
+      />
+    )}
   </div>;
 }

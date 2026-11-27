@@ -1,5 +1,6 @@
 // Local-only brand folder export for Inkscape: writes <DATA_DIR>/brand-exports/<kit>/assets-<ver>/, tokens.json,
 // and atomically points <kit>/vigente -> assets-<ver> so external SVGs referencing vigente/<logo>.png update in one step.
+import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -7,9 +8,8 @@ const SAFE_SLUG = /^[a-z0-9][a-z0-9._-]{0,80}$/i;
 const SAFE_FILE = /^[a-z0-9][a-z0-9._-]{0,120}\.(png|svg|jpg|jpeg|webp)$/i;
 const MAX_BODY_BYTES = 40 * 1024 * 1024;
 
-function isLoopback(addr) {
-  return !addr || addr === '127.0.0.1' || addr === '::1' || addr === '::ffff:127.0.0.1';
-}
+/** 127.0.0.0/8 and ::1, also as IPv4-mapped IPv6 (::ffff:127.x.x.x). */
+const isLoopback = (addr) => typeof addr === 'string' && (addr === '::1' || /^(::ffff:)?127\.\d+\.\d+\.\d+$/.test(addr));
 
 function decodeDataUrl(dataUrl) {
   const m = /^data:[^;]+;base64,(.+)$/s.exec(String(dataUrl || ''));
@@ -44,7 +44,13 @@ export async function syncBrandExportOnDisk(rootDir, payload) {
     await fs.writeFile(path.join(kitDir, 'tokens.json'), payload.tokensJson, 'utf8');
   }
   const vigentePath = path.join(kitDir, 'vigente');
-  const tmpLink = path.join(kitDir, `.vigente.tmp-${Date.now()}`);
+  const existing = await fs.lstat(vigentePath).catch((e) => (e?.code === 'ENOENT' ? null : Promise.reject(e)));
+  if (existing && !existing.isSymbolicLink()) {
+    const err = new Error('vigente exists and is not a symlink');
+    err.statusCode = 409;
+    throw err;
+  }
+  const tmpLink = path.join(kitDir, `.vigente.tmp-${crypto.randomUUID()}`);
   await fs.symlink(verName, tmpLink, 'dir');
   try {
     await fs.rename(tmpLink, vigentePath);
@@ -70,20 +76,24 @@ export function brandExport(dataDir = path.resolve(process.cwd(), 'data')) {
   const root = path.resolve(dataDir);
   const handler = async (req, res, next) => {
     if (req.method !== 'POST' || req.url !== '/x/brand-export/sync') return next();
-    if (!isLoopback(req.socket?.remoteAddress)) {
-      res.statusCode = 403;
-      return res.end('Local requests only');
+    const send = (status, data, type = 'text/plain') => {
+      res.statusCode = status;
+      res.setHeader('Content-Type', type);
+      res.setHeader('Cache-Control', 'no-store');
+      res.end(data);
+    };
+    if (!isLoopback(req.socket?.remoteAddress)) return send(403, 'Local requests only');
+    const origin = req.headers?.origin;
+    if (req.headers?.['x-ogs'] !== '1' || (origin && origin !== `http://${req.headers.host}` && origin !== `https://${req.headers.host}`)) {
+      return send(403, 'Writes only from the app');
     }
     try {
       const payload = JSON.parse(await readBody(req));
       const result = await syncBrandExportOnDisk(root, payload);
-      res.statusCode = 200;
-      res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify(result));
+      send(200, JSON.stringify(result), 'application/json');
     } catch (err) {
-      res.statusCode = 400;
-      res.setHeader('Content-Type', 'text/plain');
-      res.end(err instanceof Error ? err.message : 'Brand export failed');
+      const status = typeof err?.statusCode === 'number' ? err.statusCode : 400;
+      send(status, err instanceof Error ? err.message : 'Brand export failed');
     }
   };
   return {

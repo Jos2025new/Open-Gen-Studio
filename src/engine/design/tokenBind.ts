@@ -127,9 +127,11 @@ export function tokenProblem(written: unknown, own?: string): string | null {
 function dimPatch(cur: Bag, f: 'radius' | 'width', next: number, nextRef: TokenRef | undefined): Bag {
   if (f === 'radius') { const n = Math.max(0, next); return { ...cur, radius: n, rx: n, ry: n, radiusToken: nextRef }; }
   const n = Math.max(1, next);
-  if ('w' in cur && typeof cur.w === 'number') return { ...cur, w: (cur.w < 0 ? -1 : 1) * n, widthToken: nextRef };
-  if ('width' in cur && typeof cur.width === 'number') {
-    const prevW = cur.width, prevH = typeof cur.height === 'number' ? cur.height : undefined;
+  if ('w' in cur && (typeof cur.w === 'number' || typeof cur.w === 'string')) {
+    return { ...cur, w: (typeof cur.w === 'number' && cur.w < 0 ? -1 : 1) * n, widthToken: nextRef };
+  }
+  if ('width' in cur && (typeof cur.width === 'number' || typeof cur.width === 'string')) {
+    const prevW = typeof cur.width === 'number' ? cur.width : 0, prevH = typeof cur.height === 'number' ? cur.height : undefined;
     const height = prevW > 0 && prevH !== undefined ? Math.max(1, Math.round((n * prevH) / prevW)) : prevH;
     return { ...cur, width: n, ...(height !== undefined ? { height } : {}), widthToken: nextRef };
   }
@@ -140,7 +142,9 @@ function dimPatch(cur: Bag, f: 'radius' | 'width', next: number, nextRef: TokenR
 function fresh<T extends object>(obj: T, fields: readonly Field[], library: readonly Subject[], mode?: string, own?: string, opts?: { aliasesOnly?: boolean; changed?: Set<string> }): T {
   let out: Bag | null = null;
   for (const f of fields) {
-    const cur = (out ?? obj) as Bag, rawProp = f === 'width' && 'w' in cur ? 'w' : f, value = cur[rawProp], alias = parseTokenAlias(value);
+    const cur = (out ?? obj) as Bag;
+    const rawProp = f === 'width' && 'w' in cur ? 'w' : f === 'radius' && parseTokenAlias(cur.rx) !== null ? 'rx' : f;
+    const value = cur[rawProp], alias = parseTokenAlias(value);
     if (alias !== null) {
       const found = fieldChoices(f, mode, own).find((c) => c.ref.token === alias);
       const val = found?.ref.value ?? NONE[TYPE[f]];
@@ -204,28 +208,34 @@ export function docModes(doc: DesignDoc, st = useStore.getState()): string[] {
   return [...new Set(st.library.filter((s) => ids.has(s.id)).flatMap((s) => Object.values(s.tokens ?? {}).flatMap((t) => Object.keys(t.modes ?? {}))))];
 }
 
-export type TokenAutoSyncListener = (ev: { sessionId: string; tokens: string[]; prevDocs: DesignDoc[] }) => void;
+export type TokenAutoSyncListener = (ev: { sessionId: string; tokens: string[]; prevDocs: DesignDoc[]; nextDocs: DesignDoc[]; library: readonly Subject[] }) => void;
 let autoTokenListener: TokenAutoSyncListener | null = null;
 export function onAutoTokenSync(fn: TokenAutoSyncListener | null): void { autoTokenListener = fn; }
 
+const tokenSyncDone = new WeakMap<DesignDoc, readonly Subject[]>();
+
+/** Marks a document snapshot as already synced against `library` (used by Revert so auto-sync does not immediately re-apply). */
+export function markTokenSyncDone(doc: DesignDoc, library: readonly Subject[] = useStore.getState().library): void {
+  tokenSyncDone.set(doc, library);
+}
+
 /** Keeps the documents of the session on screen up to date; in manual mode only resolves newly written "{token}" aliases. */
 export function installTokenSync(): () => void {
-  const done = new WeakMap<DesignDoc, readonly Subject[]>();
   return useStore.subscribe((st, prev) => {
     const session = st.sessions[st.activeSessionId];
     if (!session || (session === prev.sessions[st.activeSessionId] && st.library === prev.library && st.activeSessionId === prev.activeSessionId && st.settings.brandSyncMode === prev.settings.brandSyncMode)) return;
     const manual = st.settings.brandSyncMode === 'manual';
-    const changed = new Set<string>(), prevDocs: DesignDoc[] = [];
+    const changed = new Set<string>(), prevDocs: DesignDoc[] = [], nextDocs: DesignDoc[] = [];
     for (const doc of session.docs) {
-      if (!manual && done.get(doc) === st.library) continue;
+      if (!manual && tokenSyncDone.get(doc) === st.library) continue;
       const next = syncTokens(doc, st.library, { aliasesOnly: manual, changed });
-      if (!manual) done.set(doc, st.library);
+      if (!manual) tokenSyncDone.set(doc, st.library);
       if (next === doc) continue;
-      if (!manual) done.set(next, st.library);
-      if (changed.size) prevDocs.push(doc);
+      if (!manual) tokenSyncDone.set(next, st.library);
+      if (changed.size) { prevDocs.push(doc); nextDocs.push(next); }
       setDoc(session.id, doc.id, (d) => (d === doc ? next : syncTokens(d, st.library, { aliasesOnly: manual })));
     }
-    if (!manual && prevDocs.length && changed.size) autoTokenListener?.({ sessionId: session.id, tokens: [...changed], prevDocs });
+    if (!manual && prevDocs.length && changed.size) autoTokenListener?.({ sessionId: session.id, tokens: [...changed], prevDocs, nextDocs, library: st.library });
   });
 }
 

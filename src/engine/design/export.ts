@@ -12,6 +12,7 @@ import { inkscapePrimAttrs } from './inkscapeShape';
 import { decorationRects } from './textLayout';
 import { base64, canOutline, textPathData, type FontLoader } from './exportText';
 import { blurFilterSvg, blurRegion, cornerRadii, roundRectPath, strokeAlignOf, strokeLookSvg } from './shapeLook';
+import { linkedBrandHref } from '../brandExportFolder';
 import type { DesignDoc, Layer, TextLayer, VectorShape } from '../types';
 import { fontStack, shapeBox, type Box } from './doc';
 import { strokeSvg } from './brushTextures';
@@ -256,7 +257,7 @@ async function buildSvg(doc: DesignDoc, deps: SvgDeps, viewport: SvgViewport | u
     const pic = step.t === 'clip' && l.visible ? await picture({ ...doc, background: null, layers: [{ ...l, opacity: 1, blend: 'normal' }, ...step.fx] }, `“${l.name}”`, step.fx.flatMap(noSvg)) : null;
     if (pic) inner = pic;
     else if (l.type === 'raster') {
-      const linked = build.linkBrandAssets && l.libraryAsset ? `vigente/${l.libraryAsset.slug || l.libraryAsset.nodeId}.png` : null;
+      const linked = build.linkBrandAssets && l.libraryAsset ? linkedBrandHref(l) : null;
       const href = linked ?? await deps.rasterHref(l);
       if (!href) { unread.push(l.name); continue; }
       inner = `<image x="${n(l.x)}" y="${n(l.y)}" width="${n(l.width)}" height="${n(l.height)}" preserveAspectRatio="none" href="${linked ? xmlEscape(href) : href}"/>`;

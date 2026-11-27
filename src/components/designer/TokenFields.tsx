@@ -68,6 +68,20 @@ export function WidthTokenField({ value, onChange }: { value: Partial<import('..
     onChange={(v) => { const c = choices.find((x) => key(x.ref) === v); onChange(c ? { w: ((value.w ?? 1) < 0 ? -1 : 1) * Math.max(1, Number(c.ref.value)), widthToken: c.ref } : { widthToken: undefined }); }} />;
 }
 
+/** Width bound to a brand dimension token on a raster layer (scales height proportionally); nothing without dimension tokens. */
+export function RasterWidthTokenField({ layer, onChange }: { layer: import('../../engine/types').RasterLayer; onChange: (patch: Partial<import('../../engine/types').RasterLayer>) => void }) {
+  const choices = useChoices('dimension'), ref = tokenOf(layer, 'width');
+  if (!choices.length) return null;
+  return <InlineSelect label="Width token" value={ref ? key(ref) : ''} options={[{ value: '', label: 'None' }, ...choices.map((c) => ({ value: key(c.ref), label: `${c.label} · ${c.ref.value}px` }))]}
+    onChange={(v) => {
+      const c = choices.find((x) => key(x.ref) === v);
+      if (!c) { onChange({ widthToken: undefined }); return; }
+      const width = Math.max(1, Number(c.ref.value));
+      const height = layer.width > 0 ? Math.max(1, Math.round((width * layer.height) / layer.width)) : layer.height;
+      onChange({ width, height, widthToken: c.ref });
+    }} />;
+}
+
 /** What a picked text layer has in Layer properties. */
 export function TextLayerFields({ layer, onChange }: { layer: TextLayer; onChange: (patch: Partial<TextLayer>) => void }) {
   return <>

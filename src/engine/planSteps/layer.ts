@@ -1,6 +1,6 @@
 import { parseTokenAlias } from '../libraryTokens';
 import { parsePath } from '../design/path';
-import { tokenProblem, writtenStyle } from '../design/tokenBind';
+import { tokenChoices, tokenProblem, writtenStyle } from '../design/tokenBind';
 import type { LayerStep, LayerType, ShapeSpec, StrokeSpec, TextStyle } from '../types';
 import { num } from './shared';
 import type { RawStep, StepEnv } from './env';
@@ -53,7 +53,13 @@ export function normalizeStrokes(raw: Array<Record<string, unknown>> | undefined
   });
 }
 
-export function normalizeShapes(raw: Array<Record<string, unknown>> | undefined, errors: string[] = [], where = 'layer'): ShapeSpec[] {
+export function normalizeShapes(raw: Array<Record<string, unknown>> | undefined, errors: string[] = [], where = 'layer', own?: string, mode?: string): ShapeSpec[] {
+  const dimRef = (v: unknown) => {
+    const alias = parseTokenAlias(v);
+    if (alias === null) return null;
+    const ref = tokenChoices('dimension', mode, own).find((c) => c.ref.token === alias)?.ref;
+    return { alias, raw: String(v).trim(), ref };
+  };
   return (raw ?? []).slice(0, 40).flatMap((s, i): ShapeSpec[] => {
     if (s.type === 'path') {
       const d = typeof s.d === 'string' ? s.d.trim() : '';
@@ -66,16 +72,23 @@ export function normalizeShapes(raw: Array<Record<string, unknown>> | undefined,
       return [{ type: 'path', d, box0: b, x: b.x, y: b.y, w: b.w, h: b.h, fill: color(s.fill, null), stroke: color(s.stroke, s.fill ? null : '#ffffff'), strokeWidth: Math.max(0, num(s.stroke_width ?? s.strokeWidth, s.fill ? 0 : 4)), radius: 0 }];
     }
     const type = s.type === 'ellipse' || s.type === 'line' ? s.type : 'rect';
+    const rawW = s.w ?? s.width, wTok = dimRef(rawW);
+    const rawR = s.radius ?? s.rx, rTok = dimRef(rawR);
+    const w = wTok ? (wTok.ref ? Math.max(1, Number(wTok.ref.value)) : (wTok.raw as unknown as number)) : num(rawW, 100);
+    const radius = rTok ? (rTok.ref ? Math.max(0, Number(rTok.ref.value)) : (rTok.raw as unknown as number)) : Math.max(0, num(rawR, 0));
+    const rxPatch = rTok?.ref ? { rx: radius, ry: radius, radiusToken: rTok.ref } : (!rTok && s.rx != null ? { rx: Math.max(0, num(s.rx, 0)), ...(s.ry != null ? { ry: Math.max(0, num(s.ry, 0)) } : {}) } : {});
     return [{
       type,
       x: num(s.x, 0),
       y: num(s.y, 0),
-      w: num(s.w ?? s.width, 100),
+      w,
       h: num(s.h ?? s.height, type === 'line' ? 0 : 100),
       fill: type === 'line' ? null : color(s.fill, '#ffffff'),
       stroke: color(s.stroke, type === 'line' ? '#ffffff' : null),
       strokeWidth: Math.max(0, num(s.stroke_width ?? s.strokeWidth, type === 'line' ? 4 : 0)),
-      radius: Math.max(0, num(s.radius, 0)),
+      radius,
+      ...rxPatch,
+      ...(wTok?.ref ? { widthToken: wTok.ref } : {}),
     }];
   });
 }
@@ -131,7 +144,7 @@ export async function normalizeLayer(s: RawStep, env: StepEnv): Promise<void> {
     text: layerType === 'text' ? s.text?.trim() : undefined,
     style: layerType === 'text' ? normalizeTextStyle(s.style, ctx.docKit?.()) : undefined,
     box: s.box ? { x: num(s.box.x, 0), y: num(s.box.y, 0), width: num(s.box.width, 0) } : undefined,
-    shapes: layerType === 'vector' ? normalizeShapes(s.shapes, errors, where) : undefined,
+    shapes: layerType === 'vector' ? normalizeShapes(s.shapes, errors, where, ctx.docKit?.()) : undefined,
     strokes,
   };
   steps.push(step);

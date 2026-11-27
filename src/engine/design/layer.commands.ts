@@ -68,7 +68,8 @@ export const commands = [
     effect: 'write',
     run: (on, args) => {
       const errors: string[] = [];
-      const shapes = normalizeShapes(args.shapes, errors, 'shapes');
+      const doc = A.getDoc(on.session, on.doc);
+      const shapes = normalizeShapes(args.shapes, errors, 'shapes', doc?.library?.subjectId, doc?.tokenMode);
       if (errors.length || !shapes.length) throw new Error(errors.join(' ') || 'No valid shape.');
       return made(A.addVectorLayer(on.session, on.doc, shapes, args.name), 'The shapes could not be added.');
     },

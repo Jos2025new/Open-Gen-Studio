@@ -94,7 +94,7 @@ export const shapeGestures = {
       if (d0 && !pbox) return;
       // Stroke style of the next shape (ShapeLookFields); corners only for rectangles.
       const { join, cap, miter, dash, dashOffset, paintOrder } = shapeStyle;
-      const look = { join, cap, miter, dash, dashOffset, paintOrder, fillToken: lineLike ? undefined : shapeStyle.fillToken, fillOpacity: lineLike ? undefined : shapeStyle.fillOpacity, strokeToken: lineLike && !shapeStyle.stroke ? shapeStyle.fillToken : shapeStyle.strokeToken, strokeOpacity: lineLike && !shapeStyle.stroke ? shapeStyle.fillOpacity : shapeStyle.strokeOpacity };
+      const look = { join, cap, miter, dash, dashOffset, paintOrder, fillToken: lineLike ? undefined : shapeStyle.fillToken, fillOpacity: lineLike ? undefined : shapeStyle.fillOpacity, strokeToken: lineLike && !shapeStyle.stroke ? shapeStyle.fillToken : shapeStyle.strokeToken, strokeOpacity: lineLike && !shapeStyle.stroke ? shapeStyle.fillOpacity : shapeStyle.strokeOpacity, ...(d.tool === 'rect' ? { radiusToken: shapeStyle.radiusToken } : {}) };
       const shape = pfit || pbox ? {
         id: uid('shp'),
         ...(pfit ?? { type: 'path' as const, d: d0!, box0: pbox!, ...pbox! }),
