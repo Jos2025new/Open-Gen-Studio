@@ -467,6 +467,10 @@ export interface RasterLayer extends LayerBase {
   /** Layers drawn into this one by a merge: their Library elements stay. */
   merged?: string[];
   sourceAssetId?: string;
+  /** Stable slot in a Library kit (logo/graphic): replacing the slot updates this layer's pixels across designs. */
+  libraryAsset?: import('./libraryTypes').LibraryAssetRef;
+  /** Width taken from a dimension token of a Library kit; height scales proportionally when the token changes. */
+  widthToken?: import('./libraryTypes').TokenRef;
   /** Images are protected from brush/eraser unless the user allows painting on them. */
   allowPaint?: boolean;
 }

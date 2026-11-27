@@ -9,10 +9,10 @@ import type { Layer, Subject, TextStyle } from '../types';
 import type { DesignDoc } from './docType';
 
 /* Values of a document taken from the tokens of a Library entry: they change when the token or the document's mode does. */
-type Field = 'color' | 'fill' | 'stroke' | 'fontFamily' | 'fontSize' | 'background';
+type Field = 'color' | 'fill' | 'stroke' | 'fontFamily' | 'fontSize' | 'background' | 'radius' | 'width';
 type OpacityKey = 'colorOpacity' | 'fillOpacity' | 'strokeOpacity' | 'alpha' | 'opacity';
 type Bag = Record<string, unknown>;
-const TYPE: Record<Field, KitTokenType> = { color: 'color', fill: 'color', stroke: 'color', background: 'color', fontFamily: 'fontFamily', fontSize: 'dimension' };
+const TYPE: Record<Field, KitTokenType> = { color: 'color', fill: 'color', stroke: 'color', background: 'color', fontFamily: 'fontFamily', fontSize: 'dimension', radius: 'dimension', width: 'dimension' };
 const REQUIRED_OPACITY = new Set<OpacityKey>(['alpha', 'opacity']);
 /** What a token that does not exist leaves. */
 const NONE: Partial<Record<KitTokenType, string | number>> = { color: '#000000', fontFamily: 'Inter', dimension: 32 };
@@ -52,11 +52,15 @@ export function tokenPatch(field: 'fontFamily', value: string, ref?: TokenRef): 
 export function tokenPatch(field: 'background', value: string, ref?: TokenRef, prev?: TokenRef): { background: string; backgroundToken?: TokenRef };
 export function tokenPatch<F extends 'fill' | 'stroke'>(field: F, value: string, ref?: TokenRef, prev?: TokenRef): { [K in F]: string } & { [K in `${F}Token`]?: TokenRef } & { [K in `${F}Opacity`]?: number };
 export function tokenPatch(field: 'color', value: string, ref?: TokenRef, prev?: TokenRef): { color: string; colorToken?: TokenRef; colorOpacity?: number };
+export function tokenPatch(field: 'radius', value: number, ref?: TokenRef): { radius: number; rx: number; ry: number; radiusToken?: TokenRef };
+export function tokenPatch(field: 'width', value: number, ref?: TokenRef): { width: number; widthToken?: TokenRef };
 export function tokenPatch<O extends 'alpha' | 'opacity'>(field: 'color', value: string, ref: TokenRef | undefined, prev: TokenRef | undefined, opKey: O): { color: string; colorToken?: TokenRef } & Partial<Record<O, number>>;
-export function tokenPatch(field: Field, value: string, ref?: TokenRef, prev?: TokenRef, opKey?: 'alpha' | 'opacity'): Bag {
+export function tokenPatch(field: Field, value: string | number, ref?: TokenRef, prev?: TokenRef, opKey?: 'alpha' | 'opacity'): Bag {
+  if (field === 'radius') { const n = Math.max(0, Number(value)); return { radius: n, rx: n, ry: n, radiusToken: ref }; }
+  if (field === 'width') { const n = Math.max(1, Number(value)); return { width: n, widthToken: ref }; }
   if (TYPE[field] !== 'color') return { [field]: value, [key(field)]: ref };
   const ok: OpacityKey | undefined = opKey ?? (field === 'fill' ? 'fillOpacity' : field === 'stroke' ? 'strokeOpacity' : field === 'color' ? 'colorOpacity' : undefined);
-  return colorTokenPatch(field, value, ref, prev, ok);
+  return colorTokenPatch(field, String(value), ref, prev, ok);
 }
 /** A family of an entry, with its token when it has one. */
 export function familyPatch(kit: Subject, family: string) {
@@ -65,13 +69,22 @@ export function familyPatch(kit: Subject, family: string) {
 }
 /** The token a field's value comes from, while it still does. */
 export const tokenOf = (obj: object, field: Field): TokenRef | undefined => {
-  const ref = (obj as Bag)[key(field)] as TokenRef | undefined;
+  const bag = obj as Bag, ref = bag[key(field)] as TokenRef | undefined;
   if (!ref) return undefined;
-  if (typeof ref.value === 'string' && ref.value.length === 9) {
-    const p = parseHexAlpha(ref.value), opKey = opacityKeyOf(obj, field), op = opKey ? ((obj as Bag)[opKey] as number | undefined) ?? 1 : 1;
-    return p && (obj as Bag)[field] === p.color && alphaFromOpacity(op) === p.alpha ? ref : undefined;
+  if (field === 'radius') {
+    const cur = typeof bag.rx === 'number' ? bag.rx : bag.radius;
+    const sameRy = bag.ry === undefined || bag.ry === cur;
+    return sameRy && Number(ref.value) === cur ? ref : undefined;
   }
-  return ref.value === (obj as Bag)[field] ? ref : undefined;
+  if (field === 'width') {
+    const cur = typeof bag.w === 'number' ? Math.abs(bag.w) : typeof bag.width === 'number' ? bag.width : undefined;
+    return cur !== undefined && Math.abs(Number(ref.value) - cur) < 0.01 ? ref : undefined;
+  }
+  if (typeof ref.value === 'string' && ref.value.length === 9) {
+    const p = parseHexAlpha(ref.value), opKey = opacityKeyOf(obj, field), op = opKey ? (bag[opKey] as number | undefined) ?? 1 : 1;
+    return p && bag[field] === p.color && alphaFromOpacity(op) === p.alpha ? ref : undefined;
+  }
+  return ref.value === bag[field] ? ref : undefined;
 };
 
 export interface TokenChoice { ref: TokenRef; label: string; kit: string }
@@ -84,7 +97,7 @@ export function tokenChoices(type: KitTokenType, mode?: string, own?: string, st
 }
 const fieldChoices = (f: Field, mode?: string, own?: string) => tokenChoices(TYPE[f], mode, own).filter((c) => f !== 'background' || String(c.ref.value).length === 7);
 
-const WRITTEN: Record<string, Field> = { color: 'color', fill: 'fill', stroke: 'stroke', background: 'background', fontFamily: 'fontFamily', font_family: 'fontFamily', fontSize: 'fontSize', font_size: 'fontSize' };
+const WRITTEN: Record<string, Field> = { color: 'color', fill: 'fill', stroke: 'stroke', background: 'background', fontFamily: 'fontFamily', font_family: 'fontFamily', fontSize: 'fontSize', font_size: 'fontSize', radius: 'radius', rx: 'radius', width: 'width', w: 'width' };
 /** A style as written: a size as "{token}" becomes its number (text is laid out at once); the other tokens are placed by syncTokens. */
 export function writtenStyle(style: Omit<Partial<TextStyle>, 'fontSize'> & { fontSize?: number | string }, own?: string, mode?: string): Partial<TextStyle> {
   const { fontSize, ...rest } = style, alias = parseTokenAlias(fontSize);
@@ -111,24 +124,41 @@ export function tokenProblem(written: unknown, own?: string): string | null {
   return `no token ${[...bad.keys()].map((n) => `"{${n}}"`).join(', ')}${kit ? ` in ${kit.name}; it has ${has.join('; ')}` : ': no brand is in use'}. Write one of its tokens or a plain value.`;
 }
 
+function dimPatch(cur: Bag, f: 'radius' | 'width', next: number, nextRef: TokenRef | undefined): Bag {
+  if (f === 'radius') { const n = Math.max(0, next); return { ...cur, radius: n, rx: n, ry: n, radiusToken: nextRef }; }
+  const n = Math.max(1, next);
+  if ('w' in cur && typeof cur.w === 'number') return { ...cur, w: (cur.w < 0 ? -1 : 1) * n, widthToken: nextRef };
+  if ('width' in cur && typeof cur.width === 'number') {
+    const prevW = cur.width, prevH = typeof cur.height === 'number' ? cur.height : undefined;
+    const height = prevW > 0 && prevH !== undefined ? Math.max(1, Math.round((n * prevH) / prevW)) : prevH;
+    return { ...cur, width: n, ...(height !== undefined ? { height } : {}), widthToken: nextRef };
+  }
+  return { ...cur, widthToken: nextRef };
+}
+
 /** One object with its fields up to date; the same object when nothing changed. A value written as "{token}" becomes that token's. */
-function fresh<T extends object>(obj: T, fields: readonly Field[], library: readonly Subject[], mode?: string, own?: string): T {
+function fresh<T extends object>(obj: T, fields: readonly Field[], library: readonly Subject[], mode?: string, own?: string, opts?: { aliasesOnly?: boolean; changed?: Set<string> }): T {
   let out: Bag | null = null;
   for (const f of fields) {
-    const cur = (out ?? obj) as Bag, value = cur[f], alias = parseTokenAlias(value);
+    const cur = (out ?? obj) as Bag, rawProp = f === 'width' && 'w' in cur ? 'w' : f, value = cur[rawProp], alias = parseTokenAlias(value);
     if (alias !== null) {
       const found = fieldChoices(f, mode, own).find((c) => c.ref.token === alias);
-      out = TYPE[f] === 'color'
-        ? { ...cur, ...colorTokenPatch(f, String(found?.ref.value ?? NONE.color), found?.ref, undefined, opacityKeyOf(obj, f)) }
-        : { ...cur, [f]: found?.ref.value ?? NONE[TYPE[f]], [key(f)]: found?.ref };
+      const val = found?.ref.value ?? NONE[TYPE[f]];
+      out = f === 'radius' || f === 'width' ? dimPatch(cur, f, Number(val), found?.ref)
+        : TYPE[f] === 'color' ? { ...cur, ...colorTokenPatch(f, String(val), found?.ref, undefined, opacityKeyOf(obj, f)) }
+          : { ...cur, [f]: val, [key(f)]: found?.ref };
       continue;
     }
+    if (opts?.aliasesOnly) continue;
     const ref = tokenOf(cur, f);
     const raw = ref && tokenValue(library.find((s) => s.id === ref.kit), ref.token, mode);
     const next = f === 'background' && typeof raw === 'string' && raw.length === 9 ? undefined : raw;
-    if (next !== undefined && next !== ref!.value && typeof next === typeof value) {
+    if (next !== undefined && next !== ref!.value && (f === 'radius' || f === 'width' ? typeof next === 'number' : typeof next === typeof value)) {
       const nextRef = { ...ref!, value: next };
-      out = TYPE[f] === 'color' ? { ...cur, ...colorTokenPatch(f, String(next), nextRef, ref, opacityKeyOf(obj, f)) } : { ...cur, [f]: next, [key(f)]: nextRef };
+      opts?.changed?.add(ref!.token);
+      out = f === 'radius' || f === 'width' ? dimPatch(cur, f, Number(next), nextRef)
+        : TYPE[f] === 'color' ? { ...cur, ...colorTokenPatch(f, String(next), nextRef, ref, opacityKeyOf(obj, f)) }
+          : { ...cur, [f]: next, [key(f)]: nextRef };
     }
   }
   return (out as T | null) ?? obj;
@@ -140,13 +170,14 @@ function each<T>(list: readonly T[], fn: (x: T) => T): T[] {
 }
 
 /** The document with its token values up to date; the same one when nothing changed. */
-function syncTokens(doc: DesignDoc, library: readonly Subject[]): DesignDoc {
-  const own = doc.library?.subjectId, mode = doc.tokenMode, one = <T extends object>(x: T, ...f: Field[]) => fresh(x, f, library, mode, own);
+export function syncTokens(doc: DesignDoc, library: readonly Subject[], opts?: { aliasesOnly?: boolean; changed?: Set<string> }): DesignDoc {
+  const own = doc.library?.subjectId, mode = doc.tokenMode, one = <T extends object>(x: T, ...f: Field[]) => fresh(x, f, library, mode, own, opts);
   const layers = each(doc.layers, (l): Layer => {
     if (l.type === 'text') return one(l, 'color', 'fontFamily', 'fontSize');
+    if (l.type === 'raster') return one(l, 'width');
     if (l.type !== 'vector') return l;
     const shapes = each(l.shapes, (s) => {
-      let n = one(s, 'fill', 'stroke');
+      let n = one(s, 'fill', 'stroke', 'radius', 'width');
       for (const g of ['fillGradient', 'strokeGradient'] as const) {
         const paint = n[g], stops = paint && each(paint.stops, (x) => one(x, 'color'));
         if (paint && stops !== paint.stops) n = { ...n, [g]: { ...paint, stops } };
@@ -167,25 +198,34 @@ export function docModes(doc: DesignDoc, st = useStore.getState()): string[] {
   from(doc, 'background');
   for (const l of doc.layers) {
     if (l.type === 'text') from(l, 'color', 'fontFamily', 'fontSize');
-    else if (l.type === 'vector') { for (const s of l.shapes) { from(s, 'fill', 'stroke'); for (const g of [s.fillGradient, s.strokeGradient]) g?.stops.forEach((x) => from(x, 'color')); } l.strokes?.forEach((s) => from(s, 'color')); }
+    else if (l.type === 'raster') from(l, 'width');
+    else if (l.type === 'vector') { for (const s of l.shapes) { from(s, 'fill', 'stroke', 'radius', 'width'); for (const g of [s.fillGradient, s.strokeGradient]) g?.stops.forEach((x) => from(x, 'color')); } l.strokes?.forEach((s) => from(s, 'color')); }
   }
   return [...new Set(st.library.filter((s) => ids.has(s.id)).flatMap((s) => Object.values(s.tokens ?? {}).flatMap((t) => Object.keys(t.modes ?? {}))))];
 }
 
-/** Keeps the documents of the session on screen up to date; not an undo step: the change is the token's. */
+export type TokenAutoSyncListener = (ev: { sessionId: string; tokens: string[]; prevDocs: DesignDoc[] }) => void;
+let autoTokenListener: TokenAutoSyncListener | null = null;
+export function onAutoTokenSync(fn: TokenAutoSyncListener | null): void { autoTokenListener = fn; }
+
+/** Keeps the documents of the session on screen up to date; in manual mode only resolves newly written "{token}" aliases. */
 export function installTokenSync(): () => void {
   const done = new WeakMap<DesignDoc, readonly Subject[]>();
   return useStore.subscribe((st, prev) => {
     const session = st.sessions[st.activeSessionId];
-    if (!session || (session === prev.sessions[st.activeSessionId] && st.library === prev.library && st.activeSessionId === prev.activeSessionId)) return;
+    if (!session || (session === prev.sessions[st.activeSessionId] && st.library === prev.library && st.activeSessionId === prev.activeSessionId && st.settings.brandSyncMode === prev.settings.brandSyncMode)) return;
+    const manual = st.settings.brandSyncMode === 'manual';
+    const changed = new Set<string>(), prevDocs: DesignDoc[] = [];
     for (const doc of session.docs) {
-      if (done.get(doc) === st.library) continue;
-      done.set(doc, st.library);
-      const next = syncTokens(doc, st.library);
+      if (!manual && done.get(doc) === st.library) continue;
+      const next = syncTokens(doc, st.library, { aliasesOnly: manual, changed });
+      if (!manual) done.set(doc, st.library);
       if (next === doc) continue;
-      done.set(next, st.library);
-      setDoc(session.id, doc.id, (d) => (d === doc ? next : syncTokens(d, st.library)));
+      if (!manual) done.set(next, st.library);
+      if (changed.size) prevDocs.push(doc);
+      setDoc(session.id, doc.id, (d) => (d === doc ? next : syncTokens(d, st.library, { aliasesOnly: manual })));
     }
+    if (!manual && prevDocs.length && changed.size) autoTokenListener?.({ sessionId: session.id, tokens: [...changed], prevDocs });
   });
 }
 

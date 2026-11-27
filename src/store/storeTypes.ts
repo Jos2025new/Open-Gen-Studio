@@ -30,6 +30,8 @@ export interface Settings {
   notifications: { tabTitle: boolean };
   /** What is attached to a message also stays in Library (default on). */
   keepAttachments?: boolean;
+  /** How brand kit changes (tokens, linked logos, components) propagate to open designs: automatic (default) or on demand. */
+  brandSyncMode?: 'auto' | 'manual';
   peopleLook?: string;
   ops: { edit: string | null; upscale: string | null; removeBg: string | null; video: string | null; videoUpscale: string | null; videoEdit: string | null; videoExtend: string | null; transcribe: string | null; editRegion: string | null; removeObject: string | null };
 }

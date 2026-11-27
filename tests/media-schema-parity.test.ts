@@ -20,10 +20,10 @@ async function sha256(value: unknown): Promise<string> {
 }
 
 // Recorded before Part 5 replaced literal media enums with MEDIA_KINDS-derived tuples;
-// `commands` updated after task/library-kits-fix retired `part` node fields from library.item.* and nodes.node.*.
+// `commands` updated after task/brand-sync added library.item.{place_asset,replace_asset,sync,export_folder}.
 const BEFORE_HASHES = {
   tools: '1e2b5d023641bd0576dd81ef88b5adba8c9f811dda61cfe83e600acf81447da7',
-  commands: '0e2cc48c7bf8d5f66d1d42adc13b3a27418b51adb768e04ddd28494f90d6a2e1',
+  commands: 'dfe8af3e373c5e3b422e26bb76fee90ef83e36195cd3f1a2c2672394517af741',
   findModels: 'bc71d19692f96f5c81151b1f2ac85694a11800259c5fc448c6bb9c8346a8332f',
   findAssets: '9a26a4fa02ec1123d71f36d8774024e087e392762fa65dc3ec1cb1cb4eaaac5c',
 };

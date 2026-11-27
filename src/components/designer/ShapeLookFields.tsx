@@ -5,6 +5,7 @@ import { shapeToPath } from '../../engine/design/affine';
 import { primToPath } from '../../engine/design/primitives';
 import { getDoc, patchLayer } from '../../engine/design/actions';
 import { InlineChoice, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
+import { RadiusTokenField, WidthTokenField } from './TokenFields';
 
 /*
  * Corners, stroke style and blur of a shape (Inkscape's rectangle toolbar and Fill & Stroke → Stroke style):
@@ -28,6 +29,7 @@ export function ShapeLookFields({ value, onChange, corners, smoothing, stroke = 
     {corners && <>
       <InlineSlider label="Rx" unit="px" min={0} max={Math.max(1, Math.round(Math.abs(w) / 2) || 200)} allowManualOverflow value={Math.round(r.rx * 10) / 10} step={0.5} onChange={(rx) => onChange({ rx, ry: value.ry ?? r.ry })} />
       <InlineSlider label="Ry" unit="px" min={0} max={Math.max(1, Math.round(Math.abs(h) / 2) || 200)} allowManualOverflow value={Math.round(r.ry * 10) / 10} step={0.5} onChange={(ry) => onChange({ ry, rx: value.rx ?? r.rx })} />
+      <RadiusTokenField value={value} onChange={onChange} />
       {smoothing && <InlineSlider label="Smoothing" unit="%" scale={100} min={0} max={1} step={0.01} disabled={!r.rx || !r.ry} value={value.smooth ?? 0} onChange={(smooth) => onChange({ smooth: smooth || undefined })} />}
       <button type="button" className="opt" disabled={!r.rx && !r.ry} onClick={() => onChange(SHARP)} data-tip="Make corners sharp (Shift-click a corner handle does the same)">Sharp corners</button>
     </>}
@@ -66,6 +68,7 @@ export function ShapeSizeFields({ sessionId, docId, layerId, shape }: { sessionI
   return <>
     <InlineSlider label="W" unit="px" min={1} max={Math.max(4000, Math.ceil(Math.abs(shape.w)))} allowManualOverflow value={Math.round(Math.abs(shape.w) * 10) / 10} onChange={(v) => set('w', v)} />
     <InlineSlider label="H" unit="px" min={1} max={Math.max(4000, Math.ceil(Math.abs(shape.h)))} allowManualOverflow value={Math.round(Math.abs(shape.h) * 10) / 10} onChange={(v) => set('h', v)} />
+    <WidthTokenField value={shape} onChange={(p) => patchShape(sessionId, docId, layerId, shape.id, p)} />
   </>;
 }
 

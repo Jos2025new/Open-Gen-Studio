@@ -52,6 +52,22 @@ export function SizeTokenField({ value, onChange }: { value: TextStyle; onChange
     onChange={(v) => { const c = choices.find((x) => key(x.ref) === v); onChange({ fontSize: c ? Number(c.ref.value) : value.fontSize, fontSizeToken: c?.ref }); }} />;
 }
 
+/** Corner radius bound to a brand dimension token; nothing without dimension tokens. */
+export function RadiusTokenField({ value, onChange }: { value: Partial<import('../../engine/types').ShapeSpec>; onChange: (patch: Partial<import('../../engine/types').ShapeSpec>) => void }) {
+  const choices = useChoices('dimension'), ref = tokenOf(value, 'radius');
+  if (!choices.length) return null;
+  return <InlineSelect label="Radius token" value={ref ? key(ref) : ''} options={[{ value: '', label: 'None' }, ...choices.map((c) => ({ value: key(c.ref), label: `${c.label} · ${c.ref.value}px` }))]}
+    onChange={(v) => { const c = choices.find((x) => key(x.ref) === v); onChange(c ? tokenPatch('radius', Number(c.ref.value), c.ref) : { radiusToken: undefined }); }} />;
+}
+
+/** Width bound to a brand dimension token (shape `w`); nothing without dimension tokens. */
+export function WidthTokenField({ value, onChange }: { value: Partial<import('../../engine/types').ShapeSpec>; onChange: (patch: Partial<import('../../engine/types').ShapeSpec>) => void }) {
+  const choices = useChoices('dimension'), ref = tokenOf(value, 'width');
+  if (!choices.length) return null;
+  return <InlineSelect label="Width token" value={ref ? key(ref) : ''} options={[{ value: '', label: 'None' }, ...choices.map((c) => ({ value: key(c.ref), label: `${c.label} · ${c.ref.value}px` }))]}
+    onChange={(v) => { const c = choices.find((x) => key(x.ref) === v); onChange(c ? { w: ((value.w ?? 1) < 0 ? -1 : 1) * Math.max(1, Number(c.ref.value)), widthToken: c.ref } : { widthToken: undefined }); }} />;
+}
+
 /** What a picked text layer has in Layer properties. */
 export function TextLayerFields({ layer, onChange }: { layer: TextLayer; onChange: (patch: Partial<TextLayer>) => void }) {
   return <>

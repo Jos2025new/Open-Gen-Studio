@@ -29,7 +29,7 @@ export type ExportArea = 'canvas' | 'content' | 'objects' | 'selection' | 'layer
 
 /** One file of a multi-file export: a scale, the text added to the name, and a format. */
 export interface ExportRow { scale: number; suffix: string; format: ExportFormat }
-export interface SvgOptions { decimals?: number; minify?: boolean; metadata?: boolean }
+export interface SvgOptions { decimals?: number; minify?: boolean; metadata?: boolean; linkBrandAssets?: boolean }
 /** Print shop PDF: the paper is the trim size; bleed is added on every side, marks need a slug outside it. */
 export interface PrintOptions { bleedMm: number; marks: boolean }
 /** Crop marks start this far beyond the bleed edge and are this long; the page grows by both. */

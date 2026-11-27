@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from 'vitest/config';
 import type { Connect } from 'vite';
 import { localStore } from './server/local-store.js';
+import { brandExport } from './server/brand-export.js';
 import react from '@vitejs/plugin-react';
 import { HOST_NOT_ALLOWED, TOO_MANY_REDIRECTS, mediaUrlAllowed, nextHop } from './src/lib/mediaHosts';
 
@@ -79,7 +80,7 @@ function mediaRelay(): Plugin {
 
 export default defineConfig({
   // localStore: disk copy of state and media in ./data (dev/preview only; the app has no backend).
-  plugins: [react(), mediaRelay(), localStore(undefined, process.env.DATA_DIR)],
+  plugins: [react(), mediaRelay(), localStore(undefined, process.env.DATA_DIR), brandExport(process.env.DATA_DIR)],
   // data/ (state with the API keys, media, backups) lives in the project folder: never serve it as a static file.
   // Vite's own defaults are kept (the list replaces them).
   server: { port: 5173, proxy, fs: { deny: ['.env', '.env.*', '*.{crt,pem}', '**/.git/**', '**/data/**', '**/data.bak-*/**'] } },

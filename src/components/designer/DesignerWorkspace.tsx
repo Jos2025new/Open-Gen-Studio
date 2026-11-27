@@ -15,6 +15,7 @@ import { DocBackgroundChoice } from './DocBackgroundChoice';
 import { canRedo, canUndo, historyDepth, subscribeHistory } from '../../engine/design/history';
 import { designerKey } from './designerKeys';
 import { ValueNotice } from './ValueNotice';
+import { BrandSyncNotice } from './BrandSyncNotice';
 import { designerClipboard } from './designerClipboard';
 import { IMPORT_ACCEPT, importDesignFiles } from './designerFile';
 import { TopbarActions } from '../shell/TopBar';
@@ -155,6 +156,7 @@ export function DesignerWorkspace() {
       <ToolHelpLine />
       <Stage key={doc.id} sessionId={session.id} doc={doc} selectedCurve={selectedCurve} setSelectedCurve={setSelectedCurve} />
       <ValueNotice />
+      <BrandSyncNotice sessionId={session.id} />
       <DrawingChoicePrompt sessionId={session.id} doc={doc} />
       <LayersPanel sessionId={session.id} doc={doc} selectedCurve={selectedCurve} />
     </> :

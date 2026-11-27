@@ -8,7 +8,7 @@ import { cleanupKeys, copyDocPixels, expectedRasterIds, readKitVersion } from '.
 import type { Layer, LayerGroup } from './types';
 
 /* Copy-with-origin insertion of a Library component into a Designer document (single undo step, own pixels). */
-function cloneMember(layer: Layer, newGroupId: string, pxMap: ReadonlyMap<string, string>): Layer {
+export function cloneComponentLayer(layer: Layer, newGroupId: string, pxMap: ReadonlyMap<string, string>): Layer {
   const remap = (id: string) => pxMap.get(id) ?? id, copy = structuredClone(layer);
   if (copy.type === 'raster') return { ...copy, id: remap(copy.id), groupId: newGroupId, ...(copy.paintBaseId ? { paintBaseId: remap(copy.paintBaseId) } : {}) };
   if (copy.type === 'vector') {
@@ -34,7 +34,7 @@ export async function insertComponent(sessionId: string, docId: string, subjectI
   try {
     const copied = await copyDocPixels({ ...snap.doc, layers: srcLayers }, null, expectedRasterIds(snap), written);
     const groupId = uid('grp'), idMap = new Map<string, string>();
-    let layers = srcLayers.map((l) => { const next = cloneMember(l, groupId, copied.map); idMap.set(l.id, next.id); return next; });
+    let layers = srcLayers.map((l) => { const next = cloneComponentLayer(l, groupId, copied.map); idMap.set(l.id, next.id); return next; });
     if (at) {
       const box = D.unionBox(layers.map(D.approxLayerBox).filter((b): b is D.Box => b != null));
       if (box) layers = layers.map((l) => D.translateLayer(l, at.x - box.x, at.y - box.y));

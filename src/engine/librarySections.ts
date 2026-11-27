@@ -76,6 +76,18 @@ export const moveToSection = (subjectId: string, nodeId: string, title: string) 
   const section = sectionOf(subjectId, title);
   return edit(subjectId, (g) => ({ ...g, nodes: g.nodes.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, section } } : n)) }));
 };
+/** Replaces the image of an existing slot in place, keeping its stable nodeId so linked designs update automatically. */
+export async function replaceSectionAsset(subjectId: string, nodeId: string, newAssetId: string, by: 'user' | 'agent' = 'user'): Promise<Subject> {
+  const { assets, library } = useStore.getState(), entry = library.find((x) => x.id === subjectId);
+  if (!entry || !hasSections(entry)) throw new Error(`No brand kit or design system "${subjectId}".`);
+  if (!assets[newAssetId] || assets[newAssetId].kind !== 'image') throw new Error(`No image asset "${newAssetId}".`);
+  const node = (entry.graph?.nodes ?? []).find((n) => n.id === nodeId && n.data.kind === 'asset');
+  if (!node) throw new Error(`No image slot "${nodeId}" in "${entry.name}".`);
+  return saveItem({
+    subjectId, mode: 'overwrite', space: 'library', by,
+    graph: (g) => ({ ...(g ?? { nodes: [], edges: [] }), nodes: (g?.nodes ?? []).map((n) => (n.id === nodeId && n.data.kind === 'asset' ? { ...n, data: { ...n.data, assetId: newAssetId } } : n)) }),
+  });
+}
 export const setSectionText = (subjectId: string, nodeId: string, value: string) =>
   edit(subjectId, (g) => ({ ...g, nodes: g.nodes.map((n) => (n.id === nodeId && n.data.kind === 'text' ? { ...n, data: { ...n.data, text: value } } : n)) }));
 export const removeFromSection = (subjectId: string, nodeId: string) => edit(subjectId, (g) => ({

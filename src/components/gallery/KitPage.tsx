@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { addAsReference, sendToNodes, uploadFiles } from '../../engine/actions';
-import { addTextLayer, getDoc, patchLayer, placeAsset } from '../../engine/design/actions';
+import { addTextLayer, getDoc, patchLayer } from '../../engine/design/actions';
+import { placeLinkedAsset, syncBrandExportFolder } from '../../engine/brandSync';
 import { fontStack } from '../../engine/design/doc';
 import { patchPickedShapes } from '../../engine/design/multiObjectOps';
 import { objectPicks } from '../../engine/design/objectSelection';
@@ -13,7 +14,7 @@ import { applyFont } from './FontTile';
 import { useDesign } from './useDesign';
 import { addFonts, removeFont } from '../../engine/ownFonts';
 import { insertComponent } from '../../engine/libraryInsert';
-import { addCategory, addToSection, kitSections, moveToSection, removeCategory, removeFromSection, sectionNodes, setSectionText, type KitSection } from '../../engine/librarySections';
+import { addCategory, addToSection, kitSections, moveToSection, removeCategory, removeFromSection, replaceSectionAsset, sectionNodes, setSectionText, type KitSection } from '../../engine/librarySections';
 import { resolveToken } from '../../engine/libraryTokens';
 import { colorHex } from '../../engine/libraryTokensColor';
 import { createItem, readKitVersion, saveItem } from '../../engine/libraryVersions';
@@ -147,27 +148,43 @@ function Fonts({ item, busy, run }: SectionProps) {
 
 function Items({ item, section, sections, busy, run, onGone }: SectionProps) {
   const { sessionId, docId } = useDesign(), workspace = useStore((s) => s.ui.workspace);
-  const nodes = sectionNodes(item, section), file = useRef<HTMLInputElement>(null), [over, setOver] = useState(false);
+  const nodes = sectionNodes(item, section), file = useRef<HTMLInputElement>(null), replaceFile = useRef<HTMLInputElement>(null), replaceNode = useRef<string | null>(null), [over, setOver] = useState(false);
   const add = (assetIds: string[]) => run(async () => { if (assetIds.length) await addToSection(item.id, section.title, { assetIds }); });
   const upload = (files: FileList | null) => { const list = [...(files ?? [])].filter((f) => f.type.startsWith('image/') || isSvg(f)); if (list.length) void run(async () => { const ids = await uploadFiles(list); if (ids.length) await addToSection(item.id, section.title, { assetIds: ids }); }); };
-  const use = (id: string) => {
-    if (docId) void placeAsset(sessionId, docId, id, 'new');
-    else if (workspace === 'node') sendToNodes(id);
-    else addAsReference(id);
+  const uploadReplacement = (files: FileList | null) => {
+    const nodeId = replaceNode.current, f = [...(files ?? [])].find((x) => x.type.startsWith('image/') || isSvg(x));
+    replaceNode.current = null;
+    if (!nodeId || !f) return;
+    void run(async () => {
+      const ids = await uploadFiles([f]);
+      if (ids[0]) { await replaceSectionAsset(item.id, nodeId, ids[0]); toast('Imagen reemplazada en el kit.', 'success'); }
+    });
   };
+  const use = (nodeId: string, assetId: string) => {
+    if (docId) void placeLinkedAsset(sessionId, docId, item.id, nodeId);
+    else if (workspace === 'node') sendToNodes(assetId);
+    else addAsReference(assetId);
+  };
+  const syncFolder = () => void run(async () => {
+    const res = await syncBrandExportFolder(item.id);
+    toast(`Carpeta Inkscape sincronizada (${res.files.length} archivos → vigente/).`, 'success');
+  });
   const accepts = (e: React.DragEvent) => e.dataTransfer.types.includes('Files') || e.dataTransfer.types.includes('application/x-ogs-asset');
   return <div className={`kit-section${over ? ' is-over' : ''}`} onDragOver={(e) => { if (accepts(e)) { e.preventDefault(); setOver(true); } }} onDragLeave={() => setOver(false)}
     onDrop={(e) => { setOver(false); if (!accepts(e)) return; e.preventDefault(); const id = e.dataTransfer.getData('application/x-ogs-asset'); if (id) void add([id]); else upload(e.dataTransfer.files); }}>
     <div className="kit-add">
       <input ref={file} type="file" accept={`${PICTURE_ACCEPT},image/gif`} multiple hidden onChange={(e) => { upload(e.target.files); e.target.value = ''; }} />
+      <input ref={replaceFile} type="file" accept={`${PICTURE_ACCEPT},image/gif`} hidden onChange={(e) => { uploadReplacement(e.target.files); e.target.value = ''; }} />
       <Button size="sm" icon={Upload} disabled={busy} onClick={() => file.current?.click()}>Upload</Button>
       <FromLibrary disabled={busy} taken={new Set(nodes.flatMap((n) => assetOf(n) ?? []))} onAdd={(ids) => void add(ids)} />
+      {nodes.some((n) => assetOf(n)) ? <Button size="sm" variant="ghost" disabled={busy} data-tip="Exporta assets y actualiza el symlink vigente/ para SVGs en Inkscape" onClick={syncFolder}>Sync Inkscape</Button> : null}
       {section.custom && !nodes.length ? <IconButton icon={Trash} label={`Remove ${section.title}`} size="sm" onClick={() => { removeCategory(item.id, section.title); onGone(); }} /> : null}
     </div>
     <div className="kit-images">
       {nodes.map((n) => { const id = assetOf(n); return id ? <div key={n.id} className="kit-image">
-        <button type="button" className="kit-image-use" aria-label={`Use ${n.data.title}`} onClick={() => use(id)}><AssetMedia assetId={id} /></button>
+        <button type="button" className="kit-image-use" aria-label={`Use ${n.data.title}`} onClick={() => use(n.id, id)}><AssetMedia assetId={id} /></button>
         <CardMenu label={`More actions for ${n.data.title}`} className="pc-hover">{(close) => <>
+          <MenuItem icon={Upload} disabled={busy} onClick={() => { close(); replaceNode.current = n.id; replaceFile.current?.click(); }}>Replace image</MenuItem>
           {sections.filter((s) => s.type === 'items' && s.title !== section.title).map((s) => <MenuItem key={s.title} disabled={busy} onClick={() => { close(); void run(() => moveToSection(item.id, n.id, s.title)); }}>{`Move to ${s.title}`}</MenuItem>)}
           <MenuItem icon={Trash} tone="danger" onClick={() => { close(); void run(() => removeFromSection(item.id, n.id)); }}>Remove</MenuItem>
         </>}</CardMenu>

@@ -10,11 +10,14 @@ import { SetGroup, SetRow } from './SettingsRows';
 /** Settings → Data: what is saved and where, and clearing everything (with its own confirmation). The remembered Drawing choice is in the register of notices (Settings → Budget). */
 export function DataTab() {
   const confirmRef = useRef<HTMLButtonElement>(null);
-  const [confirmOpen, setConfirmOpen] = useState(false), keep = useStore((s) => s.settings.keepAttachments !== false);
+  const [confirmOpen, setConfirmOpen] = useState(false), keep = useStore((s) => s.settings.keepAttachments !== false), autoBrand = useStore((s) => s.settings.brandSyncMode !== 'manual');
   return <>
     <SetGroup icon={Images} title="Library">
       <SetRow icon={Paperclip} label="Keep attachments" tip="What you attach to a message also stays in Library, even if its session is deleted.">
         <Toggle checked={keep} onChange={(v) => setSettings({ keepAttachments: v })} label="Keep attachments in Library" />
+      </SetRow>
+      <SetRow icon={Images} label="Auto-sync brand changes" tip="Automatically update open designs when a brand kit logo, component or token changes. Turn off to update on demand.">
+        <Toggle checked={autoBrand} onChange={(v) => setSettings({ brandSyncMode: v ? 'auto' : 'manual' })} label="Auto-sync brand changes" />
       </SetRow>
     </SetGroup>
     <SetGroup icon={HardDrive} title="Storage"><DataSummary /></SetGroup>

@@ -18,6 +18,8 @@ export interface KitToken { type: KitTokenType; value: string | number; descript
 export type KitTokens = Record<string, KitToken>;
 /** A value taken from a token of an entry. It holds while the value is the one it gave (design/tokenBind.ts). */
 export interface TokenRef { kit: string; token: string; value: string | number; }
+/** A stable slot (image/logo) inside a Library kit that a Designer raster layer follows across versions (brandSync.ts). */
+export interface LibraryAssetRef { subjectId: string; nodeId: string; assetId: string; slug?: string; }
 export interface KitFont { id: string; family: string; weight: number; italic?: boolean; variable?: boolean; name: string; }
 export interface KitOrigin { space: LibrarySpace; sessionId?: string; sessionTitle?: string; by: KitActor; from?: string[]; at: number; }
 export interface KitVersionRef { id: string; at: number; by: KitActor; space: LibrarySpace; label?: string; assetIds: string[]; docRev?: string; groupIds?: string[]; }

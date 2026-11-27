@@ -48,6 +48,8 @@ function options(settings: ExportSettings, baseline: ExportSettings, patch: Patc
       node: <InlineToggle label="Minify" checked={!!svg.minify} onChange={(minify) => patch({ svg: { ...svg, minify } })} /> },
     { key: 'title', label: 'Include title', group: 'SVG', applies: svgOut, changed: (svg.metadata !== false) !== (base.metadata !== false),
       node: <InlineToggle label="Include title" checked={svg.metadata !== false} onChange={(metadata) => patch({ svg: { ...svg, metadata } })} /> },
+    { key: 'link-brand', label: 'Link brand logos', group: 'SVG', applies: svgOut, changed: !!svg.linkBrandAssets !== !!base.linkBrandAssets,
+      node: <InlineToggle label="Link brand logos" tip="Write vigente/<logo>.png links for Inkscape and sync the local brand-exports folder" checked={!!svg.linkBrandAssets} onChange={(linkBrandAssets) => patch({ svg: { ...svg, linkBrandAssets } })} /> },
     { key: 'quality', label: 'Quality', group: 'JPG · WebP', applies: lossy, contextual: true, changed: level !== levelOf(baseline) || settings.maxKb !== baseline.maxKb, node: <>
       <InlineSelect label="Quality" value={level} options={[{ value: 'compress' as Level, label: 'Compress' }, { value: 'high' as Level, label: 'High' }, { value: 'limit' as Level, label: 'Limit size' }]}
         onChange={(l) => patch(l === 'limit' ? { maxKb: settings.maxKb ?? 500 } : { maxKb: undefined, quality: quality[l] })} />

@@ -34,6 +34,8 @@ export interface ShapeSpec extends ObjectMeta {
   strokeWidth: number;
   fillToken?: TokenRef;
   strokeToken?: TokenRef;
+  radiusToken?: TokenRef;
+  widthToken?: TokenRef;
   /** fill-opacity / stroke-opacity (0–1) as in SVG; absent = 1, so older documents are unchanged. */
   fillOpacity?: number;
   strokeOpacity?: number;

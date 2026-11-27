@@ -5,6 +5,7 @@ import { blobToDataUrl } from '../../lib/media';
 import { fxTarget } from '../fx/plan';
 import type { DesignDoc, Layer } from '../types';
 import { unionBox, type Box } from './doc';
+import { syncBrandExportFolder } from '../brandExportFolder';
 import { docToSvg, svgToPdf, xmlEscape, type SvgDeps } from './export';
 import { ExportError, exportError } from './exportErrors';
 import { checkRasterExport, drawExport, exportDoc, PREVIEW_MAX_SIDE, type RasterExport } from './exportRaster';
@@ -239,8 +240,12 @@ async function renderOutput(doc: DesignDoc, settings: ExportSettings, target: Ex
     if (format === 'pdf') for (const [k, f] of found) if (!canEmbedInPdf(f.woff)) { found.delete(k); missing.push(f.family); } else if (isSlanted(f.italic, f.woff)) deps.notice?.(`“${f.family}” has no italic file, so the PDF shows it upright. Text as paths keeps the slant.`);
     missing.forEach((family) => deps.notice?.(`“${family}” is a system font the app cannot read, so its text keeps the font name.`));
     const svg = selection || options.mask ? await maskedSvg(renderDoc, options, ratio, settings.svg?.metadata !== false) : await docToSvg(renderDoc, pdfDeps, options, {
-      ...settings.svg, text: settings.text ?? 'fonts', ...(format === 'pdf' ? { hidden: false, filters: false } : {}), fontFaces: format === 'svg' && live ? fontFaceCss(found.values()) : undefined,
+      ...settings.svg, text: settings.text ?? 'fonts', ...(format === 'pdf' ? { hidden: false, filters: false, linkBrandAssets: false } : {}), fontFaces: format === 'svg' && live ? fontFaceCss(found.values()) : undefined,
     });
+    if (format === 'svg' && settings.svg?.linkBrandAssets) {
+      const kitIds = [...new Set(renderDoc.layers.flatMap((l) => (l.type === 'raster' && l.libraryAsset ? [l.libraryAsset.subjectId] : [])))];
+      for (const id of kitIds) await syncBrandExportFolder(id).catch(() => deps.notice?.('Could not sync the local brand-exports/vigente folder.'));
+    }
     signal?.throwIfAborted();
     bytes = format === 'pdf' ? await svgToPdf(svg, options.width, options.height, page, settings.print,
       [...found.values()].map((f) => ({ family: f.family, weight: f.weight, italic: f.italic, sfnt: woffToSfnt(f.woff) }))) : new Blob([svg], { type: 'image/svg+xml' });
