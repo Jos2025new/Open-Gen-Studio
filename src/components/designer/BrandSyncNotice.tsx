@@ -77,7 +77,7 @@ export function BrandSyncNotice({ sessionId }: { sessionId: string }) {
           <Button size="sm" variant="primary" icon={RefreshCw} disabled={busy} onClick={() => void apply()}>
             Actualizar ahora
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => { setBrandSyncMode('auto'); void apply(); }}>
+          <Button size="sm" variant="ghost" onClick={() => setBrandSyncMode('auto')}>
             Automático
           </Button>
         </div>

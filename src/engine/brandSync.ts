@@ -1,5 +1,6 @@
 import { setDoc, setSettings, useStore } from '../store/store';
 import { brandSlotFile, brandSlug, linkedBrandHref, syncBrandExportFolder, type BrandExportFolderResult, type BrandSlotFile } from './brandExportFolder';
+import { componentChanged, diffDocForTokens, emptyDocPatch, mergeDocPatches, preserveLocalTextOverrides, recordLayerPatch, revertLayerSurgical, type DocRevertPatch } from './brandSyncDiff';
 import { assetCanvas, getDoc, placeAsset } from './design/actions';
 import * as D from './design/doc';
 import { liveGroups } from './design/groups';
@@ -7,9 +8,9 @@ import { record } from './design/history';
 import { cloneCanvas, deleteBuffers, ensureBuffers, rasterBufferIds, releaseBuffers, restoreBuffers, setBuffer, snapshotBuffers } from './design/raster';
 import { markTokenSyncDone, onAutoTokenSync, syncTokens } from './design/tokenBind';
 import { cloneComponentLayer } from './libraryInsert';
-import { isKit, type LibraryAssetRef, type TokenRef } from './libraryTypes';
+import { isKit, type LibraryAssetRef } from './libraryTypes';
 import { cleanupKeys, copyDocPixels, expectedRasterIds, readKitVersion } from './libraryVersions';
-import type { DesignDoc, GraphNode, Layer, LayerGroup, RasterLayer, Subject, TextLayer, VectorLayer, VectorShape } from './types';
+import type { DesignDoc, GraphNode, Layer, LayerGroup, RasterLayer, Subject } from './types';
 
 export { brandSlotFile, brandSlug, linkedBrandHref as linkedSvgHref, syncBrandExportFolder, type BrandExportFolderResult, type BrandSlotFile };
 
@@ -73,128 +74,12 @@ export interface BrandSyncNoticeState {
   canRevert: boolean;
 }
 
-interface LayerRevert { layerId: string; before: Layer; after: Layer }
-interface GroupRevert { groupId: string; beforeGroup: LayerGroup; beforeMembers: Layer[]; afterMemberIds: string[]; writtenBlobKeys: string[] }
-interface DocRevertPatch {
-  docId: string;
-  backgroundBefore?: { background: string | null; backgroundToken?: TokenRef };
-  backgroundAfter?: { background: string | null; backgroundToken?: TokenRef };
-  layers: Map<string, LayerRevert>;
-  groups: Map<string, GroupRevert>;
-}
 interface RevertPayload {
   sessionId: string;
   changedNames: string[];
   patches: Map<string, DocRevertPatch>;
   buffers: Map<string, HTMLCanvasElement>;
   libraryRef?: readonly Subject[];
-}
-
-const RASTER_SYNC_KEYS: ReadonlyArray<keyof RasterLayer> = ['width', 'height', 'pxWidth', 'pxHeight', 'rev', 'sourceAssetId', 'libraryAsset', 'widthToken'];
-const TEXT_SYNC_KEYS: ReadonlyArray<keyof TextLayer> = ['color', 'colorToken', 'colorOpacity', 'fontFamily', 'fontFamilyToken', 'fontSize', 'fontSizeToken'];
-const SHAPE_SYNC_KEYS: ReadonlyArray<keyof VectorShape> = ['fill', 'fillToken', 'fillOpacity', 'stroke', 'strokeToken', 'strokeOpacity', 'radius', 'rx', 'ry', 'radiusToken', 'w', 'widthToken', 'fillGradient', 'strokeGradient'];
-
-function sameVal(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
-  return JSON.stringify(a) === JSON.stringify(b);
-}
-
-function emptyDocPatch(docId: string): DocRevertPatch {
-  return { docId, layers: new Map(), groups: new Map() };
-}
-
-function recordLayerPatch(patch: DocRevertPatch, before: Layer, after: Layer): void {
-  const prev = patch.layers.get(before.id);
-  patch.layers.set(before.id, { layerId: before.id, before: prev ? prev.before : before, after });
-}
-
-function diffDocForTokens(prev: DesignDoc, next: DesignDoc): DocRevertPatch | null {
-  const patch = emptyDocPatch(prev.id);
-  let any = false;
-  if (prev.background !== next.background || !sameVal(prev.backgroundToken, next.backgroundToken)) {
-    patch.backgroundBefore = { background: prev.background, backgroundToken: prev.backgroundToken };
-    patch.backgroundAfter = { background: next.background, backgroundToken: next.backgroundToken };
-    any = true;
-  }
-  const prevById = new Map(prev.layers.map((l) => [l.id, l]));
-  for (const nextL of next.layers) {
-    const prevL = prevById.get(nextL.id);
-    if (prevL && prevL !== nextL) {
-      recordLayerPatch(patch, prevL, nextL);
-      any = true;
-    }
-  }
-  return any ? patch : null;
-}
-
-function revertFields<T extends object>(cur: T, before: T, after: T, keys: ReadonlyArray<keyof T>): T {
-  let out: T | null = null;
-  for (const k of keys) {
-    if (sameVal(before[k], after[k])) continue;
-    if (!out) out = { ...cur };
-    out[k] = before[k];
-  }
-  return out ?? cur;
-}
-
-function revertLayerSurgical(cur: Layer, before: Layer, after: Layer): Layer {
-  if (cur.type !== before.type || cur.type !== after.type) return cur;
-  if (cur.type === 'raster') return revertFields(cur, before as RasterLayer, after as RasterLayer, RASTER_SYNC_KEYS);
-  if (cur.type === 'text') return revertFields(cur, before as TextLayer, after as TextLayer, TEXT_SYNC_KEYS);
-  if (cur.type === 'vector') {
-    const bVec = before as VectorLayer, aVec = after as VectorLayer;
-    const bShapes = new Map(bVec.shapes.map((s) => [s.id, s]));
-    const aShapes = new Map(aVec.shapes.map((s) => [s.id, s]));
-    let shapesChanged = false;
-    const shapes = cur.shapes.map((s) => {
-      const bs = bShapes.get(s.id), as = aShapes.get(s.id);
-      if (!bs || !as || bs === as) return s;
-      const next = revertFields(s, bs, as, SHAPE_SYNC_KEYS);
-      if (next !== s) shapesChanged = true;
-      return next;
-    });
-    let strokesChanged = false;
-    let strokes = cur.strokes;
-    if (cur.strokes && bVec.strokes && aVec.strokes) {
-      const bSt = new Map(bVec.strokes.map((s) => [s.id, s]));
-      const aSt = new Map(aVec.strokes.map((s) => [s.id, s]));
-      strokes = cur.strokes.map((st) => {
-        const bs = bSt.get(st.id), as = aSt.get(st.id);
-        if (!bs || !as || bs === as) return st;
-        const next = revertFields(st, bs, as, ['color', 'colorToken', 'opacity']);
-        if (next !== st) strokesChanged = true;
-        return next;
-      });
-    }
-    return shapesChanged || strokesChanged ? { ...cur, shapes, ...(strokes ? { strokes } : {}) } : cur;
-  }
-  return cur;
-}
-
-function mergeDocPatches(base: DocRevertPatch, extra: DocRevertPatch): DocRevertPatch {
-  const out: DocRevertPatch = {
-    docId: base.docId,
-    backgroundBefore: base.backgroundBefore ?? extra.backgroundBefore,
-    backgroundAfter: extra.backgroundAfter ?? base.backgroundAfter,
-    layers: new Map(base.layers),
-    groups: new Map(base.groups),
-  };
-  for (const [id, lr] of extra.layers) {
-    const prev = out.layers.get(id);
-    out.layers.set(id, prev ? { layerId: id, before: prev.before, after: lr.after } : lr);
-  }
-  for (const [gid, gr] of extra.groups) {
-    const prev = out.groups.get(gid);
-    out.groups.set(gid, prev ? {
-      groupId: gid,
-      beforeGroup: prev.beforeGroup,
-      beforeMembers: prev.beforeMembers,
-      afterMemberIds: gr.afterMemberIds,
-      writtenBlobKeys: [...prev.writtenBlobKeys, ...gr.writtenBlobKeys],
-    } : gr);
-  }
-  return out;
 }
 
 function formatSummary(changedNames: string[]): string {
@@ -303,96 +188,70 @@ export function setBrandSyncMode(mode: 'auto' | 'manual'): void {
   if (mode === 'manual' && currentNotice) dismissBrandSyncNotice();
 }
 
-function componentChanged(prevDoc: DesignDoc | undefined, nextDoc: DesignDoc, pieceId: string): boolean {
-  if (!prevDoc) return true;
-  const prevGroup = (prevDoc.groups ?? []).find((x) => x.id === pieceId);
-  const nextGroup = (nextDoc.groups ?? []).find((x) => x.id === pieceId);
-  if (!prevGroup || !nextGroup) return true;
-  const prevLayers = prevDoc.layers.filter((l) => l.groupId === pieceId);
-  const nextLayers = nextDoc.layers.filter((l) => l.groupId === pieceId);
-  const normGroup = (g: LayerGroup) => ({ name: g.name, keptHidden: g.keptHidden, keptLocked: g.keptLocked });
-  return JSON.stringify(normGroup(prevGroup)) !== JSON.stringify(normGroup(nextGroup)) || JSON.stringify(prevLayers) !== JSON.stringify(nextLayers);
-}
-
 export interface BrandSyncResult { docsUpdated: number; logosUpdated: number; componentsUpdated: number; tokensUpdated: number; summary: string }
+
+let syncInFlight = false;
+let syncQueued = false;
 
 /** Propagates updated linked logos, component instances and (optionally) tokens from Library kits to designs in a session. */
 export async function syncBrandInSession(
   sessionId: string,
   opts: { docId?: string; includeTokens?: boolean; recordNotice?: boolean; mergeLibrary?: readonly Subject[] } = {},
 ): Promise<BrandSyncResult> {
-  const st = useStore.getState(), session = st.sessions[sessionId];
-  if (!session) return { docsUpdated: 0, logosUpdated: 0, componentsUpdated: 0, tokensUpdated: 0, summary: '' };
-  const targetDocs = opts.docId ? session.docs.filter((d) => d.id === opts.docId) : session.docs;
+  const st0 = useStore.getState(), session0 = st0.sessions[sessionId];
+  if (!session0) return { docsUpdated: 0, logosUpdated: 0, componentsUpdated: 0, tokensUpdated: 0, summary: '' };
+  const targetDocIds = (opts.docId ? session0.docs.filter((d) => d.id === opts.docId) : session0.docs).map((d) => d.id);
   const patches = new Map<string, DocRevertPatch>();
   const revertBuffers = new Map<string, HTMLCanvasElement>();
   const replacedBufIds: string[] = [];
   const changedNames: string[] = [];
   let docsUpdated = 0, logosUpdated = 0, componentsUpdated = 0, tokensUpdated = 0;
 
-  for (const doc0 of targetDocs) {
-    let doc = doc0, touched = false, versionBumpedOnly = false;
-    const docPatch = emptyDocPatch(doc0.id);
+  for (const docId of targetDocIds) {
+    const stStart = useStore.getState();
+    const docSnap = getDoc(sessionId, docId);
+    if (!docSnap) continue;
 
-    if (opts.includeTokens) {
-      const tokChanged = new Set<string>();
-      const next = syncTokens(doc, st.library, { changed: tokChanged });
-      if (next !== doc) {
-        const tokPatch = diffDocForTokens(doc, next);
-        if (tokPatch) {
-          docPatch.backgroundBefore = tokPatch.backgroundBefore;
-          docPatch.backgroundAfter = tokPatch.backgroundAfter;
-          for (const [id, lr] of tokPatch.layers) docPatch.layers.set(id, lr);
-        }
-        doc = next; touched = true; tokensUpdated += tokChanged.size;
-        for (const t of tokChanged) changedNames.push(`token ${t}`);
-      }
-    }
-
-    // 1. Linked raster logos / images
-    const logoUpdates: Array<{ layer: RasterLayer; assetId: string; title: string; slug: string; filename: string }> = [];
-    for (const l of doc.layers) {
+    // Phase 1 (async): prepare logo canvases & component snapshots WITHOUT holding a stale doc snapshot for final write.
+    const preparedLogos: Array<{ layerId: string; subjectId: string; nodeId: string; expectedAssetId: string; nextAssetId: string; title: string; slug: string; filename: string; canvas: HTMLCanvasElement }> = [];
+    const logoCandidates: Array<{ layer: RasterLayer; assetId: string; title: string; slug: string; filename: string }> = [];
+    for (const l of docSnap.layers) {
       if (l.type !== 'raster' || !l.libraryAsset) continue;
-      const kit = st.library.find((s) => s.id === l.libraryAsset!.subjectId);
+      const kit = stStart.library.find((s) => s.id === l.libraryAsset!.subjectId);
       const slot = slotOf(kit, l.libraryAsset.nodeId);
       if (kit && slot && slot.assetId !== l.libraryAsset.assetId) {
-        const file = brandSlotFile(kit, l.libraryAsset.nodeId, st.assets, slot.title, slot.assetId);
-        logoUpdates.push({ layer: l, assetId: slot.assetId, title: slot.title, slug: file.slug, filename: file.filename });
+        const file = brandSlotFile(kit, l.libraryAsset.nodeId, stStart.assets, slot.title, slot.assetId);
+        logoCandidates.push({ layer: l, assetId: slot.assetId, title: slot.title, slug: file.slug, filename: file.filename });
       }
     }
-    if (logoUpdates.length) {
-      // Load and snapshot v1 buffers BEFORE overwriting with v2 so Revert restores real v1 pixels.
-      await ensureBuffers(logoUpdates.map((u) => u.layer));
-      for (const [id, c] of snapshotBuffers(logoUpdates.map((u) => u.layer.id))) {
+    if (logoCandidates.length) {
+      await ensureBuffers(logoCandidates.map((u) => u.layer));
+      for (const [id, c] of snapshotBuffers(logoCandidates.map((u) => u.layer.id))) {
         if (!revertBuffers.has(id)) revertBuffers.set(id, cloneCanvas(c));
       }
-      for (const u of logoUpdates) {
+      for (const u of logoCandidates) {
         const canvas = await assetCanvas(u.assetId).catch(() => null);
         if (!canvas) continue;
-        const beforeLayer = doc.layers.find((x) => x.id === u.layer.id) as RasterLayer | undefined;
-        if (!beforeLayer) continue;
-        const nextWidth = beforeLayer.width > 0 ? beforeLayer.width : canvas.width;
-        const nextHeight = canvas.width > 0 ? Math.max(1, Math.round((nextWidth * canvas.height) / canvas.width)) : beforeLayer.height;
-        setBuffer(beforeLayer.id, canvas);
-        doc = D.updateLayer(doc, beforeLayer.id, {
-          width: nextWidth, height: nextHeight, pxWidth: canvas.width, pxHeight: canvas.height,
-          rev: beforeLayer.rev + 1, sourceAssetId: u.assetId,
-          libraryAsset: { ...beforeLayer.libraryAsset!, assetId: u.assetId, slug: u.slug, filename: u.filename },
-        } as Partial<RasterLayer>);
-        const afterLayer = doc.layers.find((x) => x.id === beforeLayer.id);
-        if (afterLayer) recordLayerPatch(docPatch, beforeLayer, afterLayer);
-        touched = true; logosUpdated++; changedNames.push(`logo «${u.title}»`);
+        preparedLogos.push({
+          layerId: u.layer.id, subjectId: u.layer.libraryAsset!.subjectId, nodeId: u.layer.libraryAsset!.nodeId,
+          expectedAssetId: u.layer.libraryAsset!.assetId, nextAssetId: u.assetId, title: u.title, slug: u.slug, filename: u.filename, canvas,
+        });
       }
     }
 
-    // 2. Component group instances
-    const outdatedGroups = liveGroups(doc).filter((g) => {
+    type PreparedComp = {
+      groupId: string; expectedVersionId: string; nextVersionId: string; bumpOnly: boolean;
+      srcGroup?: LayerGroup; nextLayers?: Layer[]; idMap?: Map<string, string>; written: string[];
+      prevSrcLayers?: Layer[];
+    };
+    const preparedComps: PreparedComp[] = [];
+    const outdatedGroups = liveGroups(docSnap).filter((g) => {
       if (!g.from) return false;
-      const kit = st.library.find((s) => s.id === g.from!.subjectId);
+      const kit = stStart.library.find((s) => s.id === g.from!.subjectId);
       return Boolean(kit?.versionId && kit.versionId !== g.from.versionId && (!kit.groupIds || kit.groupIds.includes(g.from.pieceId)));
     });
     for (const g of outdatedGroups) {
-      const kit = st.library.find((s) => s.id === g.from!.subjectId);
+      const kit = stStart.library.find((s) => s.id === g.from!.subjectId);
       if (!kit?.versionId) continue;
       const snap = await readKitVersion(kit.versionId).catch(() => null);
       if (!snap?.doc) continue;
@@ -402,14 +261,12 @@ export async function syncBrandInSession(
 
       const prevSnap = g.from!.versionId ? await readKitVersion(g.from!.versionId).catch(() => null) : null;
       if (!componentChanged(prevSnap?.doc, snap.doc, g.from!.pieceId)) {
-        // Component itself did not change (e.g. only a token was saved on the kit): bump versionId without clobbering local edits.
-        doc = { ...doc, groups: liveGroups(doc).map((x) => (x.id === g.id ? { ...x, from: { ...x.from!, versionId: kit.versionId! } } : x)) };
-        versionBumpedOnly = true;
+        preparedComps.push({ groupId: g.id, expectedVersionId: g.from!.versionId, nextVersionId: kit.versionId, bumpOnly: true, written: [] });
         continue;
       }
 
-      const curMembers = doc.layers.filter((l) => l.groupId === g.id);
-      const curBox = D.unionBox(curMembers.map(D.approxLayerBox).filter((b): b is D.Box => b != null));
+      const liveNow = getDoc(sessionId, docId);
+      const curMembers = liveNow ? liveNow.layers.filter((l) => l.groupId === g.id) : [];
       const written: string[] = [];
       try {
         await ensureBuffers(curMembers);
@@ -419,41 +276,103 @@ export async function syncBrandInSession(
         }
         const copied = await copyDocPixels({ ...snap.doc, layers: srcLayers }, null, expectedRasterIds(snap), written);
         const idMap = new Map<string, string>();
-        let nextLayers = srcLayers.map((l) => { const n = cloneComponentLayer(l, g.id, copied.map); idMap.set(l.id, n.id); return n; });
-        const srcBox = D.unionBox(nextLayers.map(D.approxLayerBox).filter((b): b is D.Box => b != null));
-        if (curBox && srcBox) nextLayers = nextLayers.map((l) => D.translateLayer(l, curBox.x - srcBox.x, curBox.y - srcBox.y));
-        // Reapply tokens on the newly cloned component layers so the target doc's tokenMode is respected.
-        nextLayers = syncTokens({ ...doc, layers: nextLayers }, st.library).layers;
-        const firstIdx = doc.layers.findIndex((l) => l.groupId === g.id);
-        const kept = doc.layers.filter((l) => l.groupId !== g.id);
-        const at = firstIdx >= 0 ? Math.min(firstIdx, kept.length) : kept.length;
-        kept.splice(at, 0, ...nextLayers);
-        const updatedGroup: LayerGroup = {
-          ...g, name: srcGroup.name, from: { ...g.from!, versionId: kit.versionId },
-          ...(srcGroup.keptHidden ? { keptHidden: srcGroup.keptHidden.map((id) => idMap.get(id) ?? id) } : { keptHidden: undefined }),
-          ...(srcGroup.keptLocked ? { keptLocked: srcGroup.keptLocked.map((id) => idMap.get(id) ?? id) } : { keptLocked: undefined }),
-        };
-        doc = { ...doc, updatedAt: Date.now(), layers: kept, groups: liveGroups(doc).map((x) => (x.id === g.id ? updatedGroup : x)) };
-        docPatch.groups.set(g.id, {
-          groupId: g.id,
-          beforeGroup: g,
-          beforeMembers: curMembers,
-          afterMemberIds: nextLayers.map((l) => l.id),
-          writtenBlobKeys: [...written],
+        const nextLayers = srcLayers.map((l) => { const n = cloneComponentLayer(l, g.id, copied.map); idMap.set(l.id, n.id); return n; });
+        const prevSrcLayers = prevSnap?.doc?.layers.filter((l) => l.groupId === g.from!.pieceId) ?? [];
+        preparedComps.push({
+          groupId: g.id, expectedVersionId: g.from!.versionId, nextVersionId: kit.versionId, bumpOnly: false,
+          srcGroup, nextLayers, idMap, written, prevSrcLayers,
         });
-        replacedBufIds.push(...curBufIds);
-        touched = true; componentsUpdated++; changedNames.push(`componente «${srcGroup.name}»`);
       } catch {
         await cleanupKeys(written);
       }
     }
 
-    if (touched) {
-      patches.set(doc0.id, docPatch);
-      setDoc(sessionId, doc0.id, () => doc);
+    // Phase 2 (synchronous atomic commit onto the LATEST live doc so concurrent user edits are never lost).
+    let docTouched = false;
+    const docPatch = emptyDocPatch(docId);
+    const unusedWritten: string[] = [];
+    setDoc(sessionId, docId, (liveDoc) => {
+      const liveLib = useStore.getState().library;
+      let doc = liveDoc, touched = false, bumped = false;
+
+      if (opts.includeTokens) {
+        const tokChanged = new Set<string>();
+        const next = syncTokens(doc, liveLib, { changed: tokChanged });
+        if (next !== doc) {
+          const tokPatch = diffDocForTokens(doc, next);
+          if (tokPatch) {
+            docPatch.backgroundBefore = tokPatch.backgroundBefore;
+            docPatch.backgroundAfter = tokPatch.backgroundAfter;
+            for (const [id, lr] of tokPatch.layers) docPatch.layers.set(id, lr);
+          }
+          doc = next; touched = true; tokensUpdated += tokChanged.size;
+          for (const t of tokChanged) changedNames.push(`token ${t}`);
+        }
+      }
+
+      for (const u of preparedLogos) {
+        const curLayer = doc.layers.find((x) => x.id === u.layerId);
+        if (!curLayer || curLayer.type !== 'raster' || !curLayer.libraryAsset) continue;
+        if (curLayer.libraryAsset.subjectId !== u.subjectId || curLayer.libraryAsset.nodeId !== u.nodeId || curLayer.libraryAsset.assetId !== u.expectedAssetId) continue;
+        const nextWidth = curLayer.width > 0 ? curLayer.width : u.canvas.width;
+        const nextHeight = u.canvas.width > 0 ? Math.max(1, Math.round((nextWidth * u.canvas.height) / u.canvas.width)) : curLayer.height;
+        setBuffer(curLayer.id, u.canvas);
+        doc = D.updateLayer(doc, curLayer.id, {
+          width: nextWidth, height: nextHeight, pxWidth: u.canvas.width, pxHeight: u.canvas.height,
+          rev: curLayer.rev + 1, sourceAssetId: u.nextAssetId,
+          libraryAsset: { ...curLayer.libraryAsset, assetId: u.nextAssetId, slug: u.slug, filename: u.filename },
+        } as Partial<RasterLayer>);
+        const afterLayer = doc.layers.find((x) => x.id === curLayer.id);
+        if (afterLayer) recordLayerPatch(docPatch, curLayer, afterLayer);
+        touched = true; logosUpdated++; changedNames.push(`logo «${u.title}»`);
+      }
+
+      for (const c of preparedComps) {
+        const curGroup = liveGroups(doc).find((x) => x.id === c.groupId);
+        if (!curGroup?.from || curGroup.from.versionId !== c.expectedVersionId) {
+          unusedWritten.push(...c.written);
+          continue;
+        }
+        if (c.bumpOnly) {
+          doc = { ...doc, groups: liveGroups(doc).map((x) => (x.id === curGroup.id ? { ...x, from: { ...x.from!, versionId: c.nextVersionId } } : x)) };
+          bumped = true;
+          continue;
+        }
+        const curMembers = doc.layers.filter((l) => l.groupId === curGroup.id);
+        const curBox = D.unionBox(curMembers.map(D.approxLayerBox).filter((b): b is D.Box => b != null));
+        let nextLayers = preserveLocalTextOverrides(curMembers, c.prevSrcLayers ?? [], c.nextLayers!);
+        const srcBox = D.unionBox(nextLayers.map(D.approxLayerBox).filter((b): b is D.Box => b != null));
+        if (curBox && srcBox) nextLayers = nextLayers.map((l) => D.translateLayer(l, curBox.x - srcBox.x, curBox.y - srcBox.y));
+        nextLayers = syncTokens({ ...doc, layers: nextLayers }, liveLib).layers;
+        const firstIdx = doc.layers.findIndex((l) => l.groupId === curGroup.id);
+        const kept = doc.layers.filter((l) => l.groupId !== curGroup.id);
+        const at = firstIdx >= 0 ? Math.min(firstIdx, kept.length) : kept.length;
+        kept.splice(at, 0, ...nextLayers);
+        const updatedGroup: LayerGroup = {
+          ...curGroup, name: c.srcGroup!.name, from: { ...curGroup.from, versionId: c.nextVersionId },
+          ...(c.srcGroup!.keptHidden ? { keptHidden: c.srcGroup!.keptHidden.map((id) => c.idMap!.get(id) ?? id) } : { keptHidden: undefined }),
+          ...(c.srcGroup!.keptLocked ? { keptLocked: c.srcGroup!.keptLocked.map((id) => c.idMap!.get(id) ?? id) } : { keptLocked: undefined }),
+        };
+        doc = { ...doc, updatedAt: Date.now(), layers: kept, groups: liveGroups(doc).map((x) => (x.id === curGroup.id ? updatedGroup : x)) };
+        docPatch.groups.set(curGroup.id, {
+          groupId: curGroup.id,
+          beforeGroup: curGroup,
+          beforeMembers: curMembers,
+          afterMemberIds: nextLayers.map((l) => l.id),
+          writtenBlobKeys: [...c.written],
+        });
+        replacedBufIds.push(...rasterBufferIds(curMembers));
+        touched = true; componentsUpdated++; changedNames.push(`componente «${c.srcGroup!.name}»`);
+      }
+
+      if (touched) docTouched = true;
+      return touched || bumped ? doc : liveDoc;
+    });
+
+    if (unusedWritten.length) await cleanupKeys(unusedWritten);
+    if (docTouched) {
+      patches.set(docId, docPatch);
       docsUpdated++;
-    } else if (versionBumpedOnly) {
-      setDoc(sessionId, doc0.id, () => doc);
     }
   }
 
@@ -476,9 +395,6 @@ export async function syncBrandInSession(
 
 /** Installs automatic brand propagation (linked logos, components and token-sync corner notices). */
 export function installBrandSync(): () => void {
-  let running = false;
-  let queued = false;
-
   const trigger = (mergeLibrary?: readonly Subject[]) => {
     const st = useStore.getState();
     if (st.settings.brandSyncMode === 'manual') return;
@@ -486,13 +402,13 @@ export function installBrandSync(): () => void {
     if (!sessionId) return;
     const pending = pendingBrandUpdates(sessionId, st);
     if (!pending.logos && !pending.components) return;
-    if (running) { queued = true; return; }
-    running = true;
-    queued = false;
+    if (syncInFlight) { syncQueued = true; return; }
+    syncInFlight = true;
+    syncQueued = false;
     void syncBrandInSession(sessionId, { includeTokens: false, recordNotice: true, mergeLibrary }).finally(() => {
-      running = false;
-      if (queued) {
-        queued = false;
+      syncInFlight = false;
+      if (syncQueued) {
+        syncQueued = false;
         trigger(useStore.getState().library);
       }
     });

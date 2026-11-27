@@ -7,7 +7,7 @@ import * as A from './actions';
 import { docCommand, docOf, hasTarget, layerOf, layerRef } from './commandKit';
 import { getBuffer } from './raster';
 import { BLEND_MODES } from './render';
-import { writtenStyle } from './tokenBind';
+import { tokenProblem, writtenStyle } from './tokenBind';
 
 /* The Designer's layers as commands (ADR 0030). Each wraps the action the interface already calls. */
 
@@ -69,6 +69,8 @@ export const commands = [
     run: (on, args) => {
       const errors: string[] = [];
       const doc = A.getDoc(on.session, on.doc);
+      const tokErr = tokenProblem(args.shapes, doc?.library?.subjectId);
+      if (tokErr) throw new Error(tokErr);
       const shapes = normalizeShapes(args.shapes, errors, 'shapes', doc?.library?.subjectId, doc?.tokenMode);
       if (errors.length || !shapes.length) throw new Error(errors.join(' ') || 'No valid shape.');
       return made(A.addVectorLayer(on.session, on.doc, shapes, args.name), 'The shapes could not be added.');

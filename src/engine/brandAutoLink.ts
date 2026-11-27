@@ -19,10 +19,11 @@ export interface BrandLinkSummary {
   widths: number;
   logos: number;
   total: number;
+  ambiguous: string[];
 }
 
 const EMPTY_SUMMARY = (kitId = '', kitName = ''): BrandLinkSummary => ({
-  kitId, kitName, colors: 0, fonts: 0, sizes: 0, radii: 0, widths: 0, logos: 0, total: 0,
+  kitId, kitName, colors: 0, fonts: 0, sizes: 0, radii: 0, widths: 0, logos: 0, total: 0, ambiguous: [],
 });
 
 function colorKey(hex: string, opacity?: number): string {
@@ -63,7 +64,13 @@ function buildLookup(kit: Subject, doc: DesignDoc, st = useStore.getState()) {
   register(tokenChoices('dimension', mode, own, fakeSt), 'dim');
 
   const slotByAsset = new Map<string, LibraryAssetRef>();
-  const slotBySlug = new Map<string, LibraryAssetRef>();
+  const slotBySlug = new Map<string, LibraryAssetRef | 'ambiguous'>();
+  const registerSlug = (slug: string, ref: LibraryAssetRef) => {
+    if (!slug) return;
+    const prev = slotBySlug.get(slug);
+    if (!prev) slotBySlug.set(slug, ref);
+    else if (prev !== 'ambiguous' && (prev.subjectId !== ref.subjectId || prev.nodeId !== ref.nodeId)) slotBySlug.set(slug, 'ambiguous');
+  };
   for (const k of kits) {
     for (const n of k.graph?.nodes ?? []) {
       if (n.data.kind !== 'asset' || !n.data.assetId) continue;
@@ -76,12 +83,15 @@ function buildLookup(kit: Subject, doc: DesignDoc, st = useStore.getState()) {
         filename: slot.filename,
       };
       if (!slotByAsset.has(n.data.assetId)) slotByAsset.set(n.data.assetId, ref);
-      const titleSlug = brandSlug(n.data.title || '', '');
-      if (titleSlug && !slotBySlug.has(titleSlug)) slotBySlug.set(titleSlug, ref);
-      const assetName = st.assets[n.data.assetId]?.name?.replace(/\.[a-z0-9]+$/i, '') ?? '';
-      const assetSlug = assetName ? brandSlug(assetName, '') : '';
-      if (assetSlug && !slotBySlug.has(assetSlug)) slotBySlug.set(assetSlug, ref);
-      if (ref.slug && !slotBySlug.has(ref.slug)) slotBySlug.set(ref.slug, ref);
+      const sec = (n.data.section || '').trim().toLowerCase();
+      // Name-based matching is restricted to Logos/Icons slots so random Photos never hijack an imported logo layer.
+      if (sec === 'logos' || sec === 'icons') {
+        const titleSlug = brandSlug((n.data.title || '').replace(/\.[a-z0-9]+$/i, ''), '');
+        registerSlug(titleSlug, ref);
+        const assetName = st.assets[n.data.assetId]?.name?.replace(/\.[a-z0-9]+$/i, '') ?? '';
+        const assetSlug = assetName ? brandSlug(assetName, '') : '';
+        if (assetSlug && assetSlug !== titleSlug) registerSlug(assetSlug, ref);
+      }
     }
   }
   return { byColor, byOpaqueColor, byFont, byDim, slotByAsset, slotBySlug };
@@ -95,7 +105,8 @@ function matchDim(map: ReadonlyMap<number, TokenRef>, value: number | undefined)
 function matchColor(map: ReadonlyMap<string, TokenRef>, hex: string | null | undefined, opacity?: number): TokenRef | undefined {
   if (!hex) return undefined;
   const full = colorKey(hex, opacity);
-  return map.get(full) ?? (full.length === 9 ? undefined : map.get(hex.trim().toLowerCase()));
+  // Never fall back from a semi-transparent color ("#rrggbb|<pct>") to an opaque token.
+  return map.get(full) ?? (full.includes('|') ? undefined : map.get(hex.trim().toLowerCase()));
 }
 
 function applyAutoLink(doc: DesignDoc, kit: Subject, st = useStore.getState()): { doc: DesignDoc; summary: BrandLinkSummary } {
@@ -125,8 +136,14 @@ function applyAutoLink(doc: DesignDoc, kit: Subject, st = useStore.getState()): 
       let next: RasterLayer = l;
       if (!next.libraryAsset) {
         const byAsset = next.sourceAssetId ? slotByAsset.get(next.sourceAssetId) : undefined;
-        const nameSlug = brandSlug(next.name.replace(/\.[a-z0-9]+$/i, ''), '');
-        const matched = byAsset ?? (nameSlug ? slotBySlug.get(nameSlug) : undefined);
+        // If the layer has a known sourceAssetId that does NOT belong to the kit, never hijack it by filename match.
+        let matched: LibraryAssetRef | undefined = byAsset;
+        if (!matched && !next.sourceAssetId) {
+          const nameSlug = brandSlug(next.name.replace(/\.[a-z0-9]+$/i, ''), '');
+          const candidate = nameSlug ? slotBySlug.get(nameSlug) : undefined;
+          if (candidate === 'ambiguous') summary.ambiguous.push(next.name);
+          else matched = candidate;
+        }
         if (matched) { next = { ...next, libraryAsset: matched }; summary.logos++; changed = true; }
       }
       if (!tokenOf(next, 'width')) {

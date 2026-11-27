@@ -216,7 +216,7 @@ describe('brandSync regressions (bugs 1, 2, 3, 5, 6, 7, 8)', () => {
 
     expect(f1.filename).toBe('logo.png');
     expect(f2.filename).toMatch(/^logo-[a-z0-9]{1,4}\.svg$/);
-    expect(f3.filename.endsWith('.webp')).toBe(true);
+    expect(f3.filename.endsWith('.png')).toBe(true);
     expect(f3.filename.length).toBeLessThanOrEqual(80);
 
     // placeLinkedAsset, linkedSvgHref and docToSvg all agree with brandSlotFile!
@@ -348,7 +348,8 @@ describe('brandSync regressions (bugs 1, 2, 3, 5, 6, 7, 8)', () => {
     const rReal = await syncBrandInSession(sid, { docId: target.id });
     expect(rReal.componentsUpdated).toBe(1);
     const afterDoc = getDoc(sid, target.id)!;
-    expect((afterDoc.layers.find((l) => l.type === 'text') as TextLayer).text).toBe('v3 real');
+    // Local text override ('Local custom') is preserved across component sync while v3 structural/token updates apply!
+    expect((afterDoc.layers.find((l) => l.type === 'text') as TextLayer).text).toBe('Local custom');
     expect((afterDoc.layers.find((l) => l.type === 'vector') as VectorLayer).shapes[0].fill).toBe('#112233');
     // Old raster buffer was freed!
     releaseBuffers(afterDoc.layers.filter((l) => l.type === 'raster').map((l) => l.id), [oldRasterId]);

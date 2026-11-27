@@ -115,12 +115,18 @@ export async function uploadFiles(files: File[]): Promise<string[]> {
   const st = get();
   const sessionId = st.activeSessionId;
   const out: Asset[] = [];
+  const inferMime = (file: File): string => {
+    if (file.type) return file.type;
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    return ext === 'png' ? 'image/png' : ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'webp' ? 'image/webp' : ext === 'gif' ? 'image/gif' : '';
+  };
   for (const given of files) {
     // SVG, HEIC and EPS become a PNG here, whichever way they came in.
     const f = await prepareImportFile(given);
     if (typeof f === 'string') { toast(`${given.name}: ${f}`, 'error'); continue; }
     const is3d = /\.glb$/i.test(f.name);
-    if (!is3d && !AUDIO_MIME.test(f.type) && !/^image\/(png|jpeg|webp|gif)$|^video\/(mp4|webm|quicktime)$/.test(f.type)) {
+    const mime = is3d ? GLB_MIME : inferMime(f);
+    if (!is3d && !AUDIO_MIME.test(mime) && !/^image\/(png|jpeg|webp|gif)$|^video\/(mp4|webm|quicktime)$/.test(mime)) {
       toast(`${f.name}: unsupported file type`, 'error');
       continue;
     }
@@ -130,20 +136,22 @@ export async function uploadFiles(files: File[]): Promise<string[]> {
     }
     try {
       if (is3d) await validateGlb(f);
-      const info = is3d ? { width: 0, height: 0, duration: undefined } : await probeMedia(f);
+      const blob = is3d ? new Blob([f], { type: GLB_MIME }) : f.type ? f : new Blob([f], { type: mime });
+      const info = is3d ? { width: 0, height: 0, duration: undefined } : await probeMedia(blob);
       const id = uid('ast');
-      await putAssetBlob(id, is3d ? new Blob([f], { type: GLB_MIME }) : f);
+      await putAssetBlob(id, blob);
       out.push({
         id,
-        kind: is3d ? 'model3d' : f.type.startsWith('video/') ? 'video' : f.type.startsWith('audio/') ? 'audio' : 'image',
-        mime: is3d ? GLB_MIME : f.type,
+        name: given.name || f.name,
+        kind: is3d ? 'model3d' : mime.startsWith('video/') ? 'video' : mime.startsWith('audio/') ? 'audio' : 'image',
+        mime,
         width: info.width,
         height: info.height,
         duration: info.duration,
         sessionId,
         origin: 'upload',
         place: placeFor(st.ui, st.ui.workspace),
-        mode: is3d ? 'model3d' : f.type.startsWith('video/') ? 'video' : f.type.startsWith('audio/') ? 'audio' : 'image',
+        mode: is3d ? 'model3d' : mime.startsWith('video/') ? 'video' : mime.startsWith('audio/') ? 'audio' : 'image',
         stored: true,
         favorite: false,
         createdAt: Date.now(),

@@ -1,5 +1,5 @@
 import { getAssetBlob } from '../lib/idb';
-import { blobToDataUrl } from '../lib/media';
+import { blobToCanvas, blobToDataUrl, canvasToBlob } from '../lib/media';
 import { useStore } from '../store/store';
 import { tokensToFile } from './libraryTokensFile';
 import { isKit } from './libraryTypes';
@@ -7,53 +7,53 @@ import type { Asset, GraphNode, RasterLayer, Subject } from './types';
 
 /* Leaf module for Inkscape vigente/ brand-folder export (no imports from design/ to keep engine acyclic). */
 
-export function brandSlug(raw: string, fallback = 'asset', maxLen = 64): string {
-  const norm = (v: string) => v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-  const base = norm(raw) || norm(fallback) || 'asset';
-  return base.slice(0, maxLen).replace(/-+$/g, '') || 'asset';
+const MAX_KIT_SLUG = 64;
+const MAX_FILENAME = 80;
+
+export function brandSlug(raw: string, fallback = 'asset', maxLen = MAX_KIT_SLUG): string {
+  const s = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  const base = (s || fallback).slice(0, maxLen).replace(/-+$/g, '');
+  return base || fallback.slice(0, maxLen) || 'asset';
 }
 
-function brandAssetExt(mime?: string, name?: string): 'png' | 'jpg' | 'webp' | 'svg' {
-  const m = (mime ?? '').toLowerCase().split(';')[0].trim();
-  if (m === 'image/svg+xml') return 'svg';
-  if (m === 'image/jpeg' || m === 'image/jpg') return 'jpg';
-  if (m === 'image/webp') return 'webp';
-  if (m === 'image/png') return 'png';
-  const ext = (name ?? '').toLowerCase().match(/\.([a-z0-9]+)$/)?.[1];
-  if (ext === 'svg') return 'svg';
-  if (ext === 'jpg' || ext === 'jpeg') return 'jpg';
-  if (ext === 'webp') return 'webp';
+/** Stable extension: all raster images normalize to .png so replacing PNG↔JPG never breaks existing SVGs; SVG stays .svg. */
+export function brandAssetExt(mime?: string, name?: string): string {
+  const m = (mime || '').toLowerCase().split(';')[0].trim();
+  if (m === 'image/svg+xml' || /\.svg$/i.test(name || '')) return 'svg';
   return 'png';
 }
 
-export interface BrandSlotFile { slug: string; filename: string; ext: 'png' | 'jpg' | 'webp' | 'svg' }
+/** Unique directory slug for a kit: appends a 4-char id suffix when another kit shares the same normalized name. */
+export function kitExportSlug(kit: Pick<Subject, 'id' | 'name'>, library: readonly Subject[] = useStore.getState().library): string {
+  const base = brandSlug(kit.name, kit.id, MAX_KIT_SLUG);
+  const collides = library.some((s) => s.id !== kit.id && isKit(s) && brandSlug(s.name, s.id, MAX_KIT_SLUG) === base);
+  if (!collides) return base;
+  const suffix = `-${kit.id.replace(/[^a-z0-9]/gi, '').slice(-4).toLowerCase() || 'kit'}`;
+  return `${base.slice(0, MAX_KIT_SLUG - suffix.length).replace(/-+$/g, '')}${suffix}`;
+}
 
-/** Deterministic disambiguated slug and filename (≤80 chars) per image slot in a Brand Kit. */
-function brandSlotFiles(
-  kit: Pick<Subject, 'graph'> | undefined,
-  assets: Record<string, Pick<Asset, 'mime' | 'name'>> = useStore.getState().assets,
-): Map<string, BrandSlotFile> {
+export interface BrandSlotFile { slug: string; filename: string; ext: string }
+
+/** Deterministic slot -> { slug, filename } map for a Brand Kit, shared by placeLinkedAsset, SVG export and disk sync. */
+function brandSlotFiles(kit: Pick<Subject, 'graph'> | undefined, assets: Record<string, Pick<Asset, 'mime' | 'name'>>): Map<string, BrandSlotFile> {
   const out = new Map<string, BrandSlotFile>();
-  const slots = (kit?.graph?.nodes ?? []).filter(
-    (n): n is GraphNode & { data: { kind: 'asset'; assetId: string; title: string; section?: string } } =>
-      n.data.kind === 'asset' && Boolean(n.data.assetId),
-  );
+  if (!kit?.graph?.nodes?.length) return out;
   const used = new Set<string>();
-  for (let i = 0; i < slots.length; i++) {
-    const n = slots[i];
+  for (const n of kit.graph.nodes) {
+    if (n.data.kind !== 'asset' || !n.data.assetId) continue;
     const asset = assets[n.data.assetId];
     const ext = brandAssetExt(asset?.mime, asset?.name);
-    const maxSlug = Math.min(64, 80 - 1 - ext.length);
-    let slug = brandSlug(n.data.title || n.id, n.id, maxSlug);
+    const maxSlug = Math.min(MAX_KIT_SLUG, MAX_FILENAME - 1 - ext.length);
+    const rawTitle = (n.data.title || '').replace(/\.[a-z0-9]+$/i, '');
+    let slug = brandSlug(rawTitle || n.id, n.id, maxSlug);
     if (used.has(slug)) {
-      const idTail = brandSlug(n.id, `${i + 1}`, 12).slice(-4) || `${i + 1}`;
-      let candidate = `${slug.slice(0, Math.max(1, maxSlug - idTail.length - 1)).replace(/-+$/g, '') || 'asset'}-${idTail}`;
-      let seq = 2;
-      while (used.has(candidate)) {
-        const suffix = `-${idTail}-${seq++}`;
-        candidate = `${slug.slice(0, Math.max(1, maxSlug - suffix.length)).replace(/-+$/g, '') || 'asset'}${suffix}`;
+      const suffix = `-${n.id.replace(/[^a-z0-9]/gi, '').slice(-4).toLowerCase() || 'dup'}`;
+      slug = `${slug.slice(0, Math.max(1, maxSlug - suffix.length)).replace(/-+$/g, '')}${suffix}`;
+      let i = 2;
+      while (used.has(slug)) {
+        const alt = `-${i++}`;
+        slug = `${slug.slice(0, Math.max(1, maxSlug - alt.length)).replace(/-+$/g, '')}${alt}`;
       }
-      slug = candidate;
     }
     used.add(slug);
     out.set(n.id, { slug, filename: `${slug}.${ext}`, ext });
@@ -73,28 +73,41 @@ export function brandSlotFile(
   if (found) return found;
   const asset = fallbackAssetId ? assets[fallbackAssetId] : undefined;
   const ext = brandAssetExt(asset?.mime, asset?.name);
-  const maxSlug = Math.min(64, 80 - 1 - ext.length);
-  const slug = brandSlug(fallbackTitle || nodeId, nodeId, maxSlug);
+  const maxSlug = Math.min(MAX_KIT_SLUG, MAX_FILENAME - 1 - ext.length);
+  const slug = brandSlug((fallbackTitle || nodeId).replace(/\.[a-z0-9]+$/i, ''), nodeId, maxSlug);
   return { slug, filename: `${slug}.${ext}`, ext };
 }
 
-/** Stable relative SVG href ("vigente/<filename>") for a raster layer linked to a Brand Kit slot. */
+/** Stable relative SVG href ("vigente/<filename>" or "<kitDir>/vigente/<filename>" for multi-kit SVGs). */
 export function linkedBrandHref(
   layer: Pick<RasterLayer, 'libraryAsset' | 'name'>,
   library: readonly Subject[] = useStore.getState().library,
   assets: Record<string, Pick<Asset, 'mime' | 'name'>> = useStore.getState().assets,
+  multiKit = false,
 ): string | null {
   const ref = layer.libraryAsset;
   if (!ref) return null;
   const kit = library.find((s) => s.id === ref.subjectId);
-  const fromKit = brandSlotFiles(kit, assets).get(ref.nodeId);
-  if (fromKit) return `vigente/${fromKit.filename}`;
-  if (ref.filename) return `vigente/${ref.filename}`;
-  const asset = assets[ref.assetId];
-  const ext = brandAssetExt(asset?.mime, asset?.name);
-  const maxSlug = Math.min(64, 80 - 1 - ext.length);
+  const prefix = multiKit && kit ? `${kitExportSlug(kit, library)}/vigente/` : 'vigente/';
+  if (kit) {
+    const found = brandSlotFiles(kit, assets).get(ref.nodeId);
+    if (found) return `${prefix}${found.filename}`;
+  }
+  if (ref.filename) return `${prefix}${ref.filename}`;
+  const fallbackExt = brandAssetExt(assets[ref.assetId]?.mime, assets[ref.assetId]?.name);
+  const maxSlug = Math.min(MAX_KIT_SLUG, MAX_FILENAME - 1 - fallbackExt.length);
   const slug = brandSlug(ref.slug || layer.name || ref.nodeId, ref.nodeId, maxSlug);
-  return `vigente/${slug}.${ext}`;
+  return `${prefix}${slug}.${fallbackExt}`;
+}
+
+async function normalizeExportBlob(blob: Blob, ext: string): Promise<Blob> {
+  if (ext === 'svg' || blob.type === 'image/png') return blob;
+  try {
+    const canvas = await blobToCanvas(blob);
+    return await canvasToBlob(canvas, 'image/png');
+  } catch {
+    return blob;
+  }
 }
 
 export interface BrandExportFolderResult { dir: string; vigentePath: string; versionDir: string; files: string[] }
@@ -108,23 +121,41 @@ export async function syncBrandExportFolder(subjectId: string): Promise<BrandExp
   const assets: Array<{ filename: string; dataUrl: string; slotTitle: string; section?: string }> = [];
   const logoTokens: Record<string, { $type: 'string'; $value: string }> = {};
   for (const n of slots) {
-    const blob = await getAssetBlob(n.data.assetId);
-    if (!blob) continue;
-    const file = slotMap.get(n.id) ?? brandSlotFile(kit, n.id, st.assets, n.data.title, n.data.assetId);
-    assets.push({ filename: file.filename, dataUrl: await blobToDataUrl(blob), slotTitle: n.data.title, section: n.data.section });
-    logoTokens[file.slug] = { $type: 'string', $value: `vigente/${file.filename}` };
+    const rawBlob = await getAssetBlob(n.data.assetId);
+    if (!rawBlob) continue;
+    const { slug, filename, ext } = slotMap.get(n.id) ?? brandSlotFile(kit, n.id, st.assets, n.data.title, n.data.assetId);
+    const outBlob = await normalizeExportBlob(rawBlob, ext);
+    assets.push({ filename, dataUrl: await blobToDataUrl(outBlob), slotTitle: n.data.title, section: n.data.section });
+    logoTokens[slug] = { $type: 'string', $value: `vigente/${filename}` };
   }
   const baseTokens = JSON.parse(tokensToFile(kit.tokens ?? {}, 'w3c').text) as Record<string, unknown>;
-  const existingMarca = typeof baseTokens.marca === 'object' && baseTokens.marca && !Array.isArray(baseTokens.marca) ? baseTokens.marca as Record<string, unknown> : {};
-  const existingLogo = typeof existingMarca.logo === 'object' && existingMarca.logo && !Array.isArray(existingMarca.logo) ? existingMarca.logo as Record<string, unknown> : {};
-  const tokensPayload = {
+  const existingMarca = typeof baseTokens.marca === 'object' && baseTokens.marca && !Array.isArray(baseTokens.marca) ? { ...(baseTokens.marca as Record<string, unknown>) } : {};
+  const existingLogo = typeof existingMarca.logo === 'object' && existingMarca.logo && !Array.isArray(existingMarca.logo) ? { ...(existingMarca.logo as Record<string, unknown>) } : {};
+  // Never clobber an existing user token subtree (e.g. marca.logo.logo with children); place colliding entries under <slug>_vigente.
+  for (const [slug, tok] of Object.entries(logoTokens)) {
+    const prev = existingLogo[slug];
+    const isSubtree = prev && typeof prev === 'object' && !('$value' in prev && Object.keys(prev).every((k) => k.startsWith('$')));
+    existingLogo[isSubtree ? `${slug}_vigente` : slug] = tok;
+  }
+  // Preserve non-default token modes under $extensions.ogs.modes so Dark/theme values are never lost in tokens.json.
+  const modeMap: Record<string, Record<string, string | number>> = {};
+  for (const [name, t] of Object.entries(kit.tokens ?? {})) {
+    for (const [mode, val] of Object.entries(t.modes ?? {})) (modeMap[mode] ??= {})[name] = val;
+  }
+  const tokensPayload: Record<string, unknown> = {
     ...baseTokens,
-    ...(Object.keys(logoTokens).length ? { marca: { ...existingMarca, logo: { ...existingLogo, ...logoTokens } } } : {}),
+    ...(Object.keys(logoTokens).length ? { marca: { ...existingMarca, logo: existingLogo } } : {}),
+    ...(Object.keys(modeMap).length ? { $extensions: { ...(typeof baseTokens.$extensions === 'object' && baseTokens.$extensions ? baseTokens.$extensions as Record<string, unknown> : {}), 'ogs.modes': modeMap } } : {}),
   };
   const res = await fetch('/x/brand-export/sync', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-OGS': '1' },
-    body: JSON.stringify({ kitSlug: brandSlug(kit.name, kit.id, 64), versionId: brandSlug(kit.versionId || `v-${Date.now()}`, 'v1', 64), tokensJson: JSON.stringify(tokensPayload, null, 2), assets }),
+    body: JSON.stringify({
+      kitSlug: kitExportSlug(kit, st.library),
+      versionId: brandSlug(kit.versionId || `v-${Date.now()}`, 'v1', 64),
+      tokensJson: JSON.stringify(tokensPayload, null, 2),
+      assets,
+    }),
   });
   if (!res.ok) throw new Error((await res.text().catch(() => '')) || `Brand folder export failed (${res.status}).`);
   return res.json() as Promise<BrandExportFolderResult>;

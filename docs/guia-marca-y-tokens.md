@@ -32,8 +32,8 @@ Guía pensada para **usuarios nuevos** (estilo Canva), **operadores que migran d
 ## 2. Control y seguridad: aviso en esquina y modo «Bajo demanda»
 
 - Por defecto, la sincronización es **automática** (`Settings → Data → Library → Auto-sync brand changes`).
-- Cada vez que un cambio del Brand Kit actualiza tus diseños, aparece un aviso no bloqueante en la esquina inferior derecha del Designer indicando **qué cambió**, con dos botones directos:
-  - **Volver al anterior**: revierte quirúrgicamente solo los cambios del Brand Kit (sin borrar capas ni ediciones que hayas hecho después) y registra un paso de historial para que incluso esa reversión se pueda deshacer con `Ctrl+Z`.
+- Cada vez que un cambio del Brand Kit actualiza tus diseños, aparece un aviso no bloqueante en la esquina inferior derecha del Designer indicando **qué cambió** (mientras sigues en la sesión actual; al recargar la página el aviso se limpia), con dos botones directos:
+  - **Volver al anterior**: revierte quirúrgicamente solo los valores que dejó el sync (si ya editaste una propiedad después, se respeta tu edición) y registra un paso de historial para que incluso esa reversión se pueda deshacer con `Ctrl+Z`.
   - **Bajo demanda**: cambia al modo manual. En modo manual los diseños no cambian solos; el aviso te muestra cuántos cambios pendientes hay con el botón **Actualizar ahora**.
 
 ---
@@ -42,11 +42,11 @@ Guía pensada para **usuarios nuevos** (estilo Canva), **operadores que migran d
 
 Si trabajas también con `.svg` abiertos a mano en Inkscape:
 1. En el Designer, abre **Export → formato SVG → engranaje de opciones** y activa **Link brand logos**.
-2. Al exportar, las capas de logo enlazadas se escriben como `href="vigente/<slug>.<ext>"` en lugar de incrustarse en base64 (PDF siempre incrusta las imágenes, nunca usa rutas externas).
-3. La app sincroniza automáticamente en tu disco local:
-   - `<DATA_DIR>/brand-exports/<kit>/assets-<versionId>/` con las imágenes vigentes.
-   - `<DATA_DIR>/brand-exports/<kit>/tokens.json` (incluyendo `marca.logo` sin pisar tokens propios como `marca.logo.ancho`).
+2. Antes de generar el SVG, la app sincroniza la carpeta local de disco:
+   - `<DATA_DIR>/brand-exports/<kit>/assets-<versionId>/` con las imágenes vigentes (todas las imágenes raster se normalizan a `.png` para que reemplazar PNG↔JPG nunca cambie el nombre ni rompa SVGs anteriores; los SVG conservan `.svg`).
+   - `<DATA_DIR>/brand-exports/<kit>/tokens.json` (mezclando `marca.logo` sin pisar subárboles de usuario y conservando modos en `$extensions['ogs.modes']`).
    - `<DATA_DIR>/brand-exports/<kit>/vigente` → enlace simbólico atómico a `assets-<versionId>`.
+3. Solo las capas cuyo archivo quedó verificado en disco se escriben como `href="vigente/<slug>.png"` (o `<kit>/vigente/<slug>.png` si el diseño mezcla varios kits); si falla la sincronización local o falta un blob, el logo se incrusta automáticamente en el SVG para nunca entregar un enlace roto. PDF siempre incrusta las imágenes.
 4. Guarda tus `.svg` exportados dentro de `<DATA_DIR>/brand-exports/<kit>/` (junto a `vigente/`). Cuando mañana cambies un logo en OGS y pulses **Sync Inkscape** en el kit, el symlink `vigente/` apunta a la nueva versión y los `.svg` en Inkscape toman el logo nuevo al recargar o reexportar.
 
 ---

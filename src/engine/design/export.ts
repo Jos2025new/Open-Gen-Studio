@@ -178,6 +178,8 @@ export interface SvgBuildOptions extends SvgOptions {
   /** 'paths' draws text as outlines; fontFaces is the embedded @font-face CSS. */
   text?: 'fonts' | 'paths';
   fontFaces?: string;
+  /** Verified layerId -> relative href map from syncBrandExportFolder; missing entries fall back to embedded pixels. */
+  verifiedBrandHrefs?: ReadonlyMap<string, string>;
 }
 
 export async function docToSvg(doc: DesignDoc, deps: SvgDeps, viewport?: SvgViewport, options: SvgBuildOptions = {}): Promise<string> {
@@ -257,7 +259,9 @@ async function buildSvg(doc: DesignDoc, deps: SvgDeps, viewport: SvgViewport | u
     const pic = step.t === 'clip' && l.visible ? await picture({ ...doc, background: null, layers: [{ ...l, opacity: 1, blend: 'normal' }, ...step.fx] }, `“${l.name}”`, step.fx.flatMap(noSvg)) : null;
     if (pic) inner = pic;
     else if (l.type === 'raster') {
-      const linked = build.linkBrandAssets && l.libraryAsset ? linkedBrandHref(l) : null;
+      const linked = build.linkBrandAssets && l.libraryAsset
+        ? (build.verifiedBrandHrefs ? build.verifiedBrandHrefs.get(l.id) ?? null : linkedBrandHref(l))
+        : null;
       const href = linked ?? await deps.rasterHref(l);
       if (!href) { unread.push(l.name); continue; }
       inner = `<image x="${n(l.x)}" y="${n(l.y)}" width="${n(l.width)}" height="${n(l.height)}" preserveAspectRatio="none" href="${linked ? xmlEscape(href) : href}"/>`;
