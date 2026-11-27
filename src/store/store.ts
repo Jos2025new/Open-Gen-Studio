@@ -66,6 +66,8 @@ export interface UiState extends PageUiPrefs {
   panelExpanded: boolean;
   /** A category (a kind) Library opens on once; set from outside (Brand with no entries). */
   libraryCategory?: string;
+  /** One-shot Brand Kit / Design System page to open directly in Library (KitPage). */
+  libraryKitId?: string;
   /** `back`: the view to return to on close (a reference opened from inside the viewer). */
   lightbox: { assetIds: string[]; index: number; back?: { assetIds: string[]; index: number } } | null;
   /** Viewer details panel: closed by default, remembered for the current app session. */

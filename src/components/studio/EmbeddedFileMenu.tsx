@@ -32,7 +32,7 @@ export function EmbeddedFileMenu({ sessionId, docs, doc }: { sessionId: string; 
     return () => window.removeEventListener('ogs:designer-export', open);
   }, [doc?.id, busy, setOpen]);
   return <>
-    <input ref={input} type="file" accept={IMPORT_ACCEPT} multiple hidden onChange={(e) => { const files = [...(e.currentTarget.files ?? [])]; e.currentTarget.value = ''; if (doc) void importDesignFiles(sessionId, doc.id, files); }} />
+    <input ref={input} type="file" accept={IMPORT_ACCEPT} multiple hidden onChange={(e) => { const files = [...(e.currentTarget.files ?? [])]; e.currentTarget.value = ''; if (files.length) void importDesignFiles(sessionId, doc?.id, files); }} />
     <IconButton ref={pop.ref} icon={FileText} label="File" size="sm" active={pop.open} aria-haspopup="menu" aria-expanded={pop.open} onClick={() => { setView('menu'); pop.toggle(); }} />
     <Popover open={pop.open} anchor={pop.ref} onClose={close} placement="bottom-start"
       edge={view === 'export' ? 'slide' : 'narrow'} align={view === 'export' ? 'start' : 'end'}
@@ -42,7 +42,7 @@ export function EmbeddedFileMenu({ sessionId, docs, doc }: { sessionId: string; 
         {view === 'menu' && <>
           <MenuItem icon={FilePlus2} label="New…" onClick={() => go('new')} />
           {docs.length > 0 && doc && <MenuItem icon={FolderOpen} label="Open…" detail={doc.name} onClick={() => go('open')} />}
-          {doc && <MenuItem icon={ImagePlus} label="Import image" onClick={() => { close(); input.current?.click(); }} />}
+          <MenuItem icon={ImagePlus} label="Import image / SVG" onClick={() => { close(); input.current?.click(); }} />
           {doc && <MenuItem icon={Library} label="Save to Library…" onClick={() => go('library')} />}
           {doc && <MenuItem icon={ArrowUpFromLine} label="Export…" onClick={() => go('export')} />}
         </>}

@@ -28,8 +28,8 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 71 | 5 |
 | [id.ts](../src/lib/id.ts) | 67 | 0 |
 | [media.ts](../src/lib/media.ts) | 62 | 88 |
+| [doc.ts](../src/engine/design/doc.ts) | 58 | 98 |
 | [catalog.ts](../src/engine/catalog.ts) | 57 | 34 |
-| [doc.ts](../src/engine/design/doc.ts) | 57 | 98 |
 | [ops.ts](../src/engine/ops.ts) | 57 | 22 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 54 | 25 |
 | [index.ts](../src/engine/params/index.ts) | 50 | 21 |

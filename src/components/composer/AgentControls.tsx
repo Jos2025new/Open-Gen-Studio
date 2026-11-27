@@ -73,6 +73,14 @@ function KitChip({ onPicked }: { onPicked?: () => void }) {
               {s.id === kit?.id ? <Check size={14} className="pick-check" /> : null}
             </button>
           ))}
+          {kit && (kit.kind === 'brand-kit' || kit.kind === 'design-system') ? (
+            <button type="button" className="pick-row" onClick={() => { setUi({ panel: 'gallery', libraryKitId: kit.id }); pop.close(); }}>
+              <span className="pick-text">
+                <span className="pick-name">{`Open ${kit.name}`}</span>
+                <span className="pick-desc">Logos, tokens, fonts & bulk import</span>
+              </span>
+            </button>
+          ) : null}
         </div>
       </Popover>
     </>

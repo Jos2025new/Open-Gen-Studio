@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { KIT_KIND_LIST, type KitKind, type LibrarySpace } from '../../engine/libraryTypes';
 import { createItem } from '../../engine/libraryVersions';
 import type { Subject } from '../../engine/types';
-import { toast, useStore } from '../../store/store';
+import { setUi, toast, useStore } from '../../store/store';
 import { BookOpen, Images, SwatchBook, type LucideIcon } from '../ui/icons';
 import { MenuItem } from '../ui/primitives';
 
@@ -23,7 +23,11 @@ export function useNewKit(sessionId: string, space: LibrarySpace, onDone?: () =>
     try {
       const name = newKitName(kind, useStore.getState().library);
       if (onPage) onPage((await createItem({ name, kind, space, by: 'user', sessionId, draft: false, open: false })).subject.id);
-      else { await createItem({ name, kind, space, by: 'user', sessionId }); onDone?.(); }
+      else {
+        const { subject } = await createItem({ name, kind, space, by: 'user', sessionId });
+        if (kind === 'brand-kit' || kind === 'design-system') setUi({ panel: 'gallery', libraryKitId: subject.id });
+        onDone?.();
+      }
     }
     catch (e) { toast((e as Error).message, 'error'); } finally { busyRef.current = false; setBusy(false); }
   };

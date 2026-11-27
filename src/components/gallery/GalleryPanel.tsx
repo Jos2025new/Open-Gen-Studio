@@ -71,12 +71,13 @@ async function openKitIn(sessionId: string, id: string, space: OpenSpace) {
 /** Assets: every generation and upload, and the library of saved characters, locations, products, objects, styles and kits. */
 export function GalleryPanel() {
   const { expanded, embedded } = usePanelExpanded();
-  const [category, setCategory] = useState<Category>('all'), asked = useStore((st) => st.ui.libraryCategory as Category | undefined);
+  const [category, setCategory] = useState<Category>('all'), asked = useStore((st) => st.ui.libraryCategory as Category | undefined), askedKit = useStore((st) => st.ui.libraryKitId);
   // Opened on a category from outside (Brand with no entries): taken once.
   useEffect(() => { if (asked) { setCategory(asked); setUi({ libraryCategory: undefined }); } }, [asked]);
   const [stored, setStored] = usePref<ItemView>('ogs.libraryView', 'card');
   const view = asItemView(stored);
   const [cols, setCols] = useState(3), [openKit, setOpenKit] = usePref<string | null>('ogs.libraryKit', null);
+  useEffect(() => { if (askedKit) { setOpenKit(askedKit); setUi({ libraryKitId: undefined }); } }, [askedKit, setOpenKit]);
   const chrome = embedded ? null : <div className="pc-chrome">
     <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Expand'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
     <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />

@@ -244,6 +244,7 @@ async function renderOutput(doc: DesignDoc, settings: ExportSettings, target: Ex
     if (format === 'svg' && settings.svg?.linkBrandAssets) {
       verifiedBrandHrefs = new Map();
       const linkedLayers = renderDoc.layers.filter((l): l is Extract<typeof l, { type: 'raster' }> => l.type === 'raster' && Boolean(l.libraryAsset));
+      if (!linkedLayers.length) deps.notice?.('No linked brand logos in this design, so no brand-exports/vigente folder was created. Place a logo from a Brand Kit or use "Vincular todo" first.');
       const kitIds = [...new Set(linkedLayers.map((l) => l.libraryAsset!.subjectId))];
       const multiKit = kitIds.length > 1;
       const syncedByKit = new Map<string, { kitSlug: string; files: Set<string>; slots: Record<string, string> }>();
