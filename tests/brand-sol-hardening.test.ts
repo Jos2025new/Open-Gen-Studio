@@ -172,7 +172,10 @@ describe('GPT 6.2 Sol hardening regressions (Altos 1–8 & Medios 1–5)', () =>
     const kit2 = (await createItem({ name: 'Sol Brand', kind: 'brand-kit', space: 'library', by: 'user' })).subject;
     const lib = useStore.getState().library;
     const k1 = lib.find((s) => s.id === kitId)!;
-    expect(kitExportSlug(k1, lib)).not.toBe(kitExportSlug(kit2, lib));
+    // R5: stable kit folder slug tied to kit.id (never changes when homonymous kits are added).
+    expect(kitExportSlug(k1)).not.toBe(kitExportSlug(kit2));
+    // R7: rasterized SVG upload (mime image/png, name Logo_Principal.svg) exports as .png, not .svg!
+    expect(brandAssetExt('image/png', 'Logo_Principal.svg')).toBe('png');
 
     seedImage('ast_p', 'logo.png', 200, 100, 'image/png');
     seedImage('ast_j', 'logo.jpg', 200, 100, 'image/jpeg');
@@ -258,5 +261,53 @@ describe('GPT 6.2 Sol hardening regressions (Altos 1–8 & Medios 1–5)', () =>
 
     // Check sectionNodes helper stays clean.
     expect(sectionNodes(kit, { title: 'Logos' })).toHaveLength(0);
+  });
+
+  it('R2, R3 & R6: homonymous component text overrides stay separate + post-sync revert preserved, concurrent same-versionId POSTs both 200, tokens.json dir returns 409 without mutating vigente', async () => {
+    // R2: two text layers both named "Title" keep their distinct overrides on sync AND post-sync edit on revert!
+    setBrandSyncMode('manual');
+    const { subject: uiKit, doc: kitDoc } = await createItem({ name: 'UI2', kind: 'design-system', space: 'studio', sessionId: sid, by: 'user' });
+    const t1 = newTextLayer('Title', 'Default 1', { x: 0, y: 0, width: 100 });
+    const t2 = newTextLayer('Title', 'Default 2', { x: 0, y: 40, width: 100 });
+    setDoc(sid, kitDoc!.id, (d) => ({ ...d, layers: [t1, t2] }));
+    const gid = groupLayers(sid, kitDoc!.id, [t1.id, t2.id])!;
+    patchGroup(sid, kitDoc!.id, gid, { name: 'Card' });
+    await saveItem({ subjectId: uiKit.id, mode: 'overwrite', sessionId: sid, docId: kitDoc!.id, space: 'studio', by: 'user' });
+
+    const target = createDoc('P2', 400, 400, '#ffffff');
+    addDoc(sid, target);
+    await insertComponent(sid, target.id, uiKit.id, gid, { x: 10, y: 10 });
+    const [inst1, inst2] = getDoc(sid, target.id)!.layers as TextLayer[];
+    patchLayer(sid, target.id, inst1.id, { text: 'First override' });
+    patchLayer(sid, target.id, inst2.id, { text: 'Second override' });
+
+    // Publish V2 changing Default 1 -> V2 1
+    setDoc(sid, kitDoc!.id, (d) => ({ ...d, layers: d.layers.map((l, i) => (i === 0 && l.type === 'text' ? { ...l, text: 'V2 1' } : l)) }));
+    await saveItem({ subjectId: uiKit.id, mode: 'overwrite', sessionId: sid, docId: kitDoc!.id, space: 'studio', by: 'user' });
+    await syncBrandInSession(sid, { docId: target.id });
+    const synced = getDoc(sid, target.id)!.layers as TextLayer[];
+    expect(synced.map((l) => l.text)).toEqual(['First override', 'Second override']);
+
+    // Edit post-sync then revert: post-sync edit is preserved!
+    patchLayer(sid, target.id, synced[0].id, { text: 'Post sync edit' });
+    expect(revertBrandSyncNotice()).toBe(true);
+    expect((getDoc(sid, target.id)!.layers as TextLayer[])[0].text).toBe('Post sync edit');
+
+    // R3: concurrent same-versionId POSTs both succeed, and tokens.json dir returns 409 BEFORE moving vigente.
+    const tmp = mkdtempSync(join(tmpdir(), 'ogs-sol-r3-'));
+    try {
+      const [c1, c2] = await Promise.all([
+        syncBrandExportOnDisk(tmp, { kitSlug: 'conc', versionId: 'v1', tokensJson: '{"a":1}', assets: [{ filename: 'logo.png', dataUrl: B64_PNG }] }),
+        syncBrandExportOnDisk(tmp, { kitSlug: 'conc', versionId: 'v1', tokensJson: '{"a":2}', assets: [{ filename: 'logo.png', dataUrl: B64_PNG }] }),
+      ]);
+      expect(c1.files).toEqual(['logo.png']);
+      expect(c2.files).toEqual(['logo.png']);
+
+      const dirKit = join(tmp, 'brand-exports', 'tokdir');
+      mkdirSync(join(dirKit, 'tokens.json'), { recursive: true });
+      await expect(syncBrandExportOnDisk(tmp, { kitSlug: 'tokdir', versionId: 'v1', tokensJson: '{"ok":1}', assets: [] })).rejects.toMatchObject({ statusCode: 409 });
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });

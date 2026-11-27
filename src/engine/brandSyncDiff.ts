@@ -4,7 +4,7 @@ import type { DesignDoc, Layer, LayerGroup, RasterLayer, TextLayer, VectorLayer,
 /* Pure surgical diff, revert and component-comparison helpers for brandSync.ts. */
 
 export interface LayerRevert { layerId: string; before: Layer; after: Layer }
-export interface GroupRevert { groupId: string; beforeGroup: LayerGroup; beforeMembers: Layer[]; afterMemberIds: string[]; writtenBlobKeys: string[] }
+export interface GroupRevert { groupId: string; beforeGroup: LayerGroup; beforeMembers: Layer[]; afterMembers: Layer[]; afterMemberIds: string[]; writtenBlobKeys: string[] }
 export interface DocRevertPatch {
   docId: string;
   backgroundBefore?: { background: string | null; backgroundToken?: TokenRef };
@@ -26,7 +26,7 @@ const PAIRED_VALUE_KEY: Record<string, string> = {
   widthToken: 'width',
 };
 
-function sameVal(a: unknown, b: unknown): boolean {
+export function sameVal(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
   return JSON.stringify(a) === JSON.stringify(b);
@@ -128,6 +128,7 @@ export function mergeDocPatches(base: DocRevertPatch, extra: DocRevertPatch): Do
       groupId: gid,
       beforeGroup: prev.beforeGroup,
       beforeMembers: prev.beforeMembers,
+      afterMembers: gr.afterMembers,
       afterMemberIds: gr.afterMemberIds,
       writtenBlobKeys: [...prev.writtenBlobKeys, ...gr.writtenBlobKeys],
     } : gr);
@@ -146,16 +147,24 @@ export function componentChanged(prevDoc: DesignDoc | undefined, nextDoc: Design
   return JSON.stringify(normGroup(prevGroup)) !== JSON.stringify(normGroup(nextGroup)) || JSON.stringify(prevLayers) !== JSON.stringify(nextLayers);
 }
 
-/** Preserves local text overrides made by the user on a component instance when syncing from prevSrc to nextLayers. */
+/** Preserves local text overrides 1-to-1 (even when multiple text layers share the same name). */
 export function preserveLocalTextOverrides(curMembers: readonly Layer[], prevSrcLayers: readonly Layer[], nextLayers: Layer[]): Layer[] {
   const curTexts = curMembers.filter((l): l is TextLayer => l.type === 'text');
   const prevTexts = prevSrcLayers.filter((l): l is TextLayer => l.type === 'text');
   if (!curTexts.length || !prevTexts.length) return nextLayers;
+  const usedCur = new Set<number>(), usedPrev = new Set<number>();
+  const take = (list: readonly TextLayer[], used: Set<number>, name: string, fallbackIdx: number): TextLayer | undefined => {
+    const byName = list.findIndex((t, idx) => !used.has(idx) && t.name === name);
+    const idx = byName >= 0 ? byName : !used.has(fallbackIdx) && fallbackIdx < list.length ? fallbackIdx : -1;
+    if (idx < 0) return undefined;
+    used.add(idx);
+    return list[idx];
+  };
   let ti = 0;
   return nextLayers.map((l) => {
     if (l.type !== 'text') return l;
-    const cur = curTexts.find((c) => c.name === l.name) ?? curTexts[ti];
-    const prev = prevTexts.find((p) => p.name === l.name) ?? prevTexts[ti];
+    const cur = take(curTexts, usedCur, l.name, ti);
+    const prev = take(prevTexts, usedPrev, l.name, ti);
     ti++;
     if (cur && prev && cur.text !== prev.text) return { ...l, text: cur.text };
     return l;

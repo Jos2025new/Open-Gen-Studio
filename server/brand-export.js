@@ -81,6 +81,15 @@ export async function syncBrandExportOnDisk(rootDir, payload) {
     err.statusCode = 409;
     throw err;
   }
+  if (tokensJson !== null) {
+    const topTokPath = path.join(kitDir, 'tokens.json');
+    const existingTok = await fs.lstat(topTokPath).catch((e) => (e?.code === 'ENOENT' ? null : Promise.reject(e)));
+    if (existingTok && (existingTok.isDirectory() || existingTok.isSymbolicLink())) {
+      const err = new Error('tokens.json exists and is not a regular file');
+      err.statusCode = 409;
+      throw err;
+    }
+  }
 
   await fs.mkdir(kitDir, { recursive: true });
   const realKitDir = await fs.realpath(kitDir);
@@ -90,10 +99,8 @@ export async function syncBrandExportOnDisk(rootDir, payload) {
     throw err;
   }
 
-  // 3. Stage all files + tokens into a brand-new immutable version directory so live readers never see partial writes.
-  const baseVerName = `assets-${versionId}`;
-  const baseExists = await fs.lstat(path.join(realKitDir, baseVerName)).then(() => true, () => false);
-  const verName = baseExists ? `${baseVerName}-${crypto.randomUUID().slice(0, 8)}` : baseVerName;
+  // 3. Stage all files + tokens into a brand-new unique immutable version dir so concurrent POSTs with the same versionId never collide.
+  const verName = `assets-${versionId}-${crypto.randomUUID().slice(0, 8)}`;
   const stageDir = path.join(realKitDir, `.staging-${crypto.randomUUID()}`);
   const versionDir = path.join(realKitDir, verName);
 

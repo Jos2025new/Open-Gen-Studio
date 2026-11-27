@@ -5,7 +5,7 @@ import { blobToDataUrl } from '../../lib/media';
 import { fxTarget } from '../fx/plan';
 import type { DesignDoc, Layer } from '../types';
 import { unionBox, type Box } from './doc';
-import { linkedBrandHref, syncBrandExportFolder } from '../brandExportFolder';
+import { syncBrandExportFolder } from '../brandExportFolder';
 import { docToSvg, svgToPdf, xmlEscape, type SvgDeps } from './export';
 import { ExportError, exportError } from './exportErrors';
 import { checkRasterExport, drawExport, exportDoc, PREVIEW_MAX_SIDE, type RasterExport } from './exportRaster';
@@ -239,29 +239,32 @@ async function renderOutput(doc: DesignDoc, settings: ExportSettings, target: Ex
     const { found, missing } = live ? await collectFonts(texts, deps.fontFile) : { found: new Map(), missing: [] as string[] };
     if (format === 'pdf') for (const [k, f] of found) if (!canEmbedInPdf(f.woff)) { found.delete(k); missing.push(f.family); } else if (isSlanted(f.italic, f.woff)) deps.notice?.(`“${f.family}” has no italic file, so the PDF shows it upright. Text as paths keeps the slant.`);
     missing.forEach((family) => deps.notice?.(`“${family}” is a system font the app cannot read, so its text keeps the font name.`));
-    // Sync local brand-exports/vigente BEFORE building SVG so only verified on-disk files become relative hrefs (never broken links).
+    // Sync local brand-exports/vigente BEFORE building SVG and verify by exact (subjectId, nodeId) slot identity (never bind to a different homonymous slot).
     let verifiedBrandHrefs: Map<string, string> | undefined;
     if (format === 'svg' && settings.svg?.linkBrandAssets) {
       verifiedBrandHrefs = new Map();
       const linkedLayers = renderDoc.layers.filter((l): l is Extract<typeof l, { type: 'raster' }> => l.type === 'raster' && Boolean(l.libraryAsset));
       const kitIds = [...new Set(linkedLayers.map((l) => l.libraryAsset!.subjectId))];
       const multiKit = kitIds.length > 1;
-      const syncedFiles = new Map<string, Set<string>>();
+      const syncedByKit = new Map<string, { kitSlug: string; files: Set<string>; slots: Record<string, string> }>();
       for (const id of kitIds) {
         try {
           const res = await syncBrandExportFolder(id);
-          syncedFiles.set(id, new Set(res.files));
+          syncedByKit.set(id, { kitSlug: res.kitSlug, files: new Set(res.files), slots: res.syncedSlots });
         } catch {
           deps.notice?.('Could not sync the local brand-exports/vigente folder; affected brand logos were embedded.');
         }
       }
       let embeddedFallback = 0;
       for (const l of linkedLayers) {
-        const href = linkedBrandHref(l, undefined, undefined, multiKit);
-        const files = syncedFiles.get(l.libraryAsset!.subjectId);
-        const filename = href ? href.split('/').pop() ?? '' : '';
-        if (href && files?.has(filename)) verifiedBrandHrefs.set(l.id, href);
-        else embeddedFallback++;
+        const ref = l.libraryAsset!;
+        const synced = syncedByKit.get(ref.subjectId);
+        const filename = synced?.slots[ref.nodeId];
+        if (synced && filename && synced.files.has(filename)) {
+          verifiedBrandHrefs.set(l.id, multiKit ? `${synced.kitSlug}/vigente/${filename}` : `vigente/${filename}`);
+        } else {
+          embeddedFallback++;
+        }
       }
       if (embeddedFallback > 0) deps.notice?.(`${embeddedFallback} brand logo${embeddedFallback > 1 ? 's' : ''} could not be verified on disk and were embedded in the SVG.`);
     }

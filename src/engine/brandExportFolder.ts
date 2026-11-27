@@ -16,20 +16,18 @@ export function brandSlug(raw: string, fallback = 'asset', maxLen = MAX_KIT_SLUG
   return base || fallback.slice(0, maxLen) || 'asset';
 }
 
-/** Stable extension: all raster images normalize to .png so replacing PNG↔JPG never breaks existing SVGs; SVG stays .svg. */
-export function brandAssetExt(mime?: string, name?: string): string {
+/** Stable extension based strictly on the exported blob's MIME: true SVG stays .svg, all raster (including rasterized SVG uploads) normalize to .png. */
+export function brandAssetExt(mime?: string, _name?: string): string {
   const m = (mime || '').toLowerCase().split(';')[0].trim();
-  if (m === 'image/svg+xml' || /\.svg$/i.test(name || '')) return 'svg';
+  if (m === 'image/svg+xml') return 'svg';
   return 'png';
 }
 
-/** Unique directory slug for a kit: appends a 4-char id suffix when another kit shares the same normalized name. */
-export function kitExportSlug(kit: Pick<Subject, 'id' | 'name'>, library: readonly Subject[] = useStore.getState().library): string {
-  const base = brandSlug(kit.name, kit.id, MAX_KIT_SLUG);
-  const collides = library.some((s) => s.id !== kit.id && isKit(s) && brandSlug(s.name, s.id, MAX_KIT_SLUG) === base);
-  if (!collides) return base;
-  const suffix = `-${kit.id.replace(/[^a-z0-9]/gi, '').slice(-4).toLowerCase() || 'kit'}`;
-  return `${base.slice(0, MAX_KIT_SLUG - suffix.length).replace(/-+$/g, '')}${suffix}`;
+/** Stable unique directory slug for a kit tied to its immutable id so adding homonymous kits never moves existing exports. */
+export function kitExportSlug(kit: Pick<Subject, 'id' | 'name'>): string {
+  const suffix = `-${kit.id.replace(/[^a-z0-9]/gi, '').slice(-8).toLowerCase() || 'kit'}`;
+  const base = brandSlug(kit.name, 'kit', Math.max(1, MAX_KIT_SLUG - suffix.length));
+  return `${base}${suffix}`;
 }
 
 export interface BrandSlotFile { slug: string; filename: string; ext: string }
@@ -88,7 +86,7 @@ export function linkedBrandHref(
   const ref = layer.libraryAsset;
   if (!ref) return null;
   const kit = library.find((s) => s.id === ref.subjectId);
-  const prefix = multiKit && kit ? `${kitExportSlug(kit, library)}/vigente/` : 'vigente/';
+  const prefix = multiKit && kit ? `${kitExportSlug(kit)}/vigente/` : 'vigente/';
   if (kit) {
     const found = brandSlotFiles(kit, assets).get(ref.nodeId);
     if (found) return `${prefix}${found.filename}`;
@@ -110,7 +108,7 @@ async function normalizeExportBlob(blob: Blob, ext: string): Promise<Blob> {
   }
 }
 
-export interface BrandExportFolderResult { dir: string; vigentePath: string; versionDir: string; files: string[] }
+export interface BrandExportFolderResult { dir: string; vigentePath: string; versionDir: string; files: string[]; kitSlug: string; syncedSlots: Record<string, string> }
 
 /** Writes the kit's current version assets + tokens.json to disk and points `<kit>/vigente` symlink to it (for Inkscape SVGs). */
 export async function syncBrandExportFolder(subjectId: string): Promise<BrandExportFolderResult> {
@@ -120,6 +118,7 @@ export async function syncBrandExportFolder(subjectId: string): Promise<BrandExp
   const slotMap = brandSlotFiles(kit, st.assets);
   const assets: Array<{ filename: string; dataUrl: string; slotTitle: string; section?: string }> = [];
   const logoTokens: Record<string, { $type: 'string'; $value: string }> = {};
+  const syncedSlots: Record<string, string> = {};
   for (const n of slots) {
     const rawBlob = await getAssetBlob(n.data.assetId);
     if (!rawBlob) continue;
@@ -127,15 +126,15 @@ export async function syncBrandExportFolder(subjectId: string): Promise<BrandExp
     const outBlob = await normalizeExportBlob(rawBlob, ext);
     assets.push({ filename, dataUrl: await blobToDataUrl(outBlob), slotTitle: n.data.title, section: n.data.section });
     logoTokens[slug] = { $type: 'string', $value: `vigente/${filename}` };
+    syncedSlots[n.id] = filename;
   }
   const baseTokens = JSON.parse(tokensToFile(kit.tokens ?? {}, 'w3c').text) as Record<string, unknown>;
   const existingMarca = typeof baseTokens.marca === 'object' && baseTokens.marca && !Array.isArray(baseTokens.marca) ? { ...(baseTokens.marca as Record<string, unknown>) } : {};
   const existingLogo = typeof existingMarca.logo === 'object' && existingMarca.logo && !Array.isArray(existingMarca.logo) ? { ...(existingMarca.logo as Record<string, unknown>) } : {};
-  // Never clobber an existing user token subtree (e.g. marca.logo.logo with children); place colliding entries under <slug>_vigente.
+  // Never overwrite ANY pre-existing user token key (leaf or subtree) under marca.logo.
   for (const [slug, tok] of Object.entries(logoTokens)) {
-    const prev = existingLogo[slug];
-    const isSubtree = prev && typeof prev === 'object' && !('$value' in prev && Object.keys(prev).every((k) => k.startsWith('$')));
-    existingLogo[isSubtree ? `${slug}_vigente` : slug] = tok;
+    const key = Object.prototype.hasOwnProperty.call(existingLogo, slug) ? `${slug}_vigente` : slug;
+    existingLogo[key] = tok;
   }
   // Preserve non-default token modes under $extensions.ogs.modes so Dark/theme values are never lost in tokens.json.
   const modeMap: Record<string, Record<string, string | number>> = {};
@@ -147,16 +146,18 @@ export async function syncBrandExportFolder(subjectId: string): Promise<BrandExp
     ...(Object.keys(logoTokens).length ? { marca: { ...existingMarca, logo: existingLogo } } : {}),
     ...(Object.keys(modeMap).length ? { $extensions: { ...(typeof baseTokens.$extensions === 'object' && baseTokens.$extensions ? baseTokens.$extensions as Record<string, unknown> : {}), 'ogs.modes': modeMap } } : {}),
   };
+  const kSlug = kitExportSlug(kit);
   const res = await fetch('/x/brand-export/sync', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-OGS': '1' },
     body: JSON.stringify({
-      kitSlug: kitExportSlug(kit, st.library),
+      kitSlug: kSlug,
       versionId: brandSlug(kit.versionId || `v-${Date.now()}`, 'v1', 64),
       tokensJson: JSON.stringify(tokensPayload, null, 2),
       assets,
     }),
   });
   if (!res.ok) throw new Error((await res.text().catch(() => '')) || `Brand folder export failed (${res.status}).`);
-  return res.json() as Promise<BrandExportFolderResult>;
+  const disk = await res.json() as { dir: string; vigentePath: string; versionDir: string; files: string[] };
+  return { ...disk, kitSlug: kSlug, syncedSlots };
 }

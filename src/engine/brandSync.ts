@@ -1,6 +1,6 @@
 import { setDoc, setSettings, useStore } from '../store/store';
 import { brandSlotFile, brandSlug, linkedBrandHref, syncBrandExportFolder, type BrandExportFolderResult, type BrandSlotFile } from './brandExportFolder';
-import { componentChanged, diffDocForTokens, emptyDocPatch, mergeDocPatches, preserveLocalTextOverrides, recordLayerPatch, revertLayerSurgical, type DocRevertPatch } from './brandSyncDiff';
+import { componentChanged, diffDocForTokens, emptyDocPatch, mergeDocPatches, preserveLocalTextOverrides, recordLayerPatch, revertLayerSurgical, sameVal, type DocRevertPatch } from './brandSyncDiff';
 import { assetCanvas, getDoc, placeAsset } from './design/actions';
 import * as D from './design/doc';
 import { liveGroups } from './design/groups';
@@ -128,6 +128,7 @@ export function revertBrandSyncNotice(): boolean {
   currentNotice = null;
 
   const docsToApply: Array<{ docId: string; next: DesignDoc }> = [];
+  const buffersToRestore = new Map<string, HTMLCanvasElement>();
   const deadComponentBufIds: string[] = [];
   const writtenBlobKeys: string[] = [];
 
@@ -137,9 +138,13 @@ export function revertBrandSyncNotice(): boolean {
     // Record current state BEFORE reverting so even "Volver al anterior" can be undone with Ctrl+Z.
     record(current);
 
+    const restoredLayerIds = new Set<string>();
     let nextLayers = current.layers.map((l) => {
       const lr = patch.layers.get(l.id);
-      return lr ? revertLayerSurgical(l, lr.before, lr.after) : l;
+      if (!lr) return l;
+      const reverted = revertLayerSurgical(l, lr.before, lr.after);
+      if (reverted !== l) restoredLayerIds.add(l.id);
+      return reverted;
     });
     let nextGroups = current.groups ? [...current.groups] : undefined;
 
@@ -148,10 +153,12 @@ export function revertBrandSyncNotice(): boolean {
       const removed = nextLayers.filter((l) => afterSet.has(l.id));
       deadComponentBufIds.push(...rasterBufferIds(removed));
       writtenBlobKeys.push(...gr.writtenBlobKeys);
+      const restoredMembers = preserveLocalTextOverrides(removed, gr.afterMembers, gr.beforeMembers);
+      for (const id of rasterBufferIds(restoredMembers)) restoredLayerIds.add(id);
       const firstIdx = nextLayers.findIndex((l) => afterSet.has(l.id));
       const kept = nextLayers.filter((l) => !afterSet.has(l.id));
       const at = firstIdx >= 0 ? Math.min(firstIdx, kept.length) : kept.length;
-      kept.splice(at, 0, ...gr.beforeMembers);
+      kept.splice(at, 0, ...restoredMembers);
       nextLayers = kept;
       if (nextGroups) {
         const has = nextGroups.some((g) => g.id === gr.groupId);
@@ -161,7 +168,7 @@ export function revertBrandSyncNotice(): boolean {
       }
     }
 
-    const bgPatch = patch.backgroundBefore && current.background === patch.backgroundAfter?.background
+    const bgPatch = patch.backgroundBefore && current.background === patch.backgroundAfter?.background && sameVal(current.backgroundToken, patch.backgroundAfter?.backgroundToken)
       ? { background: patch.backgroundBefore.background, backgroundToken: patch.backgroundBefore.backgroundToken }
       : {};
 
@@ -169,10 +176,13 @@ export function revertBrandSyncNotice(): boolean {
       docId: current.id,
       next: { ...current, ...bgPatch, updatedAt: Date.now(), layers: nextLayers, ...(nextGroups ? { groups: nextGroups } : {}) },
     });
+    for (const [bufId, canvas] of buffers) {
+      if (restoredLayerIds.has(bufId)) buffersToRestore.set(bufId, canvas);
+    }
   }
 
   const lib = useStore.getState().library;
-  if (buffers.size) restoreBuffers(buffers);
+  if (buffersToRestore.size) restoreBuffers(buffersToRestore);
   for (const { docId, next } of docsToApply) {
     markTokenSyncDone(next, lib);
     setDoc(sessionId, docId, () => next);
@@ -314,6 +324,9 @@ export async function syncBrandInSession(
         const curLayer = doc.layers.find((x) => x.id === u.layerId);
         if (!curLayer || curLayer.type !== 'raster' || !curLayer.libraryAsset) continue;
         if (curLayer.libraryAsset.subjectId !== u.subjectId || curLayer.libraryAsset.nodeId !== u.nodeId || curLayer.libraryAsset.assetId !== u.expectedAssetId) continue;
+        // R1: Revalidate against LIVE library so a stale prepared asset never overwrites a newer slot change.
+        const liveSlot = slotOf(liveLib.find((s) => s.id === u.subjectId), u.nodeId);
+        if (!liveSlot || liveSlot.assetId !== u.nextAssetId) continue;
         const nextWidth = curLayer.width > 0 ? curLayer.width : u.canvas.width;
         const nextHeight = u.canvas.width > 0 ? Math.max(1, Math.round((nextWidth * u.canvas.height) / u.canvas.width)) : curLayer.height;
         setBuffer(curLayer.id, u.canvas);
@@ -329,7 +342,8 @@ export async function syncBrandInSession(
 
       for (const c of preparedComps) {
         const curGroup = liveGroups(doc).find((x) => x.id === c.groupId);
-        if (!curGroup?.from || curGroup.from.versionId !== c.expectedVersionId) {
+        const liveKit = curGroup?.from ? liveLib.find((s) => s.id === curGroup.from!.subjectId) : undefined;
+        if (!curGroup?.from || curGroup.from.versionId !== c.expectedVersionId || !liveKit || liveKit.versionId !== c.nextVersionId) {
           unusedWritten.push(...c.written);
           continue;
         }
@@ -358,6 +372,7 @@ export async function syncBrandInSession(
           groupId: curGroup.id,
           beforeGroup: curGroup,
           beforeMembers: curMembers,
+          afterMembers: nextLayers,
           afterMemberIds: nextLayers.map((l) => l.id),
           writtenBlobKeys: [...c.written],
         });

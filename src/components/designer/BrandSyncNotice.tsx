@@ -93,10 +93,13 @@ export function BrandSyncNotice({ sessionId }: { sessionId: string }) {
         if (res.total > 0) toast(`Vinculado a ${res.kitName}: ${formatBrandLinkSummary(res)}.`, 'success');
       } catch (e) { toast((e as Error).message, 'error'); }
     };
+    const ambNote = linkPreview.ambiguous.length
+      ? ` (${linkPreview.ambiguous.length} ambiguo${linkPreview.ambiguous.length === 1 ? '' : 's'} omitido${linkPreview.ambiguous.length === 1 ? '' : 's'}: ${linkPreview.ambiguous.slice(0, 2).join(', ')})`
+      : '';
     return (
       <div className="brand-sync-notice is-suggest" role="status" aria-live="polite">
         <div className="brand-sync-notice-head">
-          <span className="brand-sync-notice-text">{`Coincide con «${linkPreview.kitName}»: ${formatBrandLinkSummary(linkPreview)}.`}</span>
+          <span className="brand-sync-notice-text">{`Coincide con «${linkPreview.kitName}»: ${formatBrandLinkSummary(linkPreview)}.${ambNote}`}</span>
           <IconButton icon={X} label="Cerrar sugerencia" size="sm" onClick={() => setDismissedLinkKey(linkKey)} />
         </div>
         <div className="brand-sync-notice-actions">

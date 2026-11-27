@@ -62,7 +62,6 @@ async function addOrReplaceInSection(subjectId: string, sectionTitle: string, fi
       count++;
     } else {
       toAdd.push(assetId);
-      if (slug) bySlug.set(slug, assetId);
     }
   }
   if (toAdd.length) {
