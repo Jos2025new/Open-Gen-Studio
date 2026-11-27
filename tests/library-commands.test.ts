@@ -11,7 +11,7 @@ describe('library commands', () => {
     expect(Object.keys(LIBRARY_ACTIONS).sort()).toEqual([
       'saveSubject', 'deleteSubject', 'libraryItem', 'subjectFromAsset', 'saveSheetViews', 'subjectFromAttachments',
       'createRecraftStyle', 'createSubjectVoice', 'createItem', 'saveItem', 'openItem', 'restoreItemVersion', 'deleteItem', 'readItem', 'listItems', 'insertComponent', 'addToSection', 'fontList',
-      'placeLinkedAsset', 'replaceSectionAsset', 'syncBrandInSession', 'syncBrandExportFolder',
+      'placeLinkedAsset', 'replaceSectionAsset', 'syncBrandInSession', 'syncBrandExportFolder', 'autoLinkDocToBrand',
     ].sort());
     for (const id of Object.values(LIBRARY_ACTIONS)) if (!id.startsWith('-')) expect(command(id)).toBeDefined();
   });

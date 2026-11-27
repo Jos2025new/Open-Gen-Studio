@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { addAsReference, sendToNodes, uploadFiles } from '../../engine/actions';
 import { addTextLayer, getDoc, patchLayer } from '../../engine/design/actions';
+import { autoLinkDocToBrand, formatBrandLinkSummary, previewBrandLink } from '../../engine/brandAutoLink';
+import { BRAND_IMPORT_ACCEPT, formatBulkImportSummary, importBrandFiles } from '../../engine/brandBulkImport';
 import { placeLinkedAsset, syncBrandExportFolder } from '../../engine/brandSync';
 import { fontStack } from '../../engine/design/doc';
 import { patchPickedShapes } from '../../engine/design/multiObjectOps';
@@ -40,12 +42,23 @@ export function KitPage({ item, chrome, menu, cover, onBack, onOpen, onDesign }:
   onBack: () => void; onOpen: (s: Subject) => void; onDesign: () => void;
 }) {
   const using = useStore((s) => s.composer.kitId === item.id), { sessionId, docId } = useDesign();
+  const openDoc = useStore((s) => (docId ? s.sessions[sessionId]?.docs.find((d) => d.id === docId) : undefined));
+  const linkCount = openDoc ? previewBrandLink(openDoc, item.id).total : 0;
+  const bulkFile = useRef<HTMLInputElement>(null);
+  const [dropOver, setDropOver] = useState(false);
   const use = () => {
     setComposer({ kitId: using ? null : item.id });
     const doc = !using && docId ? getDoc(sessionId, docId) : undefined;
     if (!doc) return;
     const group = openHistoryGroup(doc.id);
     try { brandToDoc(doc, (id, p) => patchLayer(sessionId, doc.id, id, p)); } finally { group.close(); }
+  };
+  const linkDoc = () => {
+    if (!docId) return;
+    try {
+      const res = autoLinkDocToBrand(sessionId, docId, item.id);
+      if (res.total > 0) toast(`Vinculado a ${item.name}: ${formatBrandLinkSummary(res)}.`, 'success');
+    } catch (e) { toast((e as Error).message, 'error'); }
   };
   const [title, setTitle] = useState<string | null>(null), [busy, setBusy] = useState(false), busyRef = useRef(false);
   const sections = kitSections(item), section = sections.find((x) => x.title === title);
@@ -54,16 +67,35 @@ export function KitPage({ item, chrome, menu, cover, onBack, onOpen, onDesign }:
     busyRef.current = true; setBusy(true);
     try { await fn(); } catch (e) { toast((e as Error).message, 'error'); } finally { busyRef.current = false; setBusy(false); }
   };
+  const importAll = (files: FileList | File[] | null) => {
+    const list = [...(files ?? [])];
+    if (!list.length) return;
+    void run(async () => {
+      const res = await importBrandFiles(item.id, list);
+      toast(`Importado a ${item.name}: ${formatBulkImportSummary(res)}.`, 'success');
+    });
+  };
   return <>
     <div className="gallery-controls generated-controls"><div className="pc-bar">
       <div className="pc-grp pc-left kit-crumbs">
         <IconButton icon={ChevronLeft} label="Back" size="sm" onClick={section ? () => setTitle(null) : onBack} />
         {section ? <><button type="button" className="kit-crumb" onClick={() => setTitle(null)}>{item.name}</button><span className="faint">/</span><strong>{section.title}</strong></> : <strong>{item.name}</strong>}
-        <div className="pc-icons">{section ? <IconButton icon={Sparkles} label={using ? 'In use' : 'Use'} size="sm" active={using} aria-pressed={using} onClick={use} /> : <Button size="sm" icon={Sparkles} variant={using ? 'primary' : 'secondary'} aria-pressed={using} data-tip="The agent and the Designer follow it" onClick={use}>{using ? 'In use' : 'Use'}</Button>}{menu}</div>
+        <div className="pc-icons">
+          {section ? <IconButton icon={Sparkles} label={using ? 'In use' : 'Use'} size="sm" active={using} aria-pressed={using} onClick={use} /> : <Button size="sm" icon={Sparkles} variant={using ? 'primary' : 'secondary'} aria-pressed={using} data-tip="The agent and the Designer follow it" onClick={use}>{using ? 'In use' : 'Use'}</Button>}
+          {!section && linkCount > 0 ? <Button size="sm" variant="secondary" disabled={busy} data-tip="Enlaza colores, fuentes, radios, anchos y logos del diseño actual en 1 clic" onClick={linkDoc}>{`Vincular (${linkCount})`}</Button> : null}
+          {!section ? <>
+            <input ref={bulkFile} type="file" aria-label="Import brand files" accept={BRAND_IMPORT_ACCEPT} multiple hidden onChange={(e) => { importAll(e.target.files); e.target.value = ''; }} />
+            <Button size="sm" icon={Upload} variant="ghost" disabled={busy} data-tip="Importa tokens.json, fuentes y logos de una sola vez" onClick={() => bulkFile.current?.click()}>Importar</Button>
+          </> : null}
+          {menu}
+        </div>
       </div>
       <div className="pc-grp pc-right">{chrome}</div>
     </div></div>
-    <div className="pc-split"><div className="pc-main"><div className={`gallery-scroll${busy ? ' is-busy' : ''}`} aria-busy={busy}>
+    <div className="pc-split"><div className="pc-main"><div className={`gallery-scroll${busy ? ' is-busy' : ''}${dropOver ? ' is-over' : ''}`} aria-busy={busy}
+      onDragOver={(e) => { if (!section && e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDropOver(true); } }}
+      onDragLeave={() => setDropOver(false)}
+      onDrop={(e) => { setDropOver(false); if (!section && e.dataTransfer.files?.length) { e.preventDefault(); importAll(e.dataTransfer.files); } }}>
       {section
         ? <Section key={section.title} item={item} section={section} sections={sections} busy={busy} run={run} cover={cover} onOpen={onOpen} onDesign={onDesign} onGone={() => setTitle(null)} />
         : <div className="kit-sections">

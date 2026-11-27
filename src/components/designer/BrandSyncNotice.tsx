@@ -1,4 +1,5 @@
 import { useMemo, useState, useSyncExternalStore } from 'react';
+import { autoLinkDocToBrand, formatBrandLinkSummary, previewBrandLink } from '../../engine/brandAutoLink';
 import {
   dismissBrandSyncNotice,
   getBrandSyncNotice,
@@ -9,7 +10,7 @@ import {
   syncBrandInSession,
 } from '../../engine/brandSync';
 import { toast, useStore } from '../../store/store';
-import { RefreshCw, Undo2, X } from '../ui/icons';
+import { RefreshCw, Sparkles, Undo2, X } from '../ui/icons';
 import { Button, IconButton } from '../ui/primitives';
 import './BrandSyncNotice.css';
 
@@ -18,12 +19,21 @@ export function BrandSyncNotice({ sessionId }: { sessionId: string }) {
   const notice = useSyncExternalStore(subscribeBrandSyncNotice, getBrandSyncNotice);
   const mode = useStore((s) => s.settings.brandSyncMode ?? 'auto');
   const library = useStore((s) => s.library);
-  const docs = useStore((s) => s.sessions[sessionId]?.docs);
+  const kitId = useStore((s) => s.composer.kitId);
+  const session = useStore((s) => s.sessions[sessionId]);
+  const docs = session?.docs;
+  const activeDoc = docs?.find((d) => d.id === session?.activeDocId);
   const [busy, setBusy] = useState(false);
+  const [dismissedLinkKey, setDismissedLinkKey] = useState<string | null>(null);
 
   const pending = useMemo(
     () => (mode === 'manual' ? pendingBrandUpdates(sessionId) : { tokens: 0, logos: 0, components: 0, total: 0, kits: [] }),
     [mode, sessionId, library, docs],
+  );
+
+  const linkPreview = useMemo(
+    () => (activeDoc && kitId ? previewBrandLink(activeDoc, kitId) : null),
+    [activeDoc, kitId, library],
   );
 
   if (notice && notice.sessionId === sessionId) {
@@ -69,6 +79,29 @@ export function BrandSyncNotice({ sessionId }: { sessionId: string }) {
           </Button>
           <Button size="sm" variant="ghost" onClick={() => { setBrandSyncMode('auto'); void apply(); }}>
             Automático
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const linkKey = activeDoc && linkPreview && linkPreview.total > 0 ? `${activeDoc.id}:${linkPreview.kitId}:${linkPreview.total}` : null;
+  if (activeDoc && linkPreview && linkPreview.total > 0 && linkKey !== dismissedLinkKey) {
+    const linkAll = () => {
+      try {
+        const res = autoLinkDocToBrand(sessionId, activeDoc.id, linkPreview.kitId);
+        if (res.total > 0) toast(`Vinculado a ${res.kitName}: ${formatBrandLinkSummary(res)}.`, 'success');
+      } catch (e) { toast((e as Error).message, 'error'); }
+    };
+    return (
+      <div className="brand-sync-notice is-suggest" role="status" aria-live="polite">
+        <div className="brand-sync-notice-head">
+          <span className="brand-sync-notice-text">{`Coincide con «${linkPreview.kitName}»: ${formatBrandLinkSummary(linkPreview)}.`}</span>
+          <IconButton icon={X} label="Cerrar sugerencia" size="sm" onClick={() => setDismissedLinkKey(linkKey)} />
+        </div>
+        <div className="brand-sync-notice-actions">
+          <Button size="sm" variant="primary" icon={Sparkles} onClick={linkAll}>
+            Vincular todo
           </Button>
         </div>
       </div>
