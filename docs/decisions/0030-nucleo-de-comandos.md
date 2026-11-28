@@ -206,7 +206,7 @@ Envoltura mecánica, sin reescribir ninguna acción. El agente llega a todo esto
 - `invoke` no aplica los valores por defecto del esquema; `run` sí. Un esquema con `.default()` se comporta distinto en cada entrada: los comandos no deben usarlo.
 - Dos comandos asíncronos que se solapan sobre el mismo historial acaban en un solo paso de deshacer. Regla del plan: nunca dos escrituras a la vez sobre el mismo destino.
 - El adaptador del Designer (paso 2) tiene que agrupar las llamadas a `record()` de sus acciones en una sola. `history.ts` del Designer no está en [persistencia protegida](../persistencia-protegida.md); si el adaptador necesitara tocar una zona protegida, se para y se pide autorización.
-- La puerta externa no existe. `caller: 'external'` solo fija la regla de aprobación; [seguridad](../seguridad.md) sigue rechazando peticiones de fuera.
+- La puerta externa del piloto vive en el sandbox. `caller: 'external'` aplica la regla de aprobación y el [puente local](#piloto-cli-externo-en-sandbox) aplica el vínculo y la autenticación.
 - **Crear y borrar documentos queda fuera de deshacer**, como en la app: una secuencia que falla no quita el doc que creó.
 - `designer.doc.delete` es `delete`: desde el agente pide la tarjeta de aprobación.
 - En una secuencia, un paso con gasto cuyos argumentos llevan `$n` llega al aprobador sin resolver: la tarjeta no puede mostrar el coste real. Lo resuelve el paso 7.
@@ -226,3 +226,13 @@ Envoltura mecánica, sin reescribir ninguna acción. El agente llega a todo esto
 ## Paleta de comandos
 
 La paleta (Ctrl+K o Cmd+K, `src/components/shell/CommandPalette.tsx`) es la primera llamada del registro desde la interfaz. Busca en todos los apartados por título, id y alias. Sin texto muestra `Here` (lo que puede correr ahora en el espacio en pantalla) y `Recent` (en memoria, sin escribir en el navegador). Un comando con argumentos pasa a un segundo paso con un campo por argumento, sacado de `argsSchema`. Un comando `spend` o `delete` nunca corre con el primer Enter: siempre pasa al segundo paso, aunque no tenga argumentos. La paleta llama a `invoke`, no a `run`: `run` solo acepta los llamadores de la frontera, y la interfaz no pide aprobación porque el segundo paso ya es la confirmación. Valida los argumentos con el esquema antes de llamar. Deja fuera los comandos cuyos argumentos no son valores simples (listas, objetos, registros): hoy son 32 de 111, y la prueba los cuenta.
+
+## Piloto CLI externo en sandbox
+
+1. Ejecuta `npm run dev:sandbox` y abre `http://127.0.0.1:5183`. La pestaña que tiene el bloqueo de escritura ofrece **Link CLI to this tab**.
+2. Ejecuta `npm run --silent cli -- find --schema designer.doc.new` para obtener el esquema y el contexto activo.
+3. Ejecuta `npm run --silent cli -- run '{"cmd":"designer.doc.new","args":{"width":320,"height":240,"name":"CLI pilot"}}'` y aprueba en la tarjeta de la pestaña. Las lecturas, como `{"cmd":"designer.doc.read"}`, son directas.
+
+El CLI lee `.sandbox/external-cli.json` (permisos `0600`). El lanzador crea la credencial tras abrir el puerto y la retira al apagar el proceso. El puente exige el Host del sandbox y el Bearer del CLI, y rechaza orígenes externos. La pestaña se vincula por SSE con el mismo origen y responde por POST. El puente procesa una solicitud a la vez durante un máximo de 60 s y devuelve `disconnected` cuando se corta el vínculo. Cada escritura, borrado o gasto pasa por la tarjeta de aprobación. Los gastos con un máximo sin verificar quedan bloqueados en la tarjeta.
+
+Una llamada admite `on: { session?, doc?, node? }`. Cuando se omite el destino, se toma la sesión y el documento de la pestaña. En una secuencia, los pasos que requieren documento y omiten `on.doc` siguen el documento creado en un paso anterior de esa sesión.

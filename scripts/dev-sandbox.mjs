@@ -2,6 +2,7 @@ import { cp, lstat, mkdir, realpath } from 'node:fs/promises';
 import { dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer, build, preview } from 'vite';
+import { createExternalCliBridge } from '../server/external-cli.mjs';
 
 export const SANDBOX_PORT = 5183;
 export function sandboxDirectory(root, dataDir) {
@@ -73,15 +74,35 @@ async function main() {
   console.log(`Sandbox DATA_DIR=${destination}`);
   const production = process.argv.includes('--production');
   const outDir = production ? await sandboxBuildDirectory(root, process.env.SANDBOX_BUILD_DIR || 'dist') : 'dist';
-  const options = sandboxOptions(production, outDir);
+  const options = { ...sandboxOptions(production, outDir), cacheDir: '.sandbox/vite-cache' };
   if (production && !process.argv.includes('--no-build')) await build(options);
+  const bridge = createExternalCliBridge({ port: SANDBOX_PORT });
+  const mount = (server) => { server.middlewares.use(bridge.middleware); };
+  options.plugins = [{ name: 'sandbox-external-cli', enforce: 'pre', configureServer: mount, configurePreviewServer: mount }];
   const server = production ? await preview(options) : await createServer(options);
-  for (const signal of ['SIGINT', 'SIGTERM']) {
-    process.once(signal, async () => { if (production) await new Promise((done) => server.httpServer.close(done));
+  const close = async () => {
+    try { bridge.close(); }
+    finally {
+      if (production) await new Promise((done) => server.httpServer.close(done));
       else await server.close();
-      process.exit(0); });
+    }
+  };
+  let stopping = false;
+  for (const signal of ['SIGINT', 'SIGTERM']) {
+    process.once(signal, () => {
+      if (stopping) return;
+      stopping = true;
+      process.exitCode = 0;
+      void close().then(() => process.exit(), () => process.exit(1));
+    });
   }
-  if (!production) await server.listen();
+  try {
+    if (!production) await server.listen();
+    bridge.publish(root);
+  } catch (error) {
+    await close();
+    throw error;
+  }
   server.printUrls();
 }
 

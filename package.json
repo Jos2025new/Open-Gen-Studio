@@ -4,8 +4,10 @@
   "version": "0.1.0",
   "license": "Apache-2.0",
   "type": "module",
+  "bin": { "ogs": "scripts/ogs-cli.mjs" },
   "scripts": {
     "dev": "vite",
+    "cli": "node scripts/ogs-cli.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",

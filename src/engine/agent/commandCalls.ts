@@ -46,6 +46,11 @@ const AREAS: Record<string, string> = {
 };
 const NEEDS_APPROVAL = 'needs the user\'s approval';
 const DOC_CREATORS = new Set(['designer.doc.new', 'designer.doc.ensure', 'designer.doc.from_asset']);
+export function createsCommandDoc(id: string, space: unknown): boolean {
+  const docSpace = space === 'studio' || space === 'designer';
+  return DOC_CREATORS.has(id) || (id === 'library.item.create' && (space === undefined || docSpace)) ||
+    (id === 'library.item.open' && docSpace);
+}
 const ON_DOC_HINT = ' (target a new doc from an earlier step with "on": "$1.doc", or pass an id from designer.doc.list)';
 const visible = <T extends { id: string }>(items: T[]) => items.filter((item) => !AGENT_HIDDEN[item.id]);
 const areaOf = (id: string) => id.slice(0, id.indexOf('.'));
@@ -256,8 +261,7 @@ export async function runCommandsTool(sessionId: string, input: unknown, signal?
   const seq = v.data.seq.map((step, i) => {
     const spec = command(step.cmd);
     const next = !step.on?.doc && docRef && spec?.needs?.includes('doc') ? { ...step, on: { doc: docRef } } : step;
-    const space = step.args?.space, docSpace = space === 'studio' || space === 'designer';
-    if (spec && (DOC_CREATORS.has(spec.id) || (spec.id === 'library.item.create' && (space === undefined || docSpace)) || (spec.id === 'library.item.open' && docSpace))) docRef = `$${i + 1}.doc`;
+    if (spec && createsCommandDoc(spec.id, step.args?.space)) docRef = `$${i + 1}.doc`;
     return next;
   });
   for (const [i, step] of seq.entries()) {

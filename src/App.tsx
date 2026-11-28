@@ -8,6 +8,7 @@ import { settleInterruptedPlans } from './engine/agent/runtime';
 import { syncBlobsToDisk } from './lib/idb';
 import { Sidebar } from './components/shell/Sidebar';
 import { TopBar, TopbarSlotContext } from './components/shell/TopBar';
+import { ExternalCliControl } from './components/shell/ExternalCliControl';
 import { SaveGuardBanner } from './components/shell/SaveGuardBanner';
 import { SidePanel } from './components/shell/SidePanel';
 import { TextLightbox } from './components/assets/TextLightbox';
@@ -76,6 +77,7 @@ export function App() {
         <main className="main">
           <TopBar slotRef={setSlot} />
           <SaveGuardBanner />
+          {import.meta.env.VITE_OGS_SANDBOX === '1' && <ExternalCliControl />}
           <div className={`workspace ws-${omni ? 'node' : workspace} ${home ? 'is-home' : ''} ${space && !home ? 'is-space' : ''} ${omni ? 'is-omni' : ''} ${!omni && workspace === 'chat' && board.open ? 'has-studio-board' : ''}`} style={!omni && workspace === 'chat' ? ({ ['--studio-w' as string]: `${board.open ? board.width : 0}px` }) : undefined}>
             {omni ? <OmniWorkspace /> : <>
               {workspace === 'chat' ? <ChatWorkspace /> : workspace === 'node' ? <NodeWorkspace /> : <DesignerWorkspace />}

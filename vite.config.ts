@@ -83,7 +83,7 @@ export default defineConfig({
   plugins: [react(), mediaRelay(), localStore(undefined, process.env.DATA_DIR), brandExport(process.env.DATA_DIR)],
   // data/ (state with the API keys, media, backups) lives in the project folder: never serve it as a static file.
   // Vite's own defaults are kept (the list replaces them).
-  server: { port: 5173, proxy, fs: { deny: ['.env', '.env.*', '*.{crt,pem}', '**/.git/**', '**/data/**', '**/data.bak-*/**'] } },
+  server: { port: 5173, proxy, fs: { deny: ['.env', '.env.*', '*.{crt,pem}', '**/.git/**', '**/data/**', '**/data.bak-*/**', '**/external-cli.json*'] } },
   preview: { port: 4173, proxy },
   test: {
     // 20 s, not the 5 s default: on a busy machine the first test of a file pays for loading its modules and went

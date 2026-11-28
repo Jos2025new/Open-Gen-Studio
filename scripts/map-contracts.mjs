@@ -9,6 +9,8 @@ import sg from './map-contracts-saveguard.mjs';
 import keyContracts from './map-contracts-keys.mjs';
 import commandContracts from './map-contracts-commands.mjs';
 
+import externalCli from './map-external-cli.mjs';
+
 export default [
   ...videoContracts,
   ...uiContracts,
@@ -533,4 +535,5 @@ export default [
     ],
     tests: ['tests/retained-page-planner.test.ts', 'tests/fx-svg.test.ts'],
   },
+  externalCli,
 ];

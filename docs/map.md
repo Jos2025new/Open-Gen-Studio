@@ -21,14 +21,14 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
 | [types.ts](../src/engine/types.ts) | 493 | 434 |
-| [store.ts](../src/store/store.ts) | 335 | 434 |
+| [store.ts](../src/store/store.ts) | 336 | 435 |
 | [icons.tsx](../src/components/ui/icons.tsx) | 160 | 1 |
-| [primitives.tsx](../src/components/ui/primitives.tsx) | 116 | 0 |
-| [actions.ts](../src/engine/design/actions.ts) | 91 | 73 |
+| [primitives.tsx](../src/components/ui/primitives.tsx) | 117 | 0 |
+| [actions.ts](../src/engine/design/actions.ts) | 92 | 74 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 71 | 5 |
 | [id.ts](../src/lib/id.ts) | 67 | 0 |
 | [media.ts](../src/lib/media.ts) | 62 | 88 |
-| [doc.ts](../src/engine/design/doc.ts) | 58 | 98 |
+| [doc.ts](../src/engine/design/doc.ts) | 58 | 99 |
 | [catalog.ts](../src/engine/catalog.ts) | 57 | 34 |
 | [ops.ts](../src/engine/ops.ts) | 57 | 22 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 54 | 25 |
@@ -53,14 +53,14 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/gallery` | 11 | 13 |
 | `src/components/node` | 32 | 44 |
 | `src/components/omni` | 7 | 5 |
-| `src/components/shell` | 38 | 36 |
+| `src/components/shell` | 39 | 36 |
 | `src/components/space` | 10 | 9 |
 | `src/components/studio` | 8 | 7 |
 | `src/components/ui` | 26 | 29 |
-| `src/engine` | 110 | 514 |
+| `src/engine` | 111 | 515 |
 | `src/engine/agent` | 71 | 187 |
 | `src/engine/commands` | 7 | 55 |
-| `src/engine/design` | 167 | 252 |
+| `src/engine/design` | 167 | 253 |
 | `src/engine/flow` | 24 | 123 |
 | `src/engine/fx` | 8 | 11 |
 | `src/engine/guides` | 1 | 1 |
@@ -71,15 +71,16 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/planSteps` | 19 | 4 |
 | `src/engine/providers` | 15 | 99 |
 | `src/engine/skills` | 8 | 17 |
-| `src/lib` | 38 | 522 |
-| `src/store` | 19 | 436 |
+| `src/lib` | 39 | 524 |
+| `src/store` | 19 | 437 |
 
-280 de 844 módulos no tienen ningún test que los importe directamente.
+281 de 847 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
 - [App.tsx](../src/App.tsx)
 - [OmniWorkspace.tsx](../src/components/omni/OmniWorkspace.tsx)
+- [ExternalCliControl.tsx](../src/components/shell/ExternalCliControl.tsx)
 - [CreateSpace.tsx](../src/components/space/CreateSpace.tsx)
 - [ToolsSpace.tsx](../src/components/space/ToolsSpace.tsx)
 - [generation.ts](../src/engine/nodecore/generation.ts)
