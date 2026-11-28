@@ -50,7 +50,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/chat` | 23 | 28 |
 | `src/components/composer` | 16 | 19 |
 | `src/components/designer` | 123 | 64 |
-| `src/components/gallery` | 11 | 12 |
+| `src/components/gallery` | 11 | 13 |
 | `src/components/node` | 32 | 44 |
 | `src/components/omni` | 7 | 5 |
 | `src/components/shell` | 38 | 36 |

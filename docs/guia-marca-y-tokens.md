@@ -7,19 +7,19 @@ Guía pensada para **usuarios nuevos** (estilo Canva), **operadores que migran d
 ## 1. Para empezar en 3 pasos (estilo Canva)
 
 ### Paso 1 · Suelta toda tu marca de una sola vez
-1. Abre **Library → Brand kits** y crea un kit (o abre uno existente).
-2. Pulsa **Importar** en la barra superior del kit —o **arrastra y suelta** todos tus archivos juntos sobre la portada del kit.
+1. Pulsa **Brand → + New** (o abre **Library → Brand kits**) para crear o abrir un kit.
+2. Haz clic en la barra superior de arrastre (*«Drop `tokens.json`, fonts, logos, or photos — or click to import»*) o en el icono de importar —o **arrastra y suelta** todos tus archivos juntos sobre la portada del kit.
 3. Open Gen Studio clasifica cada archivo automáticamente:
-   - `*.json` (W3C Design Tokens / Penpot) → se importan y mezclan en **Tokens**.
+   - `*.json` (W3C Design Tokens / Penpot) → se importan, mezclan y guardan al instante en **Tokens** (también puedes importar `tokens.json` directamente dentro de **Colors** con **Import tokens.json**).
    - `.ttf`, `.otf`, `.woff`, `.woff2` → se cargan en **Fonts**.
    - Imágenes cuyo nombre incluya `logo`, `marca`, `isotipo`, `logotipo`, `wordmark` o `icono` → van a **Logos** (el resto a **Photos** o **References**).
 
 ### Paso 2 · Vincula cualquier diseño o SVG importado en 1 clic
-1. Pulsa **Use** en tu Brand Kit para dejarlo activo.
-2. Importa un `.svg` (o abre cualquier diseño en el Designer).
-3. Verás una sugerencia discreta en la esquina inferior derecha indicando cuántas coincidencias hay con tu marca:
-   > *«Coincide con «Tu Marca»: X colores, Y fuentes, Z radios, W anchos y N logos.»* → **[Vincular todo]**
-4. También puedes pulsar **Vincular (N)** dentro del Brand Kit o pedírselo al agente en el chat (*«vincula este diseño a mi marca»*).
+1. Deja activo tu Brand Kit con **Use** (`In use`; un kit recién creado queda activo automáticamente si no había otro).
+2. Importa un `.svg` (arrastrándolo al lienzo o desde **File → Import image / SVG**) o abre cualquier diseño en el Designer.
+3. Verás una tarjeta discreta en la esquina superior derecha del lienzo indicando cuántas coincidencias hay con tu marca:
+   > *«Matches "Tu Marca": X colors, Y fonts, Z radii, W widths and N logos.»* → **[Link all]**
+4. También puedes pulsar **Link (N)** dentro del Brand Kit o pedírselo al agente en el chat (*«vincula este diseño a mi marca»*).
 5. Todo queda en **un solo paso de deshacer (`Ctrl+Z`)**.
 
 ### Paso 3 · Cambia una vez, se actualiza todo
@@ -29,12 +29,12 @@ Guía pensada para **usuarios nuevos** (estilo Canva), **operadores que migran d
 
 ---
 
-## 2. Control y seguridad: aviso en esquina y modo «Bajo demanda»
+## 2. Control y seguridad: aviso en esquina y modo «On demand»
 
 - Por defecto, la sincronización es **automática** (`Settings → Data → Library → Auto-sync brand changes`).
-- Cada vez que un cambio del Brand Kit actualiza tus diseños, aparece un aviso no bloqueante en la esquina inferior derecha del Designer indicando **qué cambió** (mientras sigues en la sesión actual; al recargar la página el aviso se limpia), con dos botones directos:
-  - **Volver al anterior**: revierte quirúrgicamente solo los valores que dejó el sync (si ya editaste una propiedad después, se respeta tu edición) y registra un paso de historial para que incluso esa reversión se pueda deshacer con `Ctrl+Z`.
-  - **Bajo demanda**: cambia al modo manual. En modo manual los diseños no cambian solos; el aviso te muestra cuántos cambios pendientes hay con el botón **Actualizar ahora**.
+- Cada vez que un cambio del Brand Kit actualiza tus diseños, aparece un aviso no bloqueante en la esquina superior derecha del Designer indicando **qué cambió** (mientras sigues en la sesión actual; al recargar la página el aviso se limpia), con dos botones directos:
+  - **Revert**: revierte quirúrgicamente solo los valores que dejó el sync (si ya editaste una propiedad después, se respeta tu edición) y registra un paso de historial para que incluso esa reversión se pueda deshacer con `Ctrl+Z`.
+  - **On demand**: cambia al modo manual. En modo manual los diseños no cambian solos; el aviso te muestra cuántos cambios pendientes hay con el botón **Update now**.
 
 ---
 
@@ -56,7 +56,7 @@ Si trabajas también con `.svg` abiertos a mano en Inkscape:
 1. `tokens.json` en formato W3C Design Tokens (colores `#rrggbb` o `#rrggbbaa`, familias de fuente y dimensiones en `px`/`rem`).
 2. Archivos de fuentes propias (`.ttf`, `.otf`, `.woff`, `.woff2`).
 3. Variantes de logo con nombres claros que incluyan `logo` (p. ej. `logo-horizontal-oscuro.png`).
-4. Archivos `.svg` base (al importarlos en Designer se vinculan con **Vincular todo** en 1 clic).
+4. Archivos `.svg` base (al importarlos en Designer se vinculan con **Link all** en 1 clic).
 
 ---
 
