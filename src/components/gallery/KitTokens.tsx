@@ -87,7 +87,10 @@ export function KitTokens({ item, onDone, types = TOKEN_TYPES }: { item: Subject
       // Persist immediately so swatches, section tiles, and Designer auto-link update right away.
       try {
         base.current = (await store()).tokens;
-      } catch { /* keep local rows if another row is mid-edit */ }
+      } catch (saveErr) {
+        toast(`Tokens loaded, but not saved: ${(saveErr as Error).message}`, 'error');
+        return;
+      }
       toast(`${importedCount} ${importedCount === 1 ? 'token' : 'tokens'} imported${skipped.length ? `. Not supported: ${names(skipped)}` : ''}${off.length ? `. Sets not in use: ${names(off)}` : ''}.`, skipped.length || off.length ? 'info' : 'success');
     } catch (e) { toast((e as Error).message, 'error'); } finally { setBusy(false); }
   };

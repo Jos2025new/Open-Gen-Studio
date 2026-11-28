@@ -216,4 +216,31 @@ describe('Canva-simple Brand Kit: bulk drop import & 1-click auto-link', () => {
     expect(saved?.tokens?.['font.body']?.value).toBe('Inter');
     expect(saved?.tokens?.['dimension.radius']?.value).toBe('12px');
   });
+
+  it('KitTokens surfaces an error toast and never claims success when persisting imported tokens fails', async () => {
+    const emptyKit = (await createItem({ name: 'Quota Kit', kind: 'brand-kit', space: 'library', by: 'user', draft: false, open: false })).subject;
+    const { blobDb } = await import('../src/lib/idb');
+    const spy = vi.spyOn(blobDb, 'set').mockRejectedValueOnce(new Error('QuotaExceededError'));
+    try {
+      useStore.setState((st) => ({ ui: { ...st.ui, toasts: [] } }));
+      act(() => root.render(createElement(KitTokensEditor, { item: emptyKit, types: ['color'] })));
+      const input = host.querySelector('input[type="file"][aria-label="Import tokens JSON"]') as HTMLInputElement;
+      const w3cFile = new File(
+        [JSON.stringify({ color: { brand: { $type: 'color', $value: '#e85d3f' } } })],
+        'tokens.json',
+        { type: 'application/json' },
+      );
+      Object.defineProperty(input, 'files', { value: [w3cFile], configurable: true });
+      await act(async () => {
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 20));
+      });
+      const toasts = useStore.getState().ui.toasts;
+      expect(toasts.some((t) => t.level === 'error' && t.text.includes('not saved') && t.text.includes('QuotaExceededError'))).toBe(true);
+      expect(toasts.some((t) => t.level === 'success')).toBe(false);
+      expect(useStore.getState().library.find((s) => s.id === emptyKit.id)?.tokens?.['color.brand']).toBeUndefined();
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
