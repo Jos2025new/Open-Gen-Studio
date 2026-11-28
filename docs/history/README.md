@@ -79,6 +79,7 @@ Semanas y entregas en orden; evidencia del momento, no estado actual. Índice de
 - [076: dinero urgente, rediseño D+ y colocación p10 (sesión maestra 8, 2026-11-22/23)](076-2026-11-W47-master-dinero-dplus.md).
 - [077: kits de marca, tokens y fuentes en Library; guarda de Library y grupos anidados en Nodes (2026-11-24/25)](077-2026-11-W48-kits-marca.md).
 - [078: brand sync en vivo, flujo Canva-simple, endurecimiento y pulido visual (2026-11-27)](078-2026-11-W48-brand-sync-y-pulido.md).
+- [079: piloto de CLI externo en sandbox sobre ADR 0030 (2026-11-28)](079-2026-11-W48-cli-externo-sandbox.md).
 - [066: visor, historial de versiones y fusión (2026-11-16)](066-2026-11-W47-visor-historial-fusion.md).
 - [Informe: píxeles y suite del export](informe-gpt-export-pixeles-y-suite.md).
 
