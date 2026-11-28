@@ -1,9 +1,9 @@
 .brand-sync-notice {
   position: absolute;
+  top: 3.75rem;
   right: calc(var(--layers-w, 0px) + 1rem);
-  bottom: 4.75rem;
   z-index: 32;
-  max-width: min(22rem, calc(100% - var(--layers-w, 0px) - 2rem));
+  max-width: min(20rem, calc(100% - var(--layers-w, 0px) - 2rem));
   display: flex;
   flex-direction: column;
   gap: 0.5rem;

@@ -85,7 +85,7 @@ interface RevertPayload {
 function formatSummary(changedNames: string[]): string {
   const unique = [...new Set(changedNames)];
   if (!unique.length) return '';
-  return `Diseño actualizado (${unique.slice(0, 3).join(', ')}${unique.length > 3 ? ` +${unique.length - 3}` : ''})`;
+  return `Design updated (${unique.slice(0, 3).join(', ')}${unique.length > 3 ? ` +${unique.length - 3}` : ''})`;
 }
 
 let currentNotice: BrandSyncNoticeState | null = null;
@@ -337,7 +337,7 @@ export async function syncBrandInSession(
         } as Partial<RasterLayer>);
         const afterLayer = doc.layers.find((x) => x.id === curLayer.id);
         if (afterLayer) recordLayerPatch(docPatch, curLayer, afterLayer);
-        touched = true; logosUpdated++; changedNames.push(`logo «${u.title}»`);
+        touched = true; logosUpdated++; changedNames.push(`logo "${u.title}"`);
       }
 
       for (const c of preparedComps) {
@@ -377,7 +377,7 @@ export async function syncBrandInSession(
           writtenBlobKeys: [...c.written],
         });
         replacedBufIds.push(...rasterBufferIds(curMembers));
-        touched = true; componentsUpdated++; changedNames.push(`componente «${c.srcGroup!.name}»`);
+        touched = true; componentsUpdated++; changedNames.push(`component "${c.srcGroup!.name}"`);
       }
 
       if (touched) docTouched = true;
@@ -438,7 +438,7 @@ export function installBrandSync(): () => void {
     if (!patches.size) return;
     const changedNames = tokens.map((t) => `token ${t}`);
     const label = tokens.slice(0, 3).join(', ') + (tokens.length > 3 ? ` +${tokens.length - 3}` : '');
-    const summary = `Diseño actualizado con ${tokens.length === 1 ? `el token «${label}»` : `los tokens ${label}`}`;
+    const summary = `Design updated with ${tokens.length === 1 ? `token "${label}"` : `tokens ${label}`}`;
     postNotice(sessionId, summary, { sessionId, changedNames, patches, buffers: new Map(), libraryRef: library }, library);
   });
 

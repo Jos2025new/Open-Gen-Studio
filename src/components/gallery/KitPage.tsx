@@ -89,7 +89,7 @@ export function KitPage({ item, chrome, menu, cover, onBack, onOpen, onDesign }:
           {!section && linkCount > 0 ? <Button size="sm" variant="secondary" disabled={busy} data-tip="Link matching colors, fonts, radii, widths, and logos in one click" onClick={linkDoc}>{`Link (${linkCount})`}</Button> : null}
           {!section ? <>
             <input ref={bulkFile} type="file" aria-label="Import brand files" accept={BRAND_IMPORT_ACCEPT} multiple hidden onChange={(e) => { importAll(e.target.files); e.target.value = ''; }} />
-            <Button size="sm" icon={Upload} variant="ghost" disabled={busy} data-tip="Import tokens.json, fonts, logos, and images at once" onClick={() => bulkFile.current?.click()}>Import</Button>
+            <IconButton icon={Upload} label="Import brand files" size="sm" disabled={busy} onClick={() => bulkFile.current?.click()} />
           </> : null}
           {menu}
         </div>

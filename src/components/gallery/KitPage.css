@@ -4,6 +4,7 @@
 .kit-crumb:hover { color: var(--text); }
 .gallery-scroll.is-busy { opacity: 0.7; }
 .kit-sections { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 0.875rem 0.75rem; padding: 0.75rem; }
+.side-panel.is-expanded { z-index: 40; }
 .side-panel.is-expanded .kit-sections { grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); }
 .kit-section { display: flex; flex-direction: column; gap: 0.75rem; min-height: 100%; padding: 0.75rem; box-sizing: border-box; }
 .kit-section > .kit-sections { padding: 0; }
